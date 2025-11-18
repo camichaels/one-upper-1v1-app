@@ -60,6 +60,12 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         },
         (payload) => {
           setCurrentShow(payload.new);
+          // Reload previous shows when show completes to update stats
+          if (payload.new.status === 'complete') {
+            setTimeout(() => {
+              loadPreviousShows();
+            }, 500);
+          }
         }
       )
       .subscribe();
@@ -646,12 +652,27 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           {/* Stats - Always Visible */}
           <div className="mb-4 pb-4 border-b border-slate-600">
             <div className="text-sm text-slate-300">
-              <div className="mb-1">
-                😊 You: {previousShows.filter(s => s.winner_id === activeProfileId).length} wins{micHolder?.id === activeProfileId && ' (🎤 holder)'}
-              </div>
-              <div>
-                👤 {opponentProfile.name}: {previousShows.filter(s => s.winner_id === opponentProfile.id).length} wins{micHolder?.id === opponentProfile.id && ' (🎤 holder)'}
-              </div>
+              {(() => {
+                // Calculate current mic holder from most recent completed show
+                const completedShows = previousShows.filter(s => s.status === 'complete');
+                const currentMicHolderId = completedShows.length > 0 
+                  ? completedShows[0].winner_id // Most recent show winner
+                  : null;
+                
+                const myWins = previousShows.filter(s => s.winner_id === activeProfileId).length;
+                const opponentWins = previousShows.filter(s => s.winner_id === opponentProfile.id).length;
+                
+                return (
+                  <>
+                    <div className="mb-1">
+                      😊 You: {myWins} win{myWins !== 1 ? 's' : ''}{currentMicHolderId === activeProfileId && ' (🎤 holder)'}
+                    </div>
+                    <div>
+                      👤 {opponentProfile.name}: {opponentWins} win{opponentWins !== 1 ? 's' : ''}{currentMicHolderId === opponentProfile.id && ' (🎤 holder)'}
+                    </div>
+                  </>
+                );
+              })()}
             </div>
           </div>
 
