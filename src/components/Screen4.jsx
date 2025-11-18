@@ -610,14 +610,27 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               {/* Stats */}
               <div className="border-t-2 border-slate-600 pt-3 mb-4">
                 <div className="text-sm text-slate-300">
-                  {micHolder && (
-                    <div className="mb-1">
-                      🎤 {micHolder.name}: {previousShows.filter(s => s.winner_id === rivalry.mic_holder_id).length} wins (🎤 holder)
-                    </div>
-                  )}
-                  <div>
-                    😊 You: {previousShows.filter(s => s.winner_id === activeProfileId).length} wins
-                  </div>
+                  {(() => {
+                    // Calculate current mic holder from most recent completed show (including this one)
+                    const completedShows = previousShows.filter(s => s.status === 'complete');
+                    const currentMicHolderId = completedShows.length > 0 
+                      ? completedShows[0].winner_id // Most recent show winner
+                      : null;
+                    
+                    const myWins = previousShows.filter(s => s.winner_id === activeProfileId).length;
+                    const opponentWins = previousShows.filter(s => s.winner_id === opponentProfile.id).length;
+                    
+                    return (
+                      <>
+                        <div className="mb-1">
+                          😊 You: {myWins} win{myWins !== 1 ? 's' : ''}{currentMicHolderId === activeProfileId && ' (🎤 holder)'}
+                        </div>
+                        <div>
+                          👤 {opponentProfile.name}: {opponentWins} win{opponentWins !== 1 ? 's' : ''}{currentMicHolderId === opponentProfile.id && ' (🎤 holder)'}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
