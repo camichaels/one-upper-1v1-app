@@ -1,0 +1,761 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { getRandomPrompt, selectJudges } from '../utils/prompts';
+
+export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
+  const [loading, setLoading] = useState(true);
+  const [rivalry, setRivalry] = useState(null);
+  const [currentShow, setCurrentShow] = useState(null);
+  const [myAnswer, setMyAnswer] = useState('');
+  const [wordCount, setWordCount] = useState(0);
+  const [showJudgeBanter, setShowJudgeBanter] = useState(false);
+  const [previousShows, setPreviousShows] = useState([]);
+  const [showMenu, setShowMenu] = useState(false);
+  const [countdown, setCountdown] = useState(null);
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const [judgeProfiles, setJudgeProfiles] = useState([]);
+  const [selectedJudge, setSelectedJudge] = useState(null);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Load rivalry and current show
+  useEffect(() => {
+    loadRivalryAndShow();
+  }, [activeProfileId, rivalryId]);
+
+  // Real-time subscription for rivalry deletion
+  useEffect(() => {
+    if (!rivalryId) return;
+
+    const channel = supabase
+      .channel(`rivalry-deletion-${rivalryId}`)
+      .on('postgres_changes', {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'rivalries',
+        filter: `id=eq.${rivalryId}`
+      }, (payload) => {
+        alert('😢 Rivalry Ended\n\nYour opponent cancelled the Rivalry.\n\nYour Show history has been saved.');
+        onNavigate('screen1');
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [rivalryId]);
+
+  // Real-time subscription for show updates
+  useEffect(() => {
+    if (!currentShow) return;
+
+    const channel = supabase
+      .channel(`show-${currentShow.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'shows',
+          filter: `id=eq.${currentShow.id}`
+        },
+        (payload) => {
+          setCurrentShow(payload.new);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentShow?.id]);
+
+  // Auto-advance countdown after verdict (10 seconds)
+  useEffect(() => {
+    if (currentShow?.status === 'complete' && autoAdvance) {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev === null) return 10;
+          if (prev <= 1) {
+            createNextShow();
+            return null;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    } else {
+      setCountdown(null);
+    }
+  }, [currentShow?.status, autoAdvance]);
+
+  // Fetch judge profiles when show loads
+  useEffect(() => {
+    if (!currentShow?.judges) return;
+
+    async function fetchJudgeProfiles() {
+      const { data, error } = await supabase
+        .from('judges')
+        .select('*')
+        .in('key', currentShow.judges);
+
+      if (!error && data) {
+        setJudgeProfiles(data);
+      }
+    }
+
+    fetchJudgeProfiles();
+  }, [currentShow?.judges]);
+
+  async function loadRivalryAndShow() {
+    setLoading(true);
+
+    // Load rivalry with both profiles
+    const { data: rivalryData, error: rivalryError } = await supabase
+      .from('rivalries')
+      .select(`
+        *,
+        profile_a:profiles!rivalries_profile_a_id_fkey(*),
+        profile_b:profiles!rivalries_profile_b_id_fkey(*)
+      `)
+      .eq('id', rivalryId);
+
+    if (rivalryError) {
+      console.error('Error loading rivalry:', rivalryError);
+      setLoading(false);
+      return;
+    }
+
+    setRivalry(rivalryData[0]);
+
+    // Load current show (highest show_number with status != 'complete')
+    const { data: currentShowData, error: showError } = await supabase
+      .from('shows')
+      .select('*')
+      .eq('rivalry_id', rivalryId)
+      .neq('status', 'complete')
+      .order('show_number', { ascending: false })
+      .limit(1);
+
+    if (showError) {
+      console.error('Error loading current show:', showError);
+    } else if (currentShowData && currentShowData.length > 0) {
+      setCurrentShow(currentShowData[0]);
+    }
+
+    // Load previous shows
+    loadPreviousShows();
+
+    setLoading(false);
+  }
+
+  async function loadPreviousShows() {
+    const { data, error } = await supabase
+      .from('shows')
+      .select('*')
+      .eq('rivalry_id', rivalryId)
+      .eq('status', 'complete')
+      .order('show_number', { ascending: false })
+      .limit(10);
+
+    if (!error && data) {
+      setPreviousShows(data);
+    }
+  }
+
+  function handleAnswerChange(e) {
+    const text = e.target.value;
+    setMyAnswer(text);
+    const words = text.trim().split(/\s+/).filter(w => w.length > 0);
+    setWordCount(words.length);
+  }
+
+  async function submitAnswer() {
+    if (!myAnswer.trim() || wordCount > 30) return;
+
+    const isProfileA = activeProfileId === currentShow.profile_a_id;
+    const updateData = isProfileA
+      ? {
+          profile_a_answer: myAnswer.trim(),
+          profile_a_submitted_at: new Date().toISOString()
+        }
+      : {
+          profile_b_answer: myAnswer.trim(),
+          profile_b_submitted_at: new Date().toISOString()
+        };
+
+    // Check if both players will have submitted
+    const bothSubmitted = isProfileA
+      ? currentShow.profile_b_answer
+      : currentShow.profile_a_answer;
+
+    if (bothSubmitted) {
+      updateData.status = 'judging';
+    }
+
+    const { error } = await supabase
+      .from('shows')
+      .update(updateData)
+      .eq('id', currentShow.id);
+
+    if (error) {
+      console.error('Error submitting answer:', error);
+      return;
+    }
+
+    // If both submitted, trigger judging
+    if (bothSubmitted) {
+      await triggerJudging();
+    }
+
+    setMyAnswer('');
+    setWordCount(0);
+  }
+
+  async function triggerJudging() {
+    try {
+      // Call Supabase Edge Function to judge the show with AI
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/judge-show`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify({
+            showId: currentShow.id
+          })
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error judging show:', errorData);
+        alert('Failed to judge the show. Please try again.');
+        return;
+      }
+
+      const result = await response.json();
+      console.log('Judging complete:', result);
+      
+      // Reset judge banter visibility
+      setShowJudgeBanter(false);
+
+      // Small delay to ensure database is fully updated before reloading
+      setTimeout(() => {
+        loadPreviousShows();
+      }, 500);
+      
+    } catch (error) {
+      console.error('Error in triggerJudging:', error);
+      alert('An error occurred while judging. Please try again.');
+    }
+  }
+
+  async function createNextShow() {
+    try {
+      setAutoAdvance(true); // Reset auto-advance for next show
+      const nextShowNumber = currentShow.show_number + 1;
+
+      // Check if show already exists (avoid race condition)
+      const { data: existingShow } = await supabase
+        .from('shows')
+        .select('*')
+        .eq('rivalry_id', rivalryId)
+        .eq('show_number', nextShowNumber)
+        .single();
+
+      if (existingShow) {
+        setCurrentShow(existingShow);
+        return;
+      }
+
+      // Get a random prompt and judges from database
+      const prompt = await getRandomPrompt();
+      const judgeObjects = await selectJudges();
+      const judgeKeys = judgeObjects.map(j => j.key);
+
+      // Create next show
+      const { data: newShow, error } = await supabase
+        .from('shows')
+        .insert({
+          rivalry_id: rivalryId,
+          show_number: nextShowNumber,
+          prompt_id: prompt.id,
+          prompt: prompt.text,
+          judges: judgeKeys,
+          profile_a_id: rivalry.profile_a_id,
+          profile_b_id: rivalry.profile_b_id,
+          status: 'waiting'
+        })
+        .select()
+        .single();
+
+      if (error) {
+        // If insert fails (409 conflict), fetch the show that was created
+        if (error.code === '23505') {
+          const { data: fetchedShow } = await supabase
+            .from('shows')
+            .select('*')
+            .eq('rivalry_id', rivalryId)
+            .eq('show_number', nextShowNumber)
+            .single();
+          
+          if (fetchedShow) {
+            setCurrentShow(fetchedShow);
+          }
+        } else {
+          console.error('Error creating next show:', error);
+        }
+      } else {
+        setCurrentShow(newShow);
+      }
+    } catch (err) {
+      console.error('Error in createNextShow:', err);
+    }
+  }
+
+  async function sendNudge() {
+    // TODO: Send SMS nudge
+    alert('Nudge sent! (SMS not implemented yet)');
+  }
+
+  async function handleCancelRivalry() {
+    try {
+      const { error } = await supabase
+        .from('rivalries')
+        .delete()
+        .eq('id', rivalryId);
+
+      if (error) throw error;
+
+      setShowCancelModal(false);
+      onNavigate('screen1');
+    } catch (err) {
+      console.error('Error canceling rivalry:', err);
+      alert('Failed to cancel Rivalry. Please try again.');
+    }
+  }
+
+  function handleShowJudgeProfile(judgeKey) {
+    const judge = judgeProfiles.find(j => j.key === judgeKey);
+    if (judge) {
+      setSelectedJudge(judge);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <div className="text-slate-400">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!rivalry || !currentShow) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-slate-400 mb-4">No active show found</div>
+          <button
+            onClick={() => onNavigate('screen1')}
+            className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const myProfile = activeProfileId === rivalry.profile_a_id ? rivalry.profile_a : rivalry.profile_b;
+  const opponentProfile = activeProfileId === rivalry.profile_a_id ? rivalry.profile_b : rivalry.profile_a;
+  
+  const myAnswer_db = activeProfileId === currentShow.profile_a_id ? currentShow.profile_a_answer : currentShow.profile_b_answer;
+  const opponentAnswer_db = activeProfileId === currentShow.profile_a_id ? currentShow.profile_b_answer : currentShow.profile_a_answer;
+
+  const micHolder = rivalry.mic_holder_id === rivalry.profile_a_id ? rivalry.profile_a : rivalry.profile_b;
+
+  // Determine state
+  let state = 'yourTurn';
+  if (currentShow.status === 'judging') {
+    state = 'judging';
+  } else if (currentShow.status === 'complete') {
+    state = 'verdict';
+  } else if (myAnswer_db) {
+    state = 'waiting';
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+      <div className="max-w-md mx-auto">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <div className="text-xl font-bold text-orange-500">🎤 ONE-UPPER</div>
+            <div className="text-sm text-slate-400">
+              {myProfile.avatar} {myProfile.name} vs {opponentProfile.avatar} {opponentProfile.name}
+            </div>
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu(!showMenu)}
+              className="text-slate-400 hover:text-slate-200 text-2xl transition-colors"
+            >
+              ⋮
+            </button>
+            {showMenu && (
+              <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onNavigate('screen2');
+                  }}
+                  className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                >
+                  Switch Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    onNavigate('screen2', { editProfileId: activeProfileId });
+                  }}
+                  className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                >
+                  Edit Profile
+                </button>
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setShowCancelModal(true);
+                  }}
+                  className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                >
+                  Cancel Rivalry
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Show Info */}
+        <div className="mb-6">
+          <div className="text-sm text-slate-400 mb-2">SHOW #{currentShow.show_number}</div>
+          <div className="text-lg font-bold text-slate-100 mb-3">{currentShow.prompt}</div>
+          <div className="text-sm text-slate-400 mb-1">JUDGES:</div>
+          <div className="flex flex-wrap gap-2">
+            {currentShow.judges.map((judgeKey, i) => {
+              const judge = judgeProfiles.find(j => j.key === judgeKey);
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleShowJudgeProfile(judgeKey)}
+                  className="px-3 py-1.5 bg-slate-700/50 border border-slate-600 rounded-full text-slate-200 hover:bg-slate-600 hover:border-orange-500/50 transition-all text-sm"
+                >
+                  {judge?.emoji || '❓'} {judge?.name || judgeKey}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="mb-6">
+          {/* State A: Your Turn */}
+          {state === 'yourTurn' && (
+            <div>
+              <textarea
+                value={myAnswer}
+                onChange={handleAnswerChange}
+                placeholder="[Type here...]"
+                className="w-full h-32 p-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 resize-none mb-2 focus:outline-none focus:border-orange-500 transition-colors"
+                maxLength={300}
+              />
+              <div className="text-sm text-right mb-4">
+                <span className={wordCount > 30 ? 'text-red-400' : 'text-slate-400'}>
+                  {wordCount}/30 words
+                </span>
+              </div>
+              <button
+                onClick={submitAnswer}
+                disabled={!myAnswer.trim() || wordCount > 30}
+                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400"
+              >
+                SUBMIT
+              </button>
+            </div>
+          )}
+
+          {/* State B: Waiting */}
+          {state === 'waiting' && (
+            <div>
+              <div className="text-green-400 mb-4">✓ You submitted</div>
+              <div className="text-slate-400 mb-6">⏳ Waiting for {opponentProfile.name}...</div>
+              <button
+                onClick={sendNudge}
+                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
+              >
+                NUDGE {opponentProfile.name.toUpperCase()}
+              </button>
+            </div>
+          )}
+
+          {/* Judging State */}
+          {state === 'judging' && (
+            <div className="text-center py-8">
+              <div className="text-xl mb-4 text-slate-200">⏳ JUDGES DELIBERATING...</div>
+              <div className="flex justify-center gap-2 text-3xl">
+                {judgeProfiles.map((judge, i) => (
+                  <span key={i} className="animate-pulse">
+                    {judge.emoji}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* State C: Verdict */}
+          {state === 'verdict' && (
+            <div>
+              <div className="text-center mb-4">
+                <div className="text-2xl mb-2 text-slate-100">
+                  {currentShow.winner_id === activeProfileId ? '🎤 YOU ONE-UPPED ' : '🎤 '}
+                  {currentShow.winner_id === activeProfileId 
+                    ? opponentProfile.name.toUpperCase()
+                    : `${opponentProfile.name.toUpperCase()} ONE-UPPED YOU`
+                  }
+                </div>
+              </div>
+
+              {/* Show both answers */}
+              <div className="mb-4 space-y-3">
+                <div className={`p-3 border-2 rounded-lg ${currentShow.winner_id === activeProfileId ? 'border-orange-500 bg-orange-500/10' : 'border-slate-600 bg-slate-700/30'}`}>
+                  <div className="font-bold mb-1 text-slate-200">
+                    {myProfile.avatar} {myProfile.name.toUpperCase()} {currentShow.winner_id === activeProfileId && '🎤'}
+                  </div>
+                  <div className="text-sm text-slate-300">{activeProfileId === currentShow.profile_a_id ? currentShow.profile_a_answer : currentShow.profile_b_answer}</div>
+                </div>
+                <div className={`p-3 border-2 rounded-lg ${currentShow.winner_id === opponentProfile.id ? 'border-orange-500 bg-orange-500/10' : 'border-slate-600 bg-slate-700/30'}`}>
+                  <div className="font-bold mb-1 text-slate-200">
+                    {opponentProfile.avatar} {opponentProfile.name.toUpperCase()} {currentShow.winner_id === opponentProfile.id && '🎤'}
+                  </div>
+                  <div className="text-sm text-slate-300">{activeProfileId === currentShow.profile_a_id ? currentShow.profile_b_answer : currentShow.profile_a_answer}</div>
+                </div>
+              </div>
+
+              {/* Judge scores */}
+              {currentShow.judge_data?.scores && (
+                <div className="mb-4 space-y-2">
+                  <div className="border-t-2 border-slate-600 pt-3">
+                    {Object.entries(currentShow.judge_data.scores).map(([judgeKey, data]) => {
+                      const judge = judgeProfiles.find(j => j.key === judgeKey);
+                      
+                      // Determine which player is which based on activeProfileId
+                      const myScore = activeProfileId === currentShow.profile_a_id 
+                        ? data.profile_a_score 
+                        : data.profile_b_score;
+                      const opponentScore = activeProfileId === currentShow.profile_a_id 
+                        ? data.profile_b_score 
+                        : data.profile_a_score;
+                      
+                      return (
+                        <div key={judgeKey} className="mb-2">
+                          <div className="text-sm text-slate-300">
+                            <span className="font-bold">
+                              {judge?.emoji || '❓'} {judge?.name || judgeKey}:
+                            </span>{' '}
+                            {myProfile.name} {myScore}, {opponentProfile.name} {opponentScore} — "{data.comment}"
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Judge banter toggle */}
+              {currentShow.judge_data?.banter && (
+                <button
+                  onClick={() => setShowJudgeBanter(!showJudgeBanter)}
+                  className="w-full px-4 py-2 bg-slate-700/50 border border-slate-600 rounded-lg hover:bg-slate-600 text-slate-200 transition-colors mb-4"
+                >
+                  {showJudgeBanter ? '↑ Hide judge banter' : '↓ See judge banter'}
+                </button>
+              )}
+
+              {showJudgeBanter && currentShow.judge_data?.banter && (
+                <div className="mb-4 p-4 bg-slate-700/50 border border-slate-600 rounded-lg">
+                  <div className="font-bold mb-2 text-slate-200">— JUDGE BANTER —</div>
+                  {currentShow.judge_data.banter.map((line, i) => {
+                    // Look up judge name from key
+                    const judge = judgeProfiles.find(j => j.key === line.judge);
+                    const displayName = judge?.name || line.judge;
+                    
+                    return (
+                      <div key={i} className="text-sm mb-1 text-slate-300">
+                        <span className="font-bold text-slate-200">{displayName}:</span> "{line.text}"
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Stats */}
+              <div className="border-t-2 border-slate-600 pt-3 mb-4">
+                <div className="text-sm text-slate-300">
+                  {micHolder && (
+                    <div className="mb-1">
+                      🎤 {micHolder.name}: {previousShows.filter(s => s.winner_id === rivalry.mic_holder_id).length} wins (🎤 holder)
+                    </div>
+                  )}
+                  <div>
+                    😊 You: {previousShows.filter(s => s.winner_id === activeProfileId).length} wins
+                  </div>
+                </div>
+              </div>
+
+              {/* Next show countdown */}
+              <div className="text-center mb-4">
+                {autoAdvance && countdown !== null ? (
+                  <div className="text-sm text-slate-400 mb-2">
+                    Next Show in {countdown}...
+                  </div>
+                ) : null}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (autoAdvance) {
+                    setAutoAdvance(false);
+                    setCountdown(null);
+                  } else {
+                    createNextShow();
+                  }
+                }}
+                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
+              >
+                {autoAdvance ? 'STAY HERE' : 'NEXT SHOW →'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Previous Shows */}
+        <div className="border-t-2 border-slate-600 pt-4">
+          {/* Stats - Always Visible */}
+          <div className="mb-4 pb-4 border-b border-slate-600">
+            <div className="text-sm text-slate-300">
+              <div className="mb-1">
+                😊 You: {previousShows.filter(s => s.winner_id === activeProfileId).length} wins{micHolder?.id === activeProfileId && ' (🎤 holder)'}
+              </div>
+              <div>
+                👤 {opponentProfile.name}: {previousShows.filter(s => s.winner_id === opponentProfile.id).length} wins{micHolder?.id === opponentProfile.id && ' (🎤 holder)'}
+              </div>
+            </div>
+          </div>
+
+          <div className="text-orange-500 font-bold mb-3">— PREVIOUS SHOWS —</div>
+          {previousShows.length === 0 ? (
+            <div className="text-sm text-slate-400">No previous shows yet.</div>
+          ) : (
+            <div className="space-y-2">
+              {previousShows.map((show) => {
+                const winner = show.winner_id === rivalry.profile_a_id ? rivalry.profile_a : rivalry.profile_b;
+                return (
+                  <div key={show.id} className="text-sm text-slate-300">
+                    Show #{show.show_number}: "{show.prompt.substring(0, 30)}..."
+                    <br />
+                    {winner.name} won 🎤
+                    <br />
+                    <button
+                      onClick={() => onNavigate('screen6', { showId: show.id })}
+                      className="text-blue-400 hover:underline"
+                    >
+                      [Tap to view]
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Judge Profile Modal */}
+      {selectedJudge && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 border-2 border-slate-600 rounded-lg p-6 max-w-md w-full">
+            <div className="text-center mb-4">
+              <div className="text-6xl mb-2">{selectedJudge.emoji}</div>
+              <h2 className="text-2xl font-bold text-orange-500">{selectedJudge.name}</h2>
+            </div>
+            
+            <div className="mb-4">
+              <h3 className="text-sm font-bold text-slate-400 mb-1">JUDGING STYLE:</h3>
+              <p className="text-slate-200">{selectedJudge.description}</p>
+            </div>
+            
+            {selectedJudge.examples && (
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-slate-400 mb-2">CLASSIC ONE-LINERS:</h3>
+                <div className="space-y-1">
+                  {selectedJudge.examples.split('|').map((example, i) => {
+                    // Parse by commas within quotes to separate one-liners
+                    const cleanExample = example.trim();
+                    // Split by ", " pattern to get individual quotes
+                    const oneLiners = cleanExample.split(/",\s*"/).map(line => 
+                      line.replace(/^["']|["']$/g, '').trim()
+                    );
+                    
+                    return oneLiners.map((oneLiner, j) => (
+                      <div key={`${i}-${j}`} className="text-sm text-slate-300 italic">
+                        "{oneLiner}"
+                      </div>
+                    ));
+                  })}
+                </div>
+              </div>
+            )}
+            
+            <button
+              onClick={() => setSelectedJudge(null)}
+              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Rivalry Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-slate-100 mb-2">
+              Cancel Rivalry?
+            </h3>
+            <p className="text-slate-300 text-sm mb-4">
+              This will end your Rivalry <span className="text-orange-500">with</span> {opponentProfile.name}. Your Show history will be saved, but your opponent will be notified.
+            </p>
+            <p className="text-slate-400 text-sm mb-6">This cannot be undone.</p>
+            <div className="space-y-2">
+              <button
+                onClick={handleCancelRivalry}
+                className="w-full py-3 bg-red-600 text-white font-medium rounded hover:bg-red-500"
+              >
+                Cancel Rivalry
+              </button>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+              >
+                Keep Playing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
