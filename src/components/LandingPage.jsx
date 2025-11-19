@@ -8,7 +8,7 @@ export default function LandingPage() {
         {/* HERO SECTION */}
         <div className="text-center mb-8">
           {/* Logo - Text based for now */}
-          <h1 className="text-5xl font-bold text-orange-500 mb-2">ONE-UPPER</h1>
+          <img src="/logo.png" alt="One-Upper" className="w-64 mx-auto mb-6" />
           <p className="text-xl text-slate-200 font-medium mb-4">Part brain boost, all buddy boast.</p>
           
           {/* Hero Subhead */}
@@ -188,7 +188,7 @@ export default function LandingPage() {
         <div className="border-t-2 border-slate-600 pt-8 text-center">
           <p className="text-slate-300 text-sm mb-2">
             Have feedback or ideas?<br />
-            <span className="text-orange-500">camichaels@earthlink.net</span> - I promise I won't judge 😉
+            <a href="mailto:camichaels@earthlink.net" className="text-orange-500 hover:text-orange-400">camichaels@earthlink.net</a> - I promise I won't judge 😉
           </p>
           <p className="text-slate-400 text-xs">Beta Version - More features coming soon</p>
         </div>

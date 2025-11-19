@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
+import Header from './Header';
 
 export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [loading, setLoading] = useState(true);
@@ -354,6 +355,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <Header />  {/* ← ADD THIS LINE */}
         <div className="text-slate-400">Loading...</div>
       </div>
     );
@@ -362,6 +364,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   if (!rivalry || !currentShow) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <Header />  {/* ← ADD THIS LINE */}
         <div className="text-center">
           <div className="text-slate-400 mb-4">No active show found</div>
           <button
@@ -395,11 +398,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+      <Header />  {/* ← ADD THIS LINE */}
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <div className="text-xl font-bold text-orange-500">🎤 ONE-UPPER</div>
             <div className="text-sm text-slate-400">
               {myProfile.avatar} {myProfile.name} vs {opponentProfile.avatar} {opponentProfile.name}
             </div>

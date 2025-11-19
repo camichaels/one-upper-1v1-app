@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { generateCode, isValidCodeFormat, formatCodeInput } from '../utils/codeGenerator';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
+import Header from './Header';
 
 // Avatar options
 const AVATARS = ['😎', '🤓', '😈', '🤡', '🎃', '🦄', '🐉', '🤖'];
@@ -509,6 +510,7 @@ useEffect(() => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <Header />
         <div className="text-slate-400">Loading...</div>
       </div>
     );
@@ -518,9 +520,9 @@ useEffect(() => {
   if (currentState === 'A') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+        <Header />
         <div className="max-w-md mx-auto">
-          <div className="text-xl font-bold text-orange-500 mb-2">🎤 ONE-UPPER</div>
-          <div className="text-sm text-slate-400 mb-10">Brain Boost + Buddy Boast</div>
+          
 
           {!showForm ? (
             <>
@@ -649,6 +651,7 @@ useEffect(() => {
   if (currentState === 'B') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+        <Header />
         <div className="max-w-md mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
@@ -765,6 +768,7 @@ if (currentState === 'C') {
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+        <Header />  {/* ← ADD THIS LINE */}
         <div className="max-w-md mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>

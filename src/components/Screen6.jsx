@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import Header from './Header';
 
 export default function Screen6({ onNavigate, showId }) {
   const [loading, setLoading] = useState(true);
@@ -79,6 +80,7 @@ export default function Screen6({ onNavigate, showId }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <Header />  {/* ← ADD THIS LINE */}
         <div className="text-slate-400">Loading...</div>
       </div>
     );
@@ -87,6 +89,7 @@ export default function Screen6({ onNavigate, showId }) {
   if (!show || !rivalry) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <Header />  {/* ← ADD THIS LINE */}
         <div className="text-center">
           <div className="text-slate-400 mb-4">Show not found</div>
           <button
@@ -107,6 +110,7 @@ export default function Screen6({ onNavigate, showId }) {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+      <Header />  {/* ← ADD THIS LINE */}
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -116,7 +120,6 @@ export default function Screen6({ onNavigate, showId }) {
           >
             ← Back to Game
           </button>
-          <div className="text-xl font-bold text-orange-500">🎤 ONE-UPPER</div>
           <div className="text-sm text-slate-400">
             {profileA.avatar} {profileA.name} vs {profileB.avatar} {profileB.name}
           </div>
