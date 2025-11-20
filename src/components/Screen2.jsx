@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { generateCode } from '../utils/codeGenerator';
 import { supabase } from '../lib/supabase';
+import { normalizePhone, validatePhone } from '../utils/phoneUtils';
+import Header from './Header';
 
 const AVATARS = ['😎', '🤓', '😈', '🤡', '🎃', '🦄', '🐉', '🤖'];
 
@@ -134,12 +136,23 @@ return {
         return;
       }
 
+      // Validate phone
+      const phoneValidation = validatePhone(editFormData.phone);
+      if (!phoneValidation.valid) {
+        setEditError(phoneValidation.error);
+        setIsSaving(false);
+        return;
+      }
+
+      // Normalize phone number
+      const normalizedPhone = normalizePhone(editFormData.phone);
+
       const { error } = await supabase
         .from('profiles')
         .update({
           name: editFormData.name.trim(),
           avatar: editFormData.avatar,
-          phone: editFormData.phone.trim() || null,
+          phone: normalizedPhone,
           bio: editFormData.bio.trim() || null
         })
         .eq('id', profileId);
@@ -201,6 +214,17 @@ return {
         return;
       }
 
+      // Validate phone
+      const phoneValidation = validatePhone(createFormData.phone);
+      if (!phoneValidation.valid) {
+        setCreateError(phoneValidation.error);
+        setIsCreating(false);
+        return;
+      }
+
+      // Normalize phone number
+      const normalizedPhone = normalizePhone(createFormData.phone);
+
       const code = generateCode();
 
       const { data: newProfile, error } = await supabase
@@ -209,7 +233,7 @@ return {
           code: code,
           name: createFormData.name.trim(),
           avatar: createFormData.avatar,
-          phone: createFormData.phone.trim() || null,
+          phone: normalizedPhone,
           bio: createFormData.bio.trim() || null
         })
         .select()
@@ -247,6 +271,7 @@ return {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <Header />  {/* ← ADD THIS LINE */}
         <div className="text-slate-400">Loading profiles...</div>
       </div>
     );
@@ -254,6 +279,7 @@ return {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+      <Header />  {/* ← ADD THIS LINE */}
       <div className="max-w-md mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -316,9 +342,11 @@ return {
                       type="tel"
                       value={editFormData.phone}
                       onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
-                      placeholder="+1-415-555-1234"
+                      placeholder="415-555-1234"
                       className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded text-slate-100 focus:outline-none focus:border-orange-500"
+                      required
                     />
+                    <p className="text-xs text-slate-500 mt-1">US phone number (10 digits)</p>
                   </div>
 
                   <div>
@@ -354,6 +382,13 @@ return {
                       Cancel
                     </button>
                   </div>
+                  
+                  <button
+                    onClick={() => setDeletingProfileId(profile.id)}
+                    className="w-full py-2 bg-red-600/20 text-red-400 font-medium rounded border border-red-600/50 hover:bg-red-600/30"
+                  >
+                    Delete Profile
+                  </button>
                 </div>
               ) : (
                 // VIEW MODE
@@ -454,15 +489,17 @@ return {
 
               <div>
                 <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Phone <span className="text-slate-500 font-normal">(optional):</span>
+                  Phone:
                 </label>
                 <input
                   type="tel"
                   value={createFormData.phone}
                   onChange={(e) => setCreateFormData({ ...createFormData, phone: e.target.value })}
-                  placeholder="+1-415-555-1234"
+                  placeholder="415-555-1234"
                   className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded text-slate-100 focus:outline-none focus:border-orange-500"
+                  required
                 />
+                <p className="text-xs text-slate-500 mt-1">US phone number (10 digits)</p>
               </div>
 
               <div>

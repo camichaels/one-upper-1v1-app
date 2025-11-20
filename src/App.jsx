@@ -1,10 +1,11 @@
-import { Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
 import Screen4 from './components/Screen4';
 import Screen6 from './components/Screen6';
+import JoinRivalry from './components/JoinRivalry';
 
 function App() {
   const [editProfileId, setEditProfileId] = useState(null);
@@ -16,6 +17,9 @@ function App() {
     <Routes>
       {/* Landing Page */}
       <Route path="/" element={<LandingPage />} />
+      
+      {/* Deep Link for joining rivalry */}
+      <Route path="/join/:code" element={<JoinRivalry />} />
       
       {/* Game Routes */}
       <Route 
@@ -33,9 +37,6 @@ function App() {
           />
         } 
       />
-      
-      {/* Deep Link for joining rivalry - BONUS FEATURE FOR LATER */}
-      {/* <Route path="/join/:code" element={<Screen1 onNavigate={handleNavigate} />} /> */}
     </Routes>
   );
 }
@@ -51,7 +52,6 @@ function GameRouter({
   showId,
   setShowId
 }) {
-  const navigate = useNavigate();
   const [currentScreen, setCurrentScreen] = useState('screen1');
 
   function handleNavigate(screenName, params = {}) {

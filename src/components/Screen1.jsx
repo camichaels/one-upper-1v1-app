@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { generateCode, isValidCodeFormat, formatCodeInput } from '../utils/codeGenerator';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
+import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
 
 // Avatar options
@@ -47,12 +48,20 @@ export default function Screen1({ onNavigate }) {
   const [resumeError, setResumeError] = useState('');
   const [isResuming, setIsResuming] = useState(false);
   
+  // Forgot code state (State A)
+  const [showForgotCodeModal, setShowForgotCodeModal] = useState(false);
+  const [forgotCodePhone, setForgotCodePhone] = useState('');
+  const [forgotCodeProfiles, setForgotCodeProfiles] = useState([]);
+  const [forgotCodeError, setForgotCodeError] = useState('');
+  const [isForgotCodeLoading, setIsForgotCodeLoading] = useState(false);
+  
   // Join rivalry state (State B)
   const [friendCode, setFriendCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
 const [showCancelModal, setShowCancelModal] = useState(false);
 
   // Determine which state to show on mount
@@ -97,6 +106,14 @@ if (rivalryError || !rivalryData || rivalryData.length === 0) {
   // Has profile, no rivalry → State B
   setCurrentState('B');
   setLoading(false);
+  
+  // Check if there's a pending rivalry code from deep link
+  const pendingCode = sessionStorage.getItem('pendingRivalryCode');
+  if (pendingCode) {
+    setFriendCode(pendingCode);
+    sessionStorage.removeItem('pendingRivalryCode');
+  }
+  
   return;
 }
 
@@ -266,12 +283,23 @@ useEffect(() => {
     setIsSubmitting(true);
 
     try {
-      // Validate
+      // Validate name
       if (!formData.name.trim()) {
         setFormError('Name is required');
         setIsSubmitting(false);
         return;
       }
+
+      // Validate phone
+      const phoneValidation = validatePhone(formData.phone);
+      if (!phoneValidation.valid) {
+        setFormError(phoneValidation.error);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Normalize phone number
+      const normalizedPhone = normalizePhone(formData.phone);
 
       // Generate unique code
       const code = generateCode();
@@ -283,7 +311,7 @@ useEffect(() => {
           code: code,
           name: formData.name.trim(),
           avatar: formData.avatar,
-          phone: formData.phone.trim() || null,
+          phone: normalizedPhone,
           bio: formData.bio.trim() || null
         })
         .select()
@@ -348,6 +376,60 @@ useEffect(() => {
     }
   };
 
+  // Forgot code handler
+  const handleForgotCode = async () => {
+    setForgotCodeError('');
+    setIsForgotCodeLoading(true);
+
+    try {
+      // Normalize phone before lookup
+      const normalizedPhone = normalizePhone(forgotCodePhone);
+      
+      if (!normalizedPhone) {
+        setForgotCodeError('Please enter a valid 10-digit US phone number.');
+        setIsForgotCodeLoading(false);
+        return;
+      }
+
+      // Look up profiles by normalized phone number
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('id, name, code, avatar, phone')
+        .eq('phone', normalizedPhone);
+
+      if (error) throw error;
+
+      if (!profiles || profiles.length === 0) {
+        setForgotCodeError('No profiles found with that phone number.');
+        setIsForgotCodeLoading(false);
+        return;
+      }
+
+      if (profiles.length === 1) {
+        // Auto-resume single profile
+        const profile = profiles[0];
+        localStorage.setItem('activeProfileId', profile.id);
+        saveProfileToHistory(profile);
+        window.location.reload();
+      } else {
+        // Show list of profiles
+        setForgotCodeProfiles(profiles);
+        setIsForgotCodeLoading(false);
+      }
+    } catch (err) {
+      console.error('Error looking up profiles:', err);
+      setForgotCodeError('Failed to look up profiles. Try again.');
+      setIsForgotCodeLoading(false);
+    }
+  };
+
+  // Resume profile from forgot code list
+  const handleResumeFromList = (profile) => {
+    localStorage.setItem('activeProfileId', profile.id);
+    saveProfileToHistory(profile);
+    window.location.reload();
+  };
+
   // STATE B: Join Rivalry
   const handleJoinRivalry = async () => {
     setJoinError('');
@@ -371,31 +453,42 @@ useEffect(() => {
       }
 
       // Find friend by code
-      const { data: friend, error: friendError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('code', formattedCode)
-        .single();
+const { data: friend, error: friendError } = await supabase
+  .from('profiles')
+  .select('id')
+  .eq('code', formattedCode)
+  .single();
 
-      if (friendError || !friend) {
-        setJoinError('Code not found. Check with your friend.');
-        setIsJoining(false);
-        return;
-      }
+if (friendError || !friend) {
+  setJoinError('Code not found. Check with your friend.');
+  setIsJoining(false);
+  return;
+}
 
-      // Check if rivalry already exists
-      const { data: existingRivalry } = await supabase
-        .from('rivalries')
-        .select('*')
-        .or(`and(profile_a_id.eq.${profile.id},profile_b_id.eq.${friend.id}),and(profile_a_id.eq.${friend.id},profile_b_id.eq.${profile.id})`)
-        .eq('status', 'active')
-        .maybeSingle();
+// NEW: Check if EITHER player is already in ANY rivalry
+const { data: anyExistingRivalries } = await supabase
+  .from('rivalries')
+  .select('id')
+  .or(`profile_a_id.eq.${profile.id},profile_b_id.eq.${profile.id},profile_a_id.eq.${friend.id},profile_b_id.eq.${friend.id}`)
+  .eq('status', 'active');
 
-      if (existingRivalry) {
-        setJoinError(`You already have an active Rivalry with this person.`);
-        setIsJoining(false);
-        return;
-      }
+if (anyExistingRivalries && anyExistingRivalries.length > 0) {
+  // Check if it's YOUR rivalry
+  const myRivalry = anyExistingRivalries.find(r => 
+    r.profile_a_id === profile.id || r.profile_b_id === profile.id
+  );
+  
+  if (myRivalry) {
+    setJoinError("You're already in a rivalry. Finish or cancel it first!");
+    setIsJoining(false);
+    return;
+  }
+  
+  // It's the friend's rivalry
+  setJoinError("This person is already in a rivalry. Try again later!");
+  setIsJoining(false);
+  return;
+}
 
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [profile.id, friend.id].sort();
@@ -526,6 +619,10 @@ useEffect(() => {
 
           {!showForm ? (
             <>
+              <p className="text-slate-300 text-center mb-4 text-lg">
+                New here? Let's get you started!
+              </p>
+              
               <button
                 onClick={() => setShowForm(true)}
                 className="w-full py-4 bg-orange-500 text-white font-semibold rounded-lg shadow-lg hover:bg-orange-400 transition-all"
@@ -558,9 +655,96 @@ useEffect(() => {
                   disabled={isResuming || !resumeCode.trim()}
                   className="w-full py-3 bg-slate-600/50 text-slate-200 font-medium rounded-lg border border-slate-500 hover:bg-slate-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isResuming ? 'Resuming...' : 'Resume'}
+                  {isResuming ? 'Getting you in...' : 'Get back in!'}
                 </button>
+
+                {/* Forgot Code Link */}
+                <div className="mt-3 text-center">
+                  <button
+                    onClick={() => setShowForgotCodeModal(true)}
+                    className="text-sm text-slate-400 hover:text-orange-500 underline transition-colors"
+                  >
+                    Forgot your code?
+                  </button>
+                </div>
               </div>
+
+              {/* Forgot Code Modal */}
+              {showForgotCodeModal && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                  <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full space-y-4 border border-slate-700">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-2xl font-bold text-orange-500">
+                        Find Your Profile
+                      </h3>
+                      <button
+                        onClick={() => {
+                          setShowForgotCodeModal(false);
+                          setForgotCodePhone('');
+                          setForgotCodeProfiles([]);
+                          setForgotCodeError('');
+                        }}
+                        className="text-slate-400 hover:text-slate-200 text-2xl"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    {forgotCodeProfiles.length === 0 ? (
+                      <>
+                        <p className="text-slate-300">Enter your phone number:</p>
+
+                        <input
+                          type="tel"
+                          value={forgotCodePhone}
+                          onChange={(e) => setForgotCodePhone(e.target.value)}
+                          placeholder="+1-415-555-1234"
+                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                          autoFocus
+                        />
+
+                        {forgotCodeError && (
+                          <p className="text-red-400 text-sm">{forgotCodeError}</p>
+                        )}
+
+                        <button
+                          onClick={handleForgotCode}
+                          disabled={!forgotCodePhone.trim() || isForgotCodeLoading}
+                          className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors"
+                        >
+                          {isForgotCodeLoading ? 'Looking up...' : 'Find My Profile'}
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-slate-300">Select your profile:</p>
+                        
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {forgotCodeProfiles.map((prof) => (
+                            <button
+                              key={prof.id}
+                              onClick={() => handleResumeFromList(prof)}
+                              className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-3xl">{prof.avatar}</span>
+                                <div className="flex-1">
+                                  <div className="text-lg font-bold text-slate-100">
+                                    {prof.name}
+                                  </div>
+                                  <div className="text-sm text-orange-500 font-medium">
+                                    Code: {prof.code}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <form onSubmit={handleCreateProfile} className="space-y-5">
@@ -602,16 +786,17 @@ useEffect(() => {
 
               <div>
                 <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Phone <span className="text-slate-500 font-normal">(optional):</span>
+                  Phone:
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="+1-415-555-1234"
+                  placeholder="415-555-1234"
                   className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
+                  required
                 />
-                <p className="text-xs text-slate-500 mt-1">For SMS game updates</p>
+                <p className="text-xs text-slate-500 mt-1">US phone number (10 digits)</p>
               </div>
 
               <div>
@@ -640,6 +825,14 @@ useEffect(() => {
               >
                 {isSubmitting ? 'Creating...' : 'Create'}
               </button>
+              
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="w-full py-3 bg-slate-600/50 text-slate-200 font-medium rounded-lg border border-slate-500 hover:bg-slate-600 transition-colors"
+              >
+                Cancel
+              </button>
             </form>
           )}
         </div>
@@ -652,112 +845,167 @@ useEffect(() => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
-        <div className="max-w-md mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <div className="text-lg font-semibold text-slate-200">
-                {profile.avatar} {profile.name}
-              </div>
-              <div className="text-sm text-orange-500">Code: {profile.code}</div>
+        <div className="max-w-md mx-auto space-y-6">
+          {/* Celebration Header */}
+          <div className="text-center space-y-3 py-4">
+            <div className="flex justify-center gap-3 text-3xl">
+              🎉 🎤 🎉
             </div>
-            <div className="relative">
-  <button 
-    onClick={() => setShowMenu(!showMenu)}
-    className="text-slate-400 hover:text-slate-200 text-2xl"
-  >
-    ⋮
-  </button>
-  
-  {showMenu && (
-    <>
-      {/* Backdrop to close menu */}
-      <div 
-        className="fixed inset-0 z-10" 
-        onClick={() => setShowMenu(false)}
-      />
-      
-      {/* Dropdown menu */}
-      <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
-        <button
-          onClick={() => {
-            setShowMenu(false);
-            onNavigate && onNavigate('screen2');
-          }}
-          className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-        >
-          Switch Profile
-        </button>
-        <button
-  onClick={() => {
-    setShowMenu(false);
-    onNavigate && onNavigate('screen2', { editProfileId: profile.id });
-  }}
-  className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
->
-  Edit Profile
-</button>
-      </div>
-    </>
-  )}
-</div>
-          </div>
-
-          <h2 className="text-2xl font-bold text-orange-500 mb-8">Start a Rivalry</h2>
-
-          <div className="mb-12">
-            <p className="text-slate-300 mb-4">Share your code <span className="text-orange-500">with</span> a friend:</p>
-            <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4 mb-3">
-              <div className="text-2xl font-bold text-center text-slate-100 mb-3">
-                {profile.code}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={handleCopyCode}
-                  className="flex-1 py-2 px-4 bg-slate-600/50 text-slate-200 text-sm font-medium rounded border border-slate-500 hover:bg-slate-600 transition-colors"
-                >
-                  {copied ? '✓ Copied!' : 'Copy'}
-                </button>
-                <button
-                  onClick={handleShareSMS}
-                  className="flex-1 py-2 px-4 bg-slate-600/50 text-slate-200 text-sm font-medium rounded border border-slate-500 hover:bg-slate-600 transition-colors"
-                >
-                  Share via SMS
-                </button>
-              </div>
-            </div>
-            <p className="text-xs text-slate-500 text-center">
-              When they enter your code, your Rivalry will start!
+            <h2 className="text-2xl font-bold text-slate-100">
+              Welcome, {profile.name}!
+            </h2>
+            <p className="text-slate-300 text-lg">
+              Ready to start a rivalry for the ages?
             </p>
           </div>
 
-          <div className="border-t border-slate-700 pt-8">
-            <h3 className="text-lg font-bold text-orange-500 mb-4">Or Join a Rivalry</h3>
-            <p className="text-slate-300 mb-4">Enter friend's code:</p>
-            <div className="space-y-3">
-              <input
-                type="text"
-                value={friendCode}
-                onChange={(e) => setFriendCode(e.target.value)}
-                placeholder="HAPPY-TIGER-1234"
-                className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 uppercase focus:outline-none focus:border-orange-500 transition-colors"
-              />
-              
-              {joinError && (
-                <div className="flex items-start gap-2 text-red-400 text-sm">
-                  <span>❌</span>
-                  <span>{joinError}</span>
+          {/* Profile Info + Menu */}
+          <div className="flex items-center justify-between bg-slate-800/50 rounded-lg p-4 border border-slate-700">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{profile.avatar}</span>
+              <div>
+                <div className="text-lg font-bold text-slate-100">
+                  {profile.name}
                 </div>
-              )}
-
-              <button
-                onClick={handleJoinRivalry}
-                disabled={isJoining || !friendCode.trim()}
-                className="w-full py-4 bg-orange-500 text-white font-semibold rounded-lg shadow-lg hover:bg-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                <div className="text-sm text-orange-500 font-medium">
+                  Code: {profile.code}
+                </div>
+              </div>
+            </div>
+            <div className="relative">
+              <button 
+                onClick={() => setShowMenu(!showMenu)}
+                className="text-slate-400 hover:text-slate-200 text-2xl"
               >
-                {isJoining ? 'Starting...' : 'Start Rivalry'}
+                ⋮
               </button>
+              
+              {showMenu && (
+                <>
+                  {/* Backdrop to close menu */}
+                  <div 
+                    className="fixed inset-0 z-10" 
+                    onClick={() => setShowMenu(false)}
+                  />
+                  
+                  {/* Dropdown menu */}
+                  <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onNavigate && onNavigate('screen2');
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      Switch Profile
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        onNavigate && onNavigate('screen2', { editProfileId: profile.id });
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      Edit Profile
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
+
+          {/* PRIMARY ACTION: Challenge a Friend */}
+          <div className="bg-slate-800/50 rounded-xl p-6 space-y-4 border border-slate-700">
+            <h3 className="text-xl font-bold text-orange-500 text-center">
+              Challenge a Friend
+            </h3>
+            
+            <div className="space-y-3">
+              <p className="text-slate-300 text-center">
+                Your code:
+              </p>
+              
+              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
+                <div className="text-3xl font-bold text-slate-100 tracking-wider text-center mb-3">
+                  {profile.code}
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCopyCode}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    {copied ? '✓ Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={handleShareSMS}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    Share via SMS
+                  </button>
+                </div>
+              </div>
+
+              <p className="text-slate-400 text-center text-sm">
+                Share your code. When they join, let's go! 🎤
+              </p>
+            </div>
+          </div>
+
+          {/* SECONDARY ACTION: Got an Invite? */}
+          <div className="text-center">
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="text-slate-300 hover:text-orange-500 transition-colors text-lg font-medium underline decoration-slate-600 hover:decoration-orange-500"
+            >
+              Got an invite? Enter their code →
+            </button>
+          </div>
+
+          {/* Join Modal */}
+          {showJoinModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full space-y-4 border border-slate-700">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-bold text-orange-500">
+                    Join a Rivalry
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowJoinModal(false);
+                      setJoinError('');
+                      setFriendCode('');
+                    }}
+                    className="text-slate-400 hover:text-slate-200 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <p className="text-slate-300">Enter friend's code:</p>
+
+                <input
+                  type="text"
+                  value={friendCode}
+                  onChange={(e) => setFriendCode(e.target.value)}
+                  placeholder="HAPPY-TIGER-1234"
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg uppercase"
+                  autoFocus
+                />
+
+                {joinError && (
+                  <p className="text-red-400 text-sm">{joinError}</p>
+                )}
+
+                <button
+                  onClick={handleJoinRivalry}
+                  disabled={!friendCode.trim() || isJoining}
+                  className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
+                >
+                  {isJoining ? 'Starting...' : 'Start Rivalry'}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
