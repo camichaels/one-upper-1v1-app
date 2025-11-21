@@ -1,6 +1,17 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
 
 export default function LandingPage() {
+  const navigate = useNavigate();
+
+  // Auto-redirect returning users who already have a profile
+  useEffect(() => {
+    const activeProfileId = localStorage.getItem('activeProfileId');
+    if (activeProfileId) {
+      navigate('/play');
+    }
+  }, [navigate]);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100">
       <div className="max-w-2xl mx-auto px-4 py-12">
