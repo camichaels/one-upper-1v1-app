@@ -247,6 +247,25 @@ Format:
       .update({ mic_holder_id: winnerId })
       .eq('id', show.rivalry_id)
 
+    // Send "verdict_ready" SMS to first submitter (they've been waiting longest)
+    if (show.first_submitter_id) {
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            userId: show.first_submitter_id,
+            notificationType: 'verdict_ready',
+            contextData: {
+              show_num: show.show_number,
+              prompt: show.prompt
+            }
+          }
+        })
+      } catch (smsErr) {
+        console.error('Failed to send verdict_ready SMS:', smsErr)
+        // Don't block judgment if SMS fails
+      }
+    }
+
     return new Response(
       JSON.stringify({ success: true, winner_id: winnerId }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
