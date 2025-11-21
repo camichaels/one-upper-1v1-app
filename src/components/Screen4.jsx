@@ -2,6 +2,45 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import Header from './Header';
+import confetti from 'canvas-confetti';
+
+// Winner declarations (what you see when you win)
+const winnerDeclarations = [
+  'YOU ONE-UPPED THEM!',
+  'YOU CRUSHED IT!',
+  'YOU DOMINATED!',
+  'YOU BROUGHT THE HEAT!',
+  'YOU CAME OUT ON TOP!',
+  'YOU OWNED THAT!',
+  'YOU SHOWED UP!',
+  'YOU TOOK THE W!',
+  'YOU WENT OFF!',
+  'YOU BODIED THEM!',
+  'YOU ATE THAT UP!',
+  'YOU COOKED!',
+  'YOU SNAPPED!',
+  'YOU SLAYED!',
+  'FLAWLESS VICTORY!'
+];
+
+// Loser declarations (what you see when you lose)
+const loserDeclarations = [
+  'THEY ONE-UPPED YOU!',
+  'THEY CRUSHED IT!',
+  'THEY DOMINATED!',
+  'THEY BROUGHT THE HEAT!',
+  'THEY CAME OUT ON TOP!',
+  'THEY OWNED THAT!',
+  'THEY SHOWED UP!',
+  'THEY TOOK THE W!',
+  'THEY WENT OFF!',
+  'THEY BODIED YOU!',
+  'THEY ATE THAT UP!',
+  'THEY COOKED!',
+  'NOT YOUR BEST WORK!',
+  'MAYBE NEXT TIME!',
+  'CLOSE BUT NO CIGAR!'
+];
 
 export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [loading, setLoading] = useState(true);
@@ -23,6 +62,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [showSkipModal, setShowSkipModal] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isCreatingShow, setIsCreatingShow] = useState(false);
+  const [verdictDeclaration, setVerdictDeclaration] = useState('');
 
   // Load rivalry and current show
   useEffect(() => {
@@ -183,6 +223,54 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     fetchJudgeProfiles();
   }, [currentShow?.judges]);
 
+  // Confetti effect for winner
+  useEffect(() => {
+    if (currentShow?.status === 'complete' && currentShow.winner_id === activeProfileId) {
+      // Trigger confetti
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+  }, [currentShow?.status, currentShow?.winner_id, activeProfileId]);
+
+  // Pick random verdict declaration once when verdict appears
+  useEffect(() => {
+    if (currentShow?.status === 'complete' && currentShow.winner_id && !verdictDeclaration) {
+      const isWinner = currentShow.winner_id === activeProfileId;
+      const declarations = isWinner ? winnerDeclarations : loserDeclarations;
+      let randomDeclaration = declarations[Math.floor(Math.random() * declarations.length)];
+      
+      // Calculate win streak for milestone callouts (only for winners)
+      if (isWinner) {
+        let winStreak = 0;
+        for (const show of previousShows) {
+          if (show.status === 'complete' && show.winner_id === activeProfileId) {
+            winStreak++;
+          } else {
+            break;
+          }
+        }
+        
+        // Add streak callout at milestones: 3, 5, 10
+        if (winStreak === 3) {
+          randomDeclaration += ' 🔥 3-SHOW STREAK!';
+        } else if (winStreak === 5) {
+          randomDeclaration += ' 🔥🔥 5-SHOW STREAK!';
+        } else if (winStreak === 10) {
+          randomDeclaration += ' 🔥🔥🔥 10-SHOW STREAK! LEGENDARY!';
+        }
+      }
+      
+      setVerdictDeclaration(randomDeclaration);
+    }
+    // Reset declaration when show changes
+    if (currentShow?.status !== 'complete') {
+      setVerdictDeclaration('');
+    }
+  }, [currentShow?.status, currentShow?.winner_id, currentShow?.id, activeProfileId, verdictDeclaration, previousShows]);
+
   async function loadRivalryAndShow() {
     setLoading(true);
 
@@ -204,12 +292,12 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
     setRivalry(rivalryData[0]);
 
-    // Load current show (highest show_number with status != 'complete')
+    // Load current show (highest show_number - including complete shows so verdict displays)
     const { data: currentShowData, error: showError } = await supabase
       .from('shows')
       .select('*')
       .eq('rivalry_id', rivalryId)
-      .neq('status', 'complete')
+      .neq('status', 'skipped')
       .order('show_number', { ascending: false })
       .limit(1);
 
@@ -715,11 +803,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         {state === 'verdict' && (
           <div className="text-center mb-6">
             <div className="text-2xl font-bold text-orange-500">
-              {currentShow.winner_id === activeProfileId ? '🎤 YOU ONE-UPPED ' : '🎤 '}
-              {currentShow.winner_id === activeProfileId 
-                ? opponentProfile.name.toUpperCase()
-                : `${opponentProfile.name.toUpperCase()} ONE-UPPED YOU`
-              }
+              🎤 {verdictDeclaration}
             </div>
           </div>
         )}
