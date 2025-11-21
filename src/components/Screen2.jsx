@@ -407,8 +407,8 @@ return {
 
                   {profile.rivalry ? (
                     <div className="mb-3 text-sm">
-                      <div className="text-green-400">
-                        🏆 Rivalry <span className="text-orange-500">with</span> {profile.opponentName}
+                      <div className="text-slate-300">
+                        Rivalry with {profile.opponentName}
                       </div>
                     </div>
                   ) : (
@@ -443,17 +443,19 @@ return {
           ))}
         </div>
 
-        {/* Create New Profile */}
-        {!showCreateForm ? (
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="w-full py-3 mb-4 bg-slate-700/30 text-orange-500 font-medium rounded-lg border border-slate-600 hover:bg-slate-700/50"
-          >
-            + Create New Profile
-          </button>
-        ) : (
-          <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4 mb-4">
-            <h3 className="text-lg font-semibold text-orange-500 mb-4">Create New Profile</h3>
+        {/* Create New Profile - Only show when NOT editing */}
+        {!editingProfileId && (
+          <>
+            {!showCreateForm ? (
+              <button
+                onClick={() => setShowCreateForm(true)}
+                className="w-full py-3 mb-4 bg-slate-700/30 text-orange-500 font-medium rounded-lg border border-slate-600 hover:bg-slate-700/50"
+              >
+                + Create New Profile
+              </button>
+            ) : (
+              <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4 mb-4">
+                <h3 className="text-lg font-semibold text-orange-500 mb-4">Create New Profile</h3>
             <form onSubmit={handleCreateNewProfile} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-200 mb-2">Name:</label>
@@ -538,13 +540,15 @@ return {
           </div>
         )}
 
-        {/* Log Out */}
+        {/* Log Out - Only show when NOT editing */}
         <button
           onClick={handleLogOut}
           className="w-full py-3 bg-slate-600/30 text-slate-400 font-medium rounded-lg border border-slate-600 hover:bg-slate-600/50"
         >
           Log Out
         </button>
+        </>
+        )}
 
         {/* Delete Confirmation Modal */}
         {deletingProfileId && (

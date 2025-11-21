@@ -409,6 +409,7 @@ useEffect(() => {
         // Auto-resume single profile
         const profile = profiles[0];
         localStorage.setItem('activeProfileId', profile.id);
+        // Save all profiles to history (just one in this case)
         saveProfileToHistory(profile);
         window.location.reload();
       } else {
@@ -425,8 +426,12 @@ useEffect(() => {
 
   // Resume profile from forgot code list
   const handleResumeFromList = (profile) => {
+    // Save ALL profiles from the list to localStorage history
+    forgotCodeProfiles.forEach(p => {
+      saveProfileToHistory(p);
+    });
+    // Set the selected one as active
     localStorage.setItem('activeProfileId', profile.id);
-    saveProfileToHistory(profile);
     window.location.reload();
   };
 
@@ -631,8 +636,8 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
               </button>
 
               {/* Resume Section */}
-              <div className="mt-8 pt-8 border-t border-slate-700">
-                <p className="text-sm text-slate-400 mb-3 text-center">
+              <div className="mt-8">
+                <p className="text-slate-300 text-center mb-4 text-lg">
                   Already have a profile?
                 </p>
                 <input
@@ -846,33 +851,18 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
         <div className="max-w-md mx-auto space-y-6">
-          {/* Celebration Header */}
-          <div className="text-center space-y-3 py-4">
-            <div className="flex justify-center gap-3 text-3xl">
-              🎉 🎤 🎉
+          {/* Welcome Header with Menu */}
+          <div className="relative text-center">
+            <div className="space-y-1">
+              <h2 className="text-2xl font-bold text-slate-100">
+                Welcome, {profile.name}!
+              </h2>
+              <p className="text-slate-300">
+                Ready to start a rivalry for the ages?
+              </p>
             </div>
-            <h2 className="text-2xl font-bold text-slate-100">
-              Welcome, {profile.name}!
-            </h2>
-            <p className="text-slate-300 text-lg">
-              Ready to start a rivalry for the ages?
-            </p>
-          </div>
-
-          {/* Profile Info + Menu */}
-          <div className="flex items-center justify-between bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">{profile.avatar}</span>
-              <div>
-                <div className="text-lg font-bold text-slate-100">
-                  {profile.name}
-                </div>
-                <div className="text-sm text-orange-500 font-medium">
-                  Code: {profile.code}
-                </div>
-              </div>
-            </div>
-            <div className="relative">
+            
+            <div className="absolute top-0 right-0">
               <button 
                 onClick={() => setShowMenu(!showMenu)}
                 className="text-slate-400 hover:text-slate-200 text-2xl"
@@ -908,56 +898,59 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                     >
                       Edit Profile
                     </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        localStorage.removeItem('activeProfileId');
+                        window.location.reload();
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      Log Out
+                    </button>
                   </div>
                 </>
               )}
             </div>
           </div>
 
-          {/* PRIMARY ACTION: Challenge a Friend */}
-          <div className="bg-slate-800/50 rounded-xl p-6 space-y-4 border border-slate-700">
+          {/* Challenge a Friend Section */}
+          <div className="space-y-3">
             <h3 className="text-xl font-bold text-orange-500 text-center">
               Challenge a Friend
             </h3>
             
-            <div className="space-y-3">
-              <p className="text-slate-300 text-center">
-                Your code:
-              </p>
-              
-              <div className="bg-slate-900/50 rounded-lg p-4 border border-slate-700">
-                <div className="text-3xl font-bold text-slate-100 tracking-wider text-center mb-3">
-                  {profile.code}
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCopyCode}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    {copied ? '✓ Copied!' : 'Copy'}
-                  </button>
-                  <button
-                    onClick={handleShareSMS}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    Share via SMS
-                  </button>
-                </div>
-              </div>
-
-              <p className="text-slate-400 text-center text-sm">
-                Share your code. When they join, let's go! 🎤
-              </p>
+            <p className="text-slate-300 text-center font-medium">
+              Share your code: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={handleCopyCode}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+              >
+                {copied ? '✓ Copied!' : 'Copy'}
+              </button>
+              <button
+                onClick={handleShareSMS}
+                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+              >
+                Share via SMS
+              </button>
             </div>
           </div>
 
-          {/* SECONDARY ACTION: Got an Invite? */}
-          <div className="text-center">
+          {/* Join a Friend Section */}
+          <div className="space-y-3 pt-4">
+            <h3 className="text-xl font-bold text-orange-500 text-center">
+              Got a Friend Invite?
+            </h3>
+            
             <button
               onClick={() => setShowJoinModal(true)}
-              className="text-slate-300 hover:text-orange-500 transition-colors text-lg font-medium underline decoration-slate-600 hover:decoration-orange-500"
+              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
             >
-              Got an invite? Enter their code →
+              Enter Code
             </button>
           </div>
 
@@ -1062,12 +1055,22 @@ if (currentState === 'C') {
                     </button>
                     <button
                       onClick={() => {
+                        setShowMenu(false);
+                        localStorage.removeItem('activeProfileId');
+                        window.location.reload();
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      Log Out
+                    </button>
+                    <button
+                      onClick={() => {
                         console.log('Cancel Rivalry clicked');
                         setShowMenu(false);
                         setShowCancelModal(true);
                         console.log('showCancelModal set to true');
                       }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                      className="w-full text-left px-4 py-2 text-red-400 hover:bg-slate-600 transition-colors border-t border-slate-700"
                     >
                       Cancel Rivalry
                     </button>

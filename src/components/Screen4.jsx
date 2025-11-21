@@ -787,9 +787,19 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   <button
                     onClick={() => {
                       setShowMenu(false);
+                      localStorage.removeItem('activeProfileId');
+                      window.location.reload();
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
+                  >
+                    Log Out
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
                       setShowCancelModal(true);
                     }}
-                    className="w-full text-left px-4 py-2 text-red-400 hover:bg-slate-700"
+                    className="w-full text-left px-4 py-2 text-red-400 hover:bg-slate-700 border-t border-slate-700"
                   >
                     Cancel Rivalry
                   </button>
@@ -1186,7 +1196,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               Cancel Rivalry?
             </h3>
             <p className="text-slate-300 text-sm mb-4">
-              This will end your Rivalry <span className="text-orange-500">with</span> {opponentProfile.name}. Your Show history will be saved, but your opponent will be notified.
+              This will end your Rivalry with {opponentProfile.name}. Your Show history will be saved, but your opponent will be notified.
             </p>
             <p className="text-slate-400 text-sm mb-6">This cannot be undone.</p>
             <div className="space-y-2">
