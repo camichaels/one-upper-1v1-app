@@ -10,7 +10,7 @@ const corsHeaders = {
 };
 
 // 🚨 KILL SWITCH: Set to false to disable ALL SMS (will still log to console)
-const SMS_ENABLED = true;
+const SMS_ENABLED = false;
 
 // SMS Templates (in code for MVP)
 const SMS_TEMPLATES = {

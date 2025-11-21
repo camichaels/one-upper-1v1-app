@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import Header from './Header';
 import confetti from 'canvas-confetti';
+import HowToPlayModal from './HowToPlayModal';
 
 // Winner declarations (what you see when you win)
 const winnerDeclarations = [
@@ -63,6 +64,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [showHistory, setShowHistory] = useState(false);
   const [isCreatingShow, setIsCreatingShow] = useState(false);
   const [verdictDeclaration, setVerdictDeclaration] = useState('');
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   // Load rivalry and current show
   useEffect(() => {
@@ -841,6 +843,15 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   <button
                     onClick={() => {
                       setShowMenu(false);
+                      setShowHowToPlay(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
+                  >
+                    How to Play
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
                       onNavigate('screen2');
                     }}
                     className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
@@ -1326,6 +1337,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* How to Play Modal */}
+      {showHowToPlay && (
+        <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
       )}
     </div>
   );

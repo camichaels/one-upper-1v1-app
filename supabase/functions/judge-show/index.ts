@@ -250,18 +250,32 @@ Format:
     // Send "verdict_ready" SMS to first submitter (they've been waiting longest)
     if (show.first_submitter_id) {
       try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            userId: show.first_submitter_id,
-            notificationType: 'verdict_ready',
-            contextData: {
-              show_num: show.show_number,
-              prompt: show.prompt
-            }
+        const smsResponse = await fetch(
+          `${SUPABASE_URL}/functions/v1/send-sms`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`
+            },
+            body: JSON.stringify({
+              userId: show.first_submitter_id,
+              notificationType: 'verdict_ready',
+              contextData: {
+                show_num: show.show_number,
+                prompt: show.prompt
+              }
+            })
           }
-        })
+        )
+        
+        if (!smsResponse.ok) {
+          console.error('Failed to send verdict_ready SMS:', await smsResponse.text())
+        } else {
+          console.log('✅ Verdict ready SMS sent successfully')
+        }
       } catch (smsErr) {
-        console.error('Failed to send verdict_ready SMS:', smsErr)
+        console.error('Error sending verdict_ready SMS:', smsErr)
         // Don't block judgment if SMS fails
       }
     }

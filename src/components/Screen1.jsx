@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
+import HowToPlayModal from './HowToPlayModal';
+
 
 // Avatar options
 const AVATARS = ['😎', '🤓', '😈', '🤡', '🎃', '🦄', '🐉', '🤖'];
@@ -65,6 +67,7 @@ export default function Screen1({ onNavigate }) {
 const [showCancelModal, setShowCancelModal] = useState(false);
   const [isAutoAccepting, setIsAutoAccepting] = useState(false);
   const [hasShownJoinAlert, setHasShownJoinAlert] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
@@ -940,6 +943,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
   // STATE B: Start/Join Rivalry
   if (currentState === 'B') {
     return (
+      <>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
         <div className="max-w-md mx-auto space-y-6">
@@ -987,6 +991,15 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                   
                   {/* Dropdown menu */}
                   <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowHowToPlay(true);
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      How to Play
+                    </button>
                     <button
                       onClick={() => {
                         setShowMenu(false);
@@ -1145,6 +1158,12 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
           )}
         </div>
       </div>
+
+      {/* How to Play Modal */}
+      {showHowToPlay && (
+        <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+      )}
+      </>
     );
   }
 
@@ -1172,6 +1191,15 @@ if (currentState === 'C') {
                 />
                 
                 <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowHowToPlay(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                  >
+                    How to Play
+                  </button>
                   <button
                     onClick={() => {
                       setShowMenu(false);
@@ -1263,6 +1291,11 @@ if (currentState === 'C') {
             </div>
           </div>
         </div>
+      )}
+
+      {/* How to Play Modal */}
+      {showHowToPlay && (
+        <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
       )}
     </>
   );
