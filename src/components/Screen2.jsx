@@ -52,13 +52,19 @@ useEffect(() => {
 
       const recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
       
-      if (recentProfiles.length === 0) {
+      // If we have an active profile, make sure it's included
+      let profileIds = recentProfiles.map(p => p.id);
+      
+      // If active profile is not in recent profiles, add it
+      if (activeId && !profileIds.includes(activeId)) {
+        profileIds.push(activeId);
+      }
+      
+      if (profileIds.length === 0) {
         setProfiles([]);
         setLoading(false);
         return;
       }
-
-      const profileIds = recentProfiles.map(p => p.id);
       
       const { data: profilesData, error } = await supabase
         .from('profiles')
@@ -96,6 +102,41 @@ return {
       });
 
       setProfiles(sorted);
+      
+      // Sync active profile to recentProfiles if it's missing
+      if (activeId && profilesData.length > 0) {
+        const activeProfile = profilesData.find(p => p.id === activeId);
+        if (activeProfile) {
+          let recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
+          const alreadyInRecent = recentProfiles.some(p => p.id === activeId);
+          
+          if (!alreadyInRecent) {
+            // Add active profile to FRONT of recent profiles
+            const profileInfo = {
+              id: activeProfile.id,
+              name: activeProfile.name,
+              code: activeProfile.code,
+              avatar: activeProfile.avatar
+            };
+            // Remove oldest if we're at limit
+            recentProfiles = [profileInfo, ...recentProfiles];
+            localStorage.setItem('recentProfiles', JSON.stringify(recentProfiles.slice(0, 10)));
+            console.log('✅ Added active profile to recentProfiles:', activeProfile.name);
+          } else {
+            // Move active profile to front if it's already in the list
+            recentProfiles = recentProfiles.filter(p => p.id !== activeId);
+            const profileInfo = {
+              id: activeProfile.id,
+              name: activeProfile.name,
+              code: activeProfile.code,
+              avatar: activeProfile.avatar
+            };
+            recentProfiles = [profileInfo, ...recentProfiles];
+            localStorage.setItem('recentProfiles', JSON.stringify(recentProfiles.slice(0, 10)));
+          }
+        }
+      }
+      
       setLoading(false);
     } catch (err) {
       console.error('Error loading profiles:', err);
