@@ -698,7 +698,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                           type="tel"
                           value={forgotCodePhone}
                           onChange={(e) => setForgotCodePhone(e.target.value)}
-                          placeholder="+1-415-555-1234"
+                          placeholder="415-555-1234"
                           className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                           autoFocus
                         />

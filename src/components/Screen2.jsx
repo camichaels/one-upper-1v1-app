@@ -553,10 +553,16 @@ return {
               <h3 className="text-lg font-bold text-slate-100 mb-2">
                 Delete "{profiles.find(p => p.id === deletingProfileId)?.name}"?
               </h3>
-              <p className="text-slate-300 text-sm mb-4">
-                This will end your Rivalry <span className="text-orange-500">with</span>{' '}
-                {profiles.find(p => p.id === deletingProfileId)?.opponentName || 'your opponent'} and delete all Show history.
-              </p>
+              {profiles.find(p => p.id === deletingProfileId)?.rivalry ? (
+                <p className="text-slate-300 text-sm mb-4">
+                  This will end your Rivalry <span className="text-orange-500">with</span>{' '}
+                  {profiles.find(p => p.id === deletingProfileId)?.opponentName} and delete all Show history.
+                </p>
+              ) : (
+                <p className="text-slate-300 text-sm mb-4">
+                  This will permanently delete this profile.
+                </p>
+              )}
               <p className="text-slate-400 text-sm mb-6">This cannot be undone.</p>
               <div className="space-y-2">
                 <button
