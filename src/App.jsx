@@ -1,5 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LandingPage from './components/LandingPage';
 import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
@@ -53,6 +53,17 @@ function GameRouter({
   setShowId
 }) {
   const [currentScreen, setCurrentScreen] = useState('screen1');
+
+  // Reset to screen1 if no active profile in localStorage
+  useEffect(() => {
+    const activeProfileId = localStorage.getItem('activeProfileId');
+    if (!activeProfileId && currentScreen !== 'screen1') {
+      setCurrentScreen('screen1');
+      setActiveProfileId(null);
+      setRivalryId(null);
+      setShowId(null);
+    }
+  }, []);
 
   function handleNavigate(screenName, params = {}) {
     setCurrentScreen(screenName);

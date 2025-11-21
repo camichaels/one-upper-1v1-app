@@ -63,11 +63,29 @@ export default function Screen1({ onNavigate }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
 const [showCancelModal, setShowCancelModal] = useState(false);
+  const [isAutoAccepting, setIsAutoAccepting] = useState(false);
+  const [hasShownJoinAlert, setHasShownJoinAlert] = useState(false);
+
+  // Pending invite state (from /join link)
+  const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
 
   // Determine which state to show on mount
   useEffect(() => {
     async function determineState() {
       try {
+        // Check for pending invite from /join link
+        const pendingCode = sessionStorage.getItem('pendingRivalryCode');
+        const pendingFriendName = sessionStorage.getItem('pendingRivalryFriendName');
+        const pendingFriendId = sessionStorage.getItem('pendingRivalryFriendId');
+        
+        if (pendingCode && pendingFriendName && pendingFriendId) {
+          setPendingInvite({
+            code: pendingCode,
+            friendName: pendingFriendName,
+            friendId: pendingFriendId
+          });
+        }
+
         // For MVP: Check localStorage for active profile
         const activeProfileId = localStorage.getItem('activeProfileId');
         
@@ -143,6 +161,14 @@ if (!rivalry.first_show_started) {
     determineState();
   }, []);
 
+  // Auto-accept pending invite when in State B (run only once)
+  useEffect(() => {
+    if (currentState === 'B' && pendingInvite && !isAutoAccepting) {
+      setIsAutoAccepting(true);
+      handleAcceptPendingInvite();
+    }
+  }, [currentState, pendingInvite, isAutoAccepting]);
+
 // Real-time subscription for rivalry updates (State B and C)
 useEffect(() => {
   if (!profile) return;
@@ -170,6 +196,12 @@ useEffect(() => {
         
         if (!involvesMe) return;
         
+        // Don't show alert if I'm auto-accepting (I created this rivalry via /join)
+        if (isAutoAccepting) return;
+        
+        // Don't show alert if we've already shown it for this rivalry
+        if (hasShownJoinAlert) return;
+        
         // Get opponent ID
         const opponentId = newRivalry.profile_a_id === profile.id 
           ? newRivalry.profile_b_id 
@@ -183,7 +215,8 @@ useEffect(() => {
           .single()
           .then(({ data: opponent }) => {
             if (opponent) {
-              // Show toast notification
+              // Show toast notification (only once)
+              setHasShownJoinAlert(true);
               alert(`🎉 ${opponent.name} joined your Rivalry!`);
               
               // Update state
@@ -244,7 +277,7 @@ useEffect(() => {
   return () => {
     supabase.removeChannel(channel);
   };
-}, [currentState, profile]);
+}, [currentState, profile, isAutoAccepting, hasShownJoinAlert]);
 
 // Real-time subscription for first show creation (State C)
 useEffect(() => {
@@ -325,8 +358,15 @@ useEffect(() => {
       
       // Update state
       setProfile(newProfile);
-      setCurrentState('B');
-      setShowForm(false);
+      
+      // Check if there's a pending invite - if so, auto-start rivalry
+      if (pendingInvite) {
+        await startRivalryWithPendingInvite(newProfile);
+      } else {
+        setCurrentState('B');
+        setShowForm(false);
+      }
+      
       setIsSubmitting(false);
     } catch (err) {
       console.error('Error creating profile:', err);
@@ -433,6 +473,50 @@ useEffect(() => {
     // Set the selected one as active
     localStorage.setItem('activeProfileId', profile.id);
     window.location.reload();
+  };
+
+  // Auto-start rivalry with pending invite (from /join link)
+  const startRivalryWithPendingInvite = async (userProfile) => {
+    try {
+      // Create rivalry (always put lower ID as profile_a for consistency)
+      const [profileAId, profileBId] = [userProfile.id, pendingInvite.friendId].sort();
+
+      const { data: newRivalry, error: rivalryError } = await supabase
+        .from('rivalries')
+        .insert({
+          profile_a_id: profileAId,
+          profile_b_id: profileBId,
+          mic_holder_id: userProfile.id, // Joiner holds mic initially
+          first_show_started: false
+        })
+        .select()
+        .single();
+
+      if (rivalryError) throw rivalryError;
+
+      // Clear pending invite from session storage
+      sessionStorage.removeItem('pendingRivalryCode');
+      sessionStorage.removeItem('pendingRivalryFriendName');
+      sessionStorage.removeItem('pendingRivalryFriendId');
+      setPendingInvite(null);
+
+      // Update state to show first show screen
+      setRivalry(newRivalry);
+      setCurrentState('C');
+      setShowForm(false);
+    } catch (err) {
+      console.error('Error starting rivalry:', err);
+      setFormError('Failed to start rivalry. Please try again.');
+      setCurrentState('B');
+      setShowForm(false);
+    }
+  };
+
+  // Accept pending invite challenge (when user already has profile)
+  const handleAcceptPendingInvite = async () => {
+    setIsJoining(true);
+    await startRivalryWithPendingInvite(profile);
+    setIsJoining(false);
   };
 
   // STATE B: Join Rivalry
@@ -621,6 +705,14 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         <Header />
         <div className="max-w-md mx-auto">
           
+          {/* Show personalized message if coming from /join link */}
+          {pendingInvite && (
+            <div className="text-center mb-6">
+              <p className="text-xl font-bold text-orange-500">
+                {pendingInvite.friendName} just challenged you!
+              </p>
+            </div>
+          )}
 
           {!showForm ? (
             <>
@@ -854,12 +946,27 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
           {/* Welcome Header with Menu */}
           <div className="relative text-center">
             <div className="space-y-1">
-              <h2 className="text-2xl font-bold text-slate-100">
-                Welcome, {profile.name}!
-              </h2>
-              <p className="text-slate-300">
-                Ready to start a rivalry for the ages?
-              </p>
+              {pendingInvite ? (
+                <>
+                  <div className="text-center mb-4">
+                    <p className="text-xl font-bold text-orange-500 mb-1">
+                      {pendingInvite.friendName} just challenged you!
+                    </p>
+                    <p className="text-slate-300 text-sm">
+                      Ready to accept, {profile.name}?
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold text-slate-100">
+                    Welcome, {profile.name}!
+                  </h2>
+                  <p className="text-slate-300">
+                    Ready to start a rivalry for the ages?
+                  </p>
+                </>
+              )}
             </div>
             
             <div className="absolute top-0 right-0">
@@ -914,45 +1021,82 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
             </div>
           </div>
 
-          {/* Challenge a Friend Section */}
-          <div className="space-y-3">
-            <h3 className="text-xl font-bold text-orange-500 text-center">
-              Challenge a Friend
-            </h3>
-            
-            <p className="text-slate-300 text-center font-medium">
-              Share your code: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
-            </p>
-            
-            <div className="flex gap-3">
+          {/* Challenge a Friend Section OR Auto-accepting loading */}
+          {isAutoAccepting ? (
+            /* Show loading while auto-accepting */
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🎤</div>
+              <p className="text-xl text-slate-300 mb-2">
+                Starting rivalry with {pendingInvite?.friendName}...
+              </p>
+              <p className="text-slate-400">Hold tight!</p>
+            </div>
+          ) : pendingInvite ? (
+            /* Show Accept Challenge flow (shouldn't reach here due to auto-accept) */
+            <div className="space-y-4">
               <button
-                onClick={handleCopyCode}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                onClick={handleAcceptPendingInvite}
+                disabled={isJoining}
+                className="w-full py-4 bg-orange-500 text-white font-bold rounded-lg shadow-lg hover:bg-orange-400 transition-all disabled:opacity-50"
               >
-                {copied ? '✓ Copied!' : 'Copy'}
+                {isJoining ? 'Starting Rivalry...' : 'Accept Challenge'}
               </button>
+              
               <button
-                onClick={handleShareSMS}
-                className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                onClick={() => {
+                  sessionStorage.removeItem('pendingRivalryCode');
+                  sessionStorage.removeItem('pendingRivalryFriendName');
+                  sessionStorage.removeItem('pendingRivalryFriendId');
+                  setPendingInvite(null);
+                }}
+                className="w-full py-3 bg-slate-700/50 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-all"
               >
-                Share via SMS
+                Decline
               </button>
             </div>
-          </div>
+          ) : (
+            /* Show normal Challenge/Join options */
+            <>
+              <div className="space-y-3">
+                <h3 className="text-xl font-bold text-orange-500 text-center">
+                  Challenge a Friend
+                </h3>
+                
+                <p className="text-slate-300 text-center font-medium">
+                  Share your code: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
+                </p>
+                
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleCopyCode}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    {copied ? '✓ Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={handleShareSMS}
+                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                  >
+                    Share via SMS
+                  </button>
+                </div>
+              </div>
 
-          {/* Join a Friend Section */}
-          <div className="space-y-3 pt-4">
-            <h3 className="text-xl font-bold text-orange-500 text-center">
-              Got a Friend Invite?
-            </h3>
-            
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
-            >
-              Enter Code
-            </button>
-          </div>
+              {/* Join a Friend Section */}
+              <div className="space-y-3 pt-4">
+                <h3 className="text-xl font-bold text-orange-500 text-center">
+                  Got a Friend Invite?
+                </h3>
+                
+                <button
+                  onClick={() => setShowJoinModal(true)}
+                  className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
+                >
+                  Enter Code
+                </button>
+              </div>
+            </>
+          )}
 
           {/* Join Modal */}
           {showJoinModal && (
@@ -1009,77 +1153,70 @@ if (currentState === 'C') {
   return (
     <>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />  {/* ← ADD THIS LINE */}
-        <div className="max-w-md mx-auto">
-          <div className="flex justify-between items-center mb-8">
-            <div>
-              <div className="text-lg font-semibold text-slate-200">
-                {profile.avatar} {profile.name}
-              </div>
-              <div className="text-sm text-orange-500">Code: {profile.code}</div>
-            </div>
+        <Header />
+        <div className="max-w-md mx-auto relative">
+          {/* Menu in top right corner - absolutely positioned */}
+          <div className="absolute top-0 right-0">
+            <button 
+              onClick={() => setShowMenu(!showMenu)}
+              className="text-slate-400 hover:text-slate-200 text-2xl"
+            >
+              ⋮
+            </button>
             
-            <div className="relative">
-              <button 
-                onClick={() => setShowMenu(!showMenu)}
-                className="text-slate-400 hover:text-slate-200 text-2xl"
-              >
-                ⋮
-              </button>
-              
-              {showMenu && (
-                <>
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowMenu(false)}
-                  />
-                  
-                  <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        onNavigate && onNavigate('screen2');
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      Switch Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        onNavigate && onNavigate('screen2', { editProfileId: profile.id });
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      Edit Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        localStorage.removeItem('activeProfileId');
-                        window.location.reload();
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      Log Out
-                    </button>
-                    <button
-                      onClick={() => {
-                        console.log('Cancel Rivalry clicked');
-                        setShowMenu(false);
-                        setShowCancelModal(true);
-                        console.log('showCancelModal set to true');
-                      }}
-                      className="w-full text-left px-4 py-2 text-red-400 hover:bg-slate-600 transition-colors border-t border-slate-700"
-                    >
-                      Cancel Rivalry
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            {showMenu && (
+              <>
+                <div 
+                  className="fixed inset-0 z-10" 
+                  onClick={() => setShowMenu(false)}
+                />
+                
+                <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onNavigate && onNavigate('screen2');
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                  >
+                    Switch Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      onNavigate && onNavigate('screen2', { editProfileId: profile.id });
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                  >
+                    Edit Profile
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      localStorage.removeItem('activeProfileId');
+                      window.location.reload();
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                  >
+                    Log Out
+                  </button>
+                  <button
+                    onClick={() => {
+                      console.log('Cancel Rivalry clicked');
+                      setShowMenu(false);
+                      setShowCancelModal(true);
+                      console.log('showCancelModal set to true');
+                    }}
+                    className="w-full text-left px-4 py-2 text-red-400 hover:bg-slate-600 transition-colors border-t border-slate-700"
+                  >
+                    Cancel Rivalry
+                  </button>
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Centered content */}
           <div className="text-center">
             <div className="text-3xl font-bold text-orange-500 mb-4">
               🎉 Rivalry Started!
@@ -1104,7 +1241,7 @@ if (currentState === 'C') {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
             <h3 className="text-lg font-bold text-slate-100 mb-2">
-              Cancel Rivalry <span className="text-orange-500">with</span> opponent?
+              Cancel Rivalry with opponent?
             </h3>
             <p className="text-slate-300 text-sm mb-4">
               This will end your ongoing Shows. History will be saved.

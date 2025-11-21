@@ -778,15 +778,6 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   <button
                     onClick={() => {
                       setShowMenu(false);
-                      setShowSkipModal(true);
-                    }}
-                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
-                  >
-                    Skip This Show
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
                       localStorage.removeItem('activeProfileId');
                       window.location.reload();
                     }}
@@ -911,7 +902,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       <div className="text-yellow-400 text-sm">
                         ⚠️ Judging seems stuck. You can:
                       </div>
-                      <div className="flex gap-3 justify-center">
+                      <div className="flex gap-3 justify-center flex-wrap">
                         <button
                           onClick={handleRetryJudging}
                           disabled={isRetrying}
@@ -925,6 +916,16 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                           className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
                         >
                           Pick Random Winner
+                        </button>
+                        <button
+                          onClick={() => {
+                            setShowMenu(false);
+                            setShowSkipModal(true);
+                          }}
+                          disabled={isRetrying}
+                          className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
+                        >
+                          Skip This Show
                         </button>
                       </div>
                     </div>

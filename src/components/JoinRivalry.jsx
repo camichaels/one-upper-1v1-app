@@ -15,15 +15,37 @@ export default function JoinRivalry() {
 
   async function checkUserStatus() {
     try {
+      // First, look up the friend's profile by code
+      const { data: friendProfile, error: friendError } = await supabase
+        .from('profiles')
+        .select('name, id')
+        .eq('code', code.toUpperCase())
+        .single();
+
+      if (friendError || !friendProfile) {
+        setStatus('error');
+        setErrorMessage('Invalid invite code. Check with your friend!');
+        return;
+      }
+
       // Check if user has an active profile
       const activeId = localStorage.getItem('activeProfileId');
       
       if (!activeId) {
         // No profile - need to create one first
         setStatus('needs_profile');
-        // Redirect to /play with the code stored for later
+        // Store the code and friend's name for later
         sessionStorage.setItem('pendingRivalryCode', code.toUpperCase());
+        sessionStorage.setItem('pendingRivalryFriendName', friendProfile.name);
+        sessionStorage.setItem('pendingRivalryFriendId', friendProfile.id);
         navigate('/play');
+        return;
+      }
+
+      // Check if trying to join your own code
+      if (activeId === friendProfile.id) {
+        setStatus('error');
+        setErrorMessage("You can't start a rivalry with yourself!");
         return;
       }
 
@@ -53,9 +75,25 @@ export default function JoinRivalry() {
         return;
       }
 
+      // Check if friend is already in a rivalry
+      const { data: friendRivalry } = await supabase
+        .from('rivalries')
+        .select('id')
+        .or(`profile_a_id.eq.${friendProfile.id},profile_b_id.eq.${friendProfile.id}`)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (friendRivalry) {
+        setStatus('error');
+        setErrorMessage(`${friendProfile.name} is already in a rivalry. Try again later!`);
+        return;
+      }
+
       // User has profile and not in rivalry - redirect to /play with prefilled code
       setStatus('has_profile');
       sessionStorage.setItem('pendingRivalryCode', code.toUpperCase());
+      sessionStorage.setItem('pendingRivalryFriendName', friendProfile.name);
+      sessionStorage.setItem('pendingRivalryFriendId', friendProfile.id);
       navigate('/play');
       
     } catch (err) {
