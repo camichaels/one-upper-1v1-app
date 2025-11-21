@@ -355,6 +355,35 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
     if (bothSubmitted) {
       updateData.status = 'judging';
+      
+      // Determine who submitted first (for SMS targeting and verdict notification later)
+      const mySubmitTime = new Date().toISOString();
+      const opponentSubmitTime = isProfileA 
+        ? currentShow.profile_b_submitted_at 
+        : currentShow.profile_a_submitted_at;
+      
+      const iSubmittedFirst = new Date(mySubmitTime) > new Date(opponentSubmitTime);
+      const firstSubmitterId = iSubmittedFirst ? opponentProfile.id : activeProfileId;
+      
+      updateData.first_submitter_id = firstSubmitterId;
+    } else {
+      // Only one player submitted - send "your_turn" SMS to opponent who hasn't submitted
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            userId: opponentProfile.id,
+            notificationType: 'your_turn',
+            contextData: {
+              opponent: myProfile.name,
+              show_num: currentShow.show_number,
+              prompt: currentShow.prompt
+            }
+          }
+        });
+      } catch (smsErr) {
+        console.error('Failed to send your_turn SMS:', smsErr);
+        // Don't block gameplay if SMS fails
+      }
     }
 
     const { error } = await supabase
@@ -543,8 +572,44 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   }
 
   async function sendNudge() {
-    // TODO: Send SMS nudge
-    alert('Nudge sent! (SMS not implemented yet)');
+    try {
+      // Check rate limit
+      const { data: show } = await supabase
+        .from('shows')
+        .select('last_nudge_at')
+        .eq('id', currentShow.id)
+        .single();
+      
+      if (show?.last_nudge_at) {
+        const minutesSinceLastNudge = (Date.now() - new Date(show.last_nudge_at)) / 1000 / 60;
+        if (minutesSinceLastNudge < 5) {
+          alert('You can only nudge once every 5 minutes ⏰');
+          return;
+        }
+      }
+      
+      // Send SMS
+      await supabase.functions.invoke('send-sms', {
+        body: {
+          userId: opponentProfile.id,
+          notificationType: 'nudge',
+          contextData: {
+            opponent: myProfile.name
+          }
+        }
+      });
+      
+      // Update last nudge timestamp
+      await supabase
+        .from('shows')
+        .update({ last_nudge_at: new Date().toISOString() })
+        .eq('id', currentShow.id);
+      
+      alert('Nudge sent! ⚡');
+    } catch (err) {
+      console.error('Failed to send nudge:', err);
+      alert('Failed to send nudge. Try again?');
+    }
   }
 
   async function handleCancelRivalry() {
@@ -555,6 +620,22 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         .eq('id', rivalryId);
 
       if (error) throw error;
+
+      // Send cancellation SMS to opponent
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            userId: opponentProfile.id,
+            notificationType: 'rivalry_cancelled',
+            contextData: {
+              opponent: myProfile.name
+            }
+          }
+        });
+      } catch (smsErr) {
+        console.error('Failed to send cancellation SMS:', smsErr);
+        // Don't block cancellation if SMS fails
+      }
 
       setShowCancelModal(false);
       onNavigate('screen1');
