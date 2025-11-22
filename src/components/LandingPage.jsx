@@ -196,12 +196,29 @@ export default function LandingPage() {
         </div>
 
         {/* FOOTER */}
-        <div className="border-t-2 border-slate-600 pt-8 text-center">
+        <div className="border-t-2 border-slate-600 pt-8 text-center space-y-4">
           <p className="text-slate-300 text-sm mb-2">
             Have feedback or ideas?<br />
-            <a href="mailto:camichaels@earthlink.net" className="text-orange-500 hover:text-orange-400">camichaels@earthlink.net</a> - I promise I won't judge 😉
+            <a href="mailto:hello@oneupper.app" className="text-orange-500 hover:text-orange-400">hello@oneupper.app</a> - I promise I won't judge 😉
           </p>
+          
           <p className="text-slate-400 text-xs">Beta Version - More features coming soon</p>
+          
+          {/* Copyright and Legal Links */}
+          <div className="pt-4 border-t border-slate-700">
+            <p className="text-slate-500 text-xs mb-2">
+              © 2025 One-Upper™. All rights reserved.
+            </p>
+            <div className="flex justify-center gap-4 text-xs">
+              <Link to="/privacy" className="text-slate-400 hover:text-orange-500 transition-colors">
+                Privacy Policy
+              </Link>
+              <span className="text-slate-600">|</span>
+              <Link to="/terms" className="text-slate-400 hover:text-orange-500 transition-colors">
+                Terms of Service
+              </Link>
+            </div>
+          </div>
         </div>
 
       </div>

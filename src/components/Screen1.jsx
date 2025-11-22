@@ -40,7 +40,8 @@ export default function Screen1({ onNavigate }) {
     name: '',
     avatar: AVATARS[0],
     phone: '',
-    bio: ''
+    bio: '',
+    sms_consent: false
   });
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -348,7 +349,8 @@ useEffect(() => {
           name: formData.name.trim(),
           avatar: formData.avatar,
           phone: normalizedPhone,
-          bio: formData.bio.trim() || null
+          bio: formData.bio.trim() || null,
+          sms_consent: formData.sms_consent
         })
         .select()
         .single();
@@ -912,6 +914,25 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                   className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
                 />
                 <p className="text-xs text-slate-500 mt-1">Max 50 characters</p>
+              </div>
+
+              <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.sms_consent}
+                    onChange={(e) => setFormData({ ...formData, sms_consent: e.target.checked })}
+                    className="mt-1 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-200">
+                      Send me text notifications about my games
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Get notified when it's your turn, results are ready, and more. You can change this anytime. Standard message rates may apply.
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {formError && (

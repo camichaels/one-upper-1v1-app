@@ -68,18 +68,46 @@ serve(async (req) => {
       throw new Error('userId and notificationType are required');
     }
 
-    // 1. Get user's phone number
+    // 1. Get user's profile including phone number AND SMS consent
     const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('phone, name')
+      .select('phone, name, sms_consent')
       .eq('id', userId)
       .single();
 
-    if (profileError || !profile?.phone) {
-      throw new Error('User phone number not found');
+    if (profileError || !profile) {
+      throw new Error('User profile not found');
     }
 
-    // 2. Get random SMS template for this notification type
+    if (!profile.phone) {
+      console.log(`⚠️ [NO PHONE] User ${userId} (${profile.name}) has no phone number`);
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          reason: 'no_phone',
+          message: 'User has no phone number on file'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 2. ✅ CHECK SMS CONSENT - Critical compliance step
+    if (!profile.sms_consent) {
+      console.log(`🚫 [NO CONSENT] User ${userId} (${profile.name}) has not consented to SMS`);
+      console.log(`   Type: ${notificationType}`);
+      console.log(`   Would have sent: ${notificationType}`);
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          reason: 'no_consent',
+          message: 'User has not consented to receive SMS notifications'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // 3. Get random SMS template for this notification type
     const templates = SMS_TEMPLATES[notificationType];
     if (!templates || templates.length === 0) {
       throw new Error(`No templates found for notification type: ${notificationType}`);
@@ -89,7 +117,7 @@ serve(async (req) => {
     const randomTemplate = templates[Math.floor(Math.random() * templates.length)];
     let message = randomTemplate;
 
-    // 3. Replace placeholders
+    // 4. Replace placeholders
     if (contextData.opponent) {
       message = message.replace('{opponent}', contextData.opponent);
     }
@@ -104,7 +132,7 @@ serve(async (req) => {
       message = message.replace('{prompt}', truncatedPrompt);
     }
 
-    // 4. Check if SMS is globally disabled (kill switch)
+    // 5. Check if SMS is globally disabled (kill switch)
     if (!SMS_ENABLED) {
       console.log('🚨 [SMS DISABLED] Kill switch activated - SMS disabled globally');
       console.log('  Would have sent to:', profile.name, `(+1${profile.phone})`);
@@ -121,7 +149,7 @@ serve(async (req) => {
       );
     }
 
-    // 5. Check if we're in TEST MODE (no Twilio credentials)
+    // 6. Check if we're in TEST MODE (no Twilio credentials)
     const twilioAccountSid = Deno.env.get('TWILIO_ACCOUNT_SID');
     const twilioAuthToken = Deno.env.get('TWILIO_AUTH_TOKEN');
     const twilioPhone = Deno.env.get('TWILIO_PHONE_NUMBER');
@@ -135,6 +163,7 @@ serve(async (req) => {
       console.log('  Type:', notificationType);
       console.log('  Message:', message);
       console.log('  Context:', JSON.stringify(contextData, null, 2));
+      console.log('  ✅ User has SMS consent');
       
       return new Response(
         JSON.stringify({ 
@@ -143,13 +172,14 @@ serve(async (req) => {
           recipient: profile.name,
           phone: profile.phone,
           message: message,
-          notificationType: notificationType
+          notificationType: notificationType,
+          hasConsent: true
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // PRODUCTION MODE: Send SMS via Twilio
+    // 7. PRODUCTION MODE: Send SMS via Twilio
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
     const auth = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
 
@@ -175,9 +205,16 @@ serve(async (req) => {
     const result = await twilioResponse.json();
 
     console.log('✅ SMS sent successfully:', result.sid);
+    console.log('   To:', profile.name, `(+1${profile.phone})`);
+    console.log('   Type:', notificationType);
 
     return new Response(
-      JSON.stringify({ success: true, messageSid: result.sid, testMode: false }),
+      JSON.stringify({ 
+        success: true, 
+        messageSid: result.sid, 
+        testMode: false,
+        hasConsent: true
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

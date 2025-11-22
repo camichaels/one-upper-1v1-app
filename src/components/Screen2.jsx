@@ -26,7 +26,8 @@ export default function Screen2({ onNavigate, editProfileId }) {
     name: '',
     avatar: AVATARS[0],
     phone: '',
-    bio: ''
+    bio: '',
+    sms_consent: false
   });
   const [createError, setCreateError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -155,7 +156,8 @@ return {
       name: profile.name,
       avatar: profile.avatar,
       phone: profile.phone || '',
-      bio: profile.bio || ''
+      bio: profile.bio || '',
+      sms_consent: profile.sms_consent || false
     });
     setEditError('');
   }
@@ -194,7 +196,8 @@ return {
           name: editFormData.name.trim(),
           avatar: editFormData.avatar,
           phone: normalizedPhone,
-          bio: editFormData.bio.trim() || null
+          bio: editFormData.bio.trim() || null,
+          sms_consent: editFormData.sms_consent
         })
         .eq('id', profileId);
 
@@ -275,7 +278,8 @@ return {
           name: createFormData.name.trim(),
           avatar: createFormData.avatar,
           phone: normalizedPhone,
-          bio: createFormData.bio.trim() || null
+          bio: createFormData.bio.trim() || null,
+          sms_consent: createFormData.sms_consent
         })
         .select()
         .single();
@@ -400,6 +404,25 @@ return {
                       maxLength={50}
                       className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded text-slate-100 focus:outline-none focus:border-orange-500"
                     />
+                  </div>
+
+                  <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editFormData.sms_consent || false}
+                        onChange={(e) => setEditFormData({ ...editFormData, sms_consent: e.target.checked })}
+                        className="mt-0.5 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
+                      />
+                      <div className="flex-1">
+                        <span className="text-sm text-slate-200">
+                          Send me text notifications
+                        </span>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Get notified about your games via SMS
+                        </p>
+                      </div>
+                    </label>
                   </div>
 
                   <div className="text-sm text-slate-400">
@@ -557,6 +580,25 @@ return {
                   maxLength={50}
                   className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded text-slate-100 focus:outline-none focus:border-orange-500"
                 />
+              </div>
+
+              <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={createFormData.sms_consent}
+                    onChange={(e) => setCreateFormData({ ...createFormData, sms_consent: e.target.checked })}
+                    className="mt-0.5 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-200">
+                      Send me text notifications
+                    </span>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Get notified about your games via SMS
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {createError && <div className="text-red-400 text-sm">{createError}</div>}

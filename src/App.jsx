@@ -1,11 +1,14 @@
 import { Routes, Route } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
 import Screen4 from './components/Screen4';
 import Screen6 from './components/Screen6';
 import JoinRivalry from './components/JoinRivalry';
+import PrivacyPage from './components/PrivacyPage';
+import TermsPage from './components/TermsPage';
+
 
 function App() {
   const [editProfileId, setEditProfileId] = useState(null);
@@ -20,6 +23,10 @@ function App() {
       
       {/* Deep Link for joining rivalry */}
       <Route path="/join/:code" element={<JoinRivalry />} />
+      
+      {/* Legal Pages */}
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       
       {/* Game Routes */}
       <Route 
@@ -53,17 +60,6 @@ function GameRouter({
   setShowId
 }) {
   const [currentScreen, setCurrentScreen] = useState('screen1');
-
-  // Reset to screen1 if no active profile in localStorage
-  useEffect(() => {
-    const activeProfileId = localStorage.getItem('activeProfileId');
-    if (!activeProfileId && currentScreen !== 'screen1') {
-      setCurrentScreen('screen1');
-      setActiveProfileId(null);
-      setRivalryId(null);
-      setShowId(null);
-    }
-  }, []);
 
   function handleNavigate(screenName, params = {}) {
     setCurrentScreen(screenName);
