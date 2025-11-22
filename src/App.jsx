@@ -8,6 +8,7 @@ import Screen6 from './components/Screen6';
 import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
+import JudgesPage from './components/JudgesPage';
 
 
 function App() {
@@ -27,6 +28,9 @@ function App() {
       {/* Legal Pages */}
       <Route path="/privacy" element={<PrivacyPage />} />
       <Route path="/terms" element={<TermsPage />} />
+      
+      {/* Judges Page */}
+      <Route path="/judges" element={<JudgesPage />} />
       
       {/* Game Routes */}
       <Route 

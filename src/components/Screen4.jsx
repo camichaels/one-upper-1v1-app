@@ -4,6 +4,7 @@ import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import Header from './Header';
 import confetti from 'canvas-confetti';
 import HowToPlayModal from './HowToPlayModal';
+import GoldenMic from '../assets/microphone.svg';
 
 // Winner declarations (what you see when you win)
 const winnerDeclarations = [
@@ -50,6 +51,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [myAnswer, setMyAnswer] = useState('');
   const [wordCount, setWordCount] = useState(0);
   const [showJudgeBanter, setShowJudgeBanter] = useState(false);
+  const [judgeView, setJudgeView] = useState('scores'); // 'scores' or 'chat'
   const [previousShows, setPreviousShows] = useState([]);
   const [showMenu, setShowMenu] = useState(false);
   const [countdown, setCountdown] = useState(null);
@@ -146,12 +148,12 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     };
   }, [currentShow?.id]);
 
-  // Auto-advance countdown after verdict (10 seconds)
+  // Auto-advance countdown after verdict (30 seconds)
   useEffect(() => {
     if (currentShow?.status === 'complete' && autoAdvance) {
       const timer = setInterval(() => {
         setCountdown((prev) => {
-          if (prev === null) return 10;
+          if (prev === null) return 30;
           if (prev <= 1) {
             createNextShow();
             return null;
@@ -321,8 +323,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       .select('*')
       .eq('rivalry_id', rivalryId)
       .eq('status', 'complete')
-      .order('show_number', { ascending: false })
-      .limit(10);
+      .order('show_number', { ascending: false });
 
     if (!error && data) {
       setPreviousShows(data);
@@ -798,7 +799,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               <p className="font-medium text-sm truncate text-slate-100">{myProfile.name}</p>
             </div>
             <div className="flex items-center gap-2">
-              {iAmMicHolder && <span className="text-xl">🎤</span>}
+              {iAmMicHolder && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
               <p className="text-lg font-bold text-slate-100">{myWins} {myWins === 1 ? 'win' : 'wins'}</p>
             </div>
           </div>
@@ -814,7 +815,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               <p className="font-medium text-sm truncate text-slate-100">{opponentProfile.name}</p>
             </div>
             <div className="flex items-center gap-2">
-              {!iAmMicHolder && <span className="text-xl">🎤</span>}
+              {!iAmMicHolder && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
               <p className="text-lg font-bold text-slate-100">{opponentWins} {opponentWins === 1 ? 'win' : 'wins'}</p>
             </div>
           </div>
@@ -895,8 +896,9 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         {/* Winner Declaration - Only show in verdict state */}
         {state === 'verdict' && (
           <div className="text-center mb-6">
-            <div className="text-2xl font-bold text-orange-500">
-              🎤 {verdictDeclaration}
+            <div className="flex items-center justify-center gap-2 text-2xl font-bold text-orange-500">
+              <img src={GoldenMic} alt="mic" className="w-7 h-7" />
+              <span>{verdictDeclaration}</span>
             </div>
           </div>
         )}
@@ -1046,7 +1048,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     : 'bg-slate-800/50'
                 }`}>
                   <div className="flex items-center gap-2 mb-2">
-                    {currentShow.winner_id === activeProfileId && <span className="text-lg">🎤</span>}
+                    {currentShow.winner_id === activeProfileId && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
                     <span className="text-xl">{myProfile.avatar}</span>
                     <span className="font-bold text-slate-100">{myProfile.name}</span>
                     {currentShow.judge_data?.scores && (
@@ -1073,7 +1075,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     : 'bg-slate-800/50'
                 }`}>
                   <div className="flex items-center gap-2 mb-2">
-                    {currentShow.winner_id === opponentProfile.id && <span className="text-lg">🎤</span>}
+                    {currentShow.winner_id === opponentProfile.id && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
                     <span className="text-xl">{opponentProfile.avatar}</span>
                     <span className="font-bold text-slate-100">{opponentProfile.name}</span>
                     {currentShow.judge_data?.scores && (
@@ -1094,50 +1096,63 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                 </div>
               </div>
 
-              {/* Judges Say Header */}
+              {/* Judge Content Section */}
               {currentShow.judge_data?.scores && (
-                <div className="text-center">
-                  <h3 className="text-xl font-bold text-slate-300">Judges Say...</h3>
-                </div>
-              )}
+                <div className="space-y-4">
+                  {/* Segmented Toggle for Judge Scores / Judge Chat */}
+                  {currentShow.judge_data?.banter && (
+                    <div className="flex bg-slate-800/50 border border-slate-700 rounded-lg p-1">
+                      <button
+                        onClick={() => setJudgeView('scores')}
+                        className={`flex-1 py-2 px-4 rounded font-semibold transition-all ${
+                          judgeView === 'scores'
+                            ? 'bg-orange-500 text-white'
+                            : 'text-slate-300 hover:text-slate-100'
+                        }`}
+                      >
+                        Judge Scores
+                      </button>
+                      <button
+                        onClick={() => setJudgeView('chat')}
+                        className={`flex-1 py-2 px-4 rounded font-semibold transition-all ${
+                          judgeView === 'chat'
+                            ? 'bg-orange-500 text-white'
+                            : 'text-slate-300 hover:text-slate-100'
+                        }`}
+                      >
+                        Judge Chat
+                      </button>
+                    </div>
+                  )}
 
-              {/* Judge Scores & Comments */}
-              {currentShow.judge_data?.scores && (
-                <div className="space-y-3">
-                  {Object.entries(currentShow.judge_data.scores).map(([judgeKey, data]) => {
-                    const judge = judgeProfiles.find(j => j.key === judgeKey);
-                    const myScore = activeProfileId === currentShow.profile_a_id 
-                      ? data.profile_a_score 
-                      : data.profile_b_score;
-                    const opponentScore = activeProfileId === currentShow.profile_a_id 
-                      ? data.profile_b_score 
-                      : data.profile_a_score;
-                    
-                    return (
-                      <div key={judgeKey} className="bg-slate-800/30 rounded-lg p-3">
-                        <div className="text-sm font-bold text-slate-300 mb-1">
-                          {judge?.emoji || '❓'} {judge?.name || judgeKey}: {myProfile.name} {myScore}, {opponentProfile.name} {opponentScore}
-                        </div>
-                        <div className="text-sm text-slate-400 italic">
-                          "{data.comment}"
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+                  {/* Judge Scores View */}
+                  {judgeView === 'scores' && (
+                    <div className="space-y-3">
+                      {Object.entries(currentShow.judge_data.scores).map(([judgeKey, data]) => {
+                        const judge = judgeProfiles.find(j => j.key === judgeKey);
+                        const myScore = activeProfileId === currentShow.profile_a_id 
+                          ? data.profile_a_score 
+                          : data.profile_b_score;
+                        const opponentScore = activeProfileId === currentShow.profile_a_id 
+                          ? data.profile_b_score 
+                          : data.profile_a_score;
+                        
+                        return (
+                          <div key={judgeKey} className="bg-slate-800/30 rounded-lg p-3">
+                            <div className="text-sm font-bold text-slate-300 mb-1">
+                              {judge?.emoji || '❓'} {judge?.name || judgeKey}: {myProfile.name} {myScore}, {opponentProfile.name} {opponentScore}
+                            </div>
+                            <div className="text-sm text-slate-400 italic">
+                              "{data.comment}"
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
-              {/* Judge Banter Toggle */}
-              {currentShow.judge_data?.banter && (
-                <>
-                  <button
-                    onClick={() => setShowJudgeBanter(!showJudgeBanter)}
-                    className="w-full py-3 bg-slate-800/50 border border-slate-700 rounded-lg font-semibold hover:bg-slate-700 transition-colors text-slate-200"
-                  >
-                    {showJudgeBanter ? 'Hide Judge Banter' : 'See Judge Banter'}
-                  </button>
-
-                  {showJudgeBanter && (
+                  {/* Judge Chat View */}
+                  {judgeView === 'chat' && currentShow.judge_data?.banter && (
                     <div className="bg-slate-800/30 rounded-lg p-4 space-y-2">
                       {currentShow.judge_data.banter.map((line, i) => {
                         const judge = judgeProfiles.find(j => j.key === line.judge);
@@ -1154,29 +1169,44 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       })}
                     </div>
                   )}
-                </>
+                </div>
               )}
 
-              {/* Next Show Button */}
-              <div>
-                {autoAdvance && countdown !== null && (
-                  <div className="text-center text-sm text-slate-400 mb-2">
-                    Next Show in {countdown}...
-                  </div>
+              {/* Next Show Buttons */}
+              <div className="space-y-2">
+                {autoAdvance ? (
+                  <>
+                    {/* Countdown button with embedded timer */}
+                    <button
+                      onClick={() => {
+                        setAutoAdvance(false);
+                        setCountdown(null);
+                        createNextShow();
+                      }}
+                      className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+                    >
+                      {countdown !== null ? `Next Show in ${countdown}s • Start Now` : 'START NEXT SHOW →'}
+                    </button>
+                    
+                    {/* Stay Here button */}
+                    <button
+                      onClick={() => {
+                        setAutoAdvance(false);
+                        setCountdown(null);
+                      }}
+                      className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-semibold"
+                    >
+                      STAY HERE
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={createNextShow}
+                    className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+                  >
+                    NEXT SHOW →
+                  </button>
                 )}
-                <button
-                  onClick={() => {
-                    if (autoAdvance) {
-                      setAutoAdvance(false);
-                      setCountdown(null);
-                    } else {
-                      createNextShow();
-                    }
-                  }}
-                  className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
-                >
-                  {autoAdvance ? 'STAY HERE' : 'NEXT SHOW →'}
-                </button>
               </div>
             </div>
           )}
@@ -1224,7 +1254,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     </div>
                     <div className="text-right flex-shrink-0">
                       {show.winner_id === activeProfileId && (
-                        <span className="text-2xl">🎤</span>
+                        <img src={GoldenMic} alt="mic" className="w-6 h-6" />
                       )}
                     </div>
                   </div>

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import Header from './Header';
+import GoldenMic from '../assets/microphone.svg';
 
 export default function Screen6({ onNavigate, showId }) {
   const [loading, setLoading] = useState(true);
   const [show, setShow] = useState(null);
   const [rivalry, setRivalry] = useState(null);
   const [showJudgeBanter, setShowJudgeBanter] = useState(false);
+  const [judgeView, setJudgeView] = useState('scores'); // 'scores' or 'chat'
   const [judgeProfiles, setJudgeProfiles] = useState([]);
 
   useEffect(() => {
@@ -110,8 +112,9 @@ export default function Screen6({ onNavigate, showId }) {
 
         {/* Winner Declaration */}
         <div className="text-center mb-6">
-          <div className="text-2xl font-bold text-orange-500">
-            🎤 {winner.name.toUpperCase()} ONE-UPPED {loser.name.toUpperCase()}
+          <div className="flex items-center justify-center gap-2 text-2xl font-bold text-orange-500">
+            <img src={GoldenMic} alt="mic" className="w-7 h-7" />
+            <span>{winner.name.toUpperCase()} ONE-UPPED {loser.name.toUpperCase()}</span>
           </div>
         </div>
 
@@ -129,7 +132,7 @@ export default function Screen6({ onNavigate, showId }) {
               : 'bg-slate-800/50'
           }`}>
             <div className="flex items-center gap-2 mb-2">
-              {show.winner_id === profileA.id && <span className="text-lg">🎤</span>}
+              {show.winner_id === profileA.id && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
               <span className="text-xl">{profileA.avatar}</span>
               <span className="font-bold text-slate-100">{profileA.name}</span>
               {show.judge_data?.scores && (
@@ -154,7 +157,7 @@ export default function Screen6({ onNavigate, showId }) {
               : 'bg-slate-800/50'
           }`}>
             <div className="flex items-center gap-2 mb-2">
-              {show.winner_id === profileB.id && <span className="text-lg">🎤</span>}
+              {show.winner_id === profileB.id && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
               <span className="text-xl">{profileB.avatar}</span>
               <span className="font-bold text-slate-100">{profileB.name}</span>
               {show.judge_data?.scores && (
@@ -173,45 +176,58 @@ export default function Screen6({ onNavigate, showId }) {
           </div>
         </div>
 
-        {/* Judges Say Header */}
+        {/* Judge Content Section */}
         {show.judge_data?.scores && (
-          <div className="text-center mb-6">
-            <h3 className="text-xl font-bold text-slate-300">Judges Say...</h3>
-          </div>
-        )}
+          <div className="space-y-4 mb-6">
+            {/* Segmented Toggle for Judge Scores / Judge Chat */}
+            {show.judge_data?.banter && (
+              <div className="flex bg-slate-800/50 border border-slate-700 rounded-lg p-1">
+                <button
+                  onClick={() => setJudgeView('scores')}
+                  className={`flex-1 py-2 px-4 rounded font-semibold transition-all ${
+                    judgeView === 'scores'
+                      ? 'bg-orange-500 text-white'
+                      : 'text-slate-300 hover:text-slate-100'
+                  }`}
+                >
+                  Judge Scores
+                </button>
+                <button
+                  onClick={() => setJudgeView('chat')}
+                  className={`flex-1 py-2 px-4 rounded font-semibold transition-all ${
+                    judgeView === 'chat'
+                      ? 'bg-orange-500 text-white'
+                      : 'text-slate-300 hover:text-slate-100'
+                  }`}
+                >
+                  Judge Chat
+                </button>
+              </div>
+            )}
 
-        {/* Judge Scores & Comments */}
-        {show.judge_data?.scores && (
-          <div className="space-y-3 mb-6">
-            {Object.entries(show.judge_data.scores).map(([judgeKey, data]) => {
-              const judge = judgeProfiles.find(j => j.key === judgeKey);
-              
-              return (
-                <div key={judgeKey} className="bg-slate-800/30 rounded-lg p-3">
-                  <div className="text-sm font-bold text-slate-300 mb-1">
-                    {judge?.emoji || '❓'} {judge?.name || judgeKey}: {profileA.name} {data.profile_a_score}, {profileB.name} {data.profile_b_score}
-                  </div>
-                  <div className="text-sm text-slate-400 italic">
-                    "{data.comment}"
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+            {/* Judge Scores View */}
+            {judgeView === 'scores' && (
+              <div className="space-y-3">
+                {Object.entries(show.judge_data.scores).map(([judgeKey, data]) => {
+                  const judge = judgeProfiles.find(j => j.key === judgeKey);
+                  
+                  return (
+                    <div key={judgeKey} className="bg-slate-800/30 rounded-lg p-3">
+                      <div className="text-sm font-bold text-slate-300 mb-1">
+                        {judge?.emoji || '❓'} {judge?.name || judgeKey}: {profileA.name} {data.profile_a_score}, {profileB.name} {data.profile_b_score}
+                      </div>
+                      <div className="text-sm text-slate-400 italic">
+                        "{data.comment}"
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-        {/* Judge Banter Toggle */}
-        {show.judge_data?.banter && (
-          <>
-            <button
-              onClick={() => setShowJudgeBanter(!showJudgeBanter)}
-              className="w-full py-3 bg-slate-800/50 border border-slate-700 rounded-lg font-semibold hover:bg-slate-700 transition-colors text-slate-200 mb-6"
-            >
-              {showJudgeBanter ? 'Hide Judge Banter' : 'See Judge Banter'}
-            </button>
-
-            {showJudgeBanter && (
-              <div className="bg-slate-800/30 rounded-lg p-4 space-y-2 mb-6">
+            {/* Judge Chat View */}
+            {judgeView === 'chat' && show.judge_data?.banter && (
+              <div className="bg-slate-800/30 rounded-lg p-4 space-y-2">
                 {show.judge_data.banter.map((line, i) => {
                   const judge = judgeProfiles.find(j => j.key === line.judge);
                   return (
@@ -227,15 +243,15 @@ export default function Screen6({ onNavigate, showId }) {
                 })}
               </div>
             )}
-          </>
+          </div>
         )}
 
-        {/* Back to Game Button */}
+        {/* Back to Current Show Button */}
         <button
           onClick={() => onNavigate('screen1')}
           className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
         >
-          Back to Game
+          Back to Current Show
         </button>
 
       </div>

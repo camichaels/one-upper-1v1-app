@@ -127,6 +127,16 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
+
+          {/* Meet All Judges Link */}
+          <div className="text-center mt-6">
+            <Link 
+              to="/judges"
+              className="text-orange-500 hover:text-orange-400 transition-colors text-sm"
+            >
+              Meet all the Judges →
+            </Link>
+          </div>
         </div>
 
         {/* WHAT YOU'RE PLAYING FOR */}
