@@ -80,7 +80,7 @@ export default function LandingPage() {
         <div className="border-t-2 border-slate-600 pt-8 mb-12">
           <h2 className="text-2xl font-bold text-orange-500 text-center mb-6">THE JUDGES</h2>
           <p className="text-lg text-slate-200 text-center mb-6">
-            They're brutally honest. Hilariously biased. And never boring. We've got 50+ AI judge personalities. Each round randomly picks 3 to decide your fate.
+            They're brutally honest. Hilariously biased. And never boring. We've got 25+ AI judge personalities. Each round randomly picks 3 to decide your fate.
           </p>
 
           {/* Judge Cards */}
