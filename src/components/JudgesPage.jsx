@@ -56,7 +56,7 @@ export default function JudgesPage() {
 
           {/* Page Title */}
           <h2 className="text-3xl font-bold text-orange-500 mb-2">Meet the Judges</h2>
-          <p className="text-slate-300">All {judges.length} personalities ready to judge your answers</p>
+          
         </div>
 
         {/* Judge Grid */}
