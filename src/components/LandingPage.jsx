@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import GoldenMic from '../assets/microphone.svg';
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -145,9 +146,11 @@ export default function LandingPage() {
           
           {/* Golden Mic Callout */}
           <div className="bg-slate-700/50 border-2 border-orange-500/50 rounded-lg p-8 text-center">
-            <div className="text-7xl mb-4" style={{ filter: 'sepia(100%) saturate(500%) hue-rotate(25deg) brightness(1.3)' }}>
-              🎤
-            </div>
+            <img 
+              src={GoldenMic} 
+              alt="Golden Microphone" 
+              className="w-24 h-24 mx-auto mb-4"
+            />
             <h3 className="text-2xl font-bold text-orange-500 mb-3">The Golden Mic</h3>
             <p className="text-slate-200">
               Winner of each show holds the mic... but maybe not for long, as it's back up for grabs when the next round starts.
