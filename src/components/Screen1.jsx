@@ -5,6 +5,7 @@ import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
+import InterstitialScreen from './InterstitialScreen';
 
 
 // Avatar options
@@ -72,6 +73,10 @@ const [showCancelModal, setShowCancelModal] = useState(false);
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
+
+  // Ripley interstitial state
+  const [showRivalryIntro, setShowRivalryIntro] = useState(false);
+  const [rivalryIntroText, setRivalryIntroText] = useState('');
 
   // Determine which state to show on mount
   useEffect(() => {
@@ -499,15 +504,59 @@ useEffect(() => {
 
       if (rivalryError) throw rivalryError;
 
+      // NEW: Generate rivalry intro emcee line
+      let introEmceeText = null;
+      try {
+        const emceeResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              rivalryId: newRivalry.id,
+              showNumber: 0, // Special: indicates rivalry intro
+              triggerType: 'rivalry_intro'
+            })
+          }
+        );
+        
+        if (emceeResponse.ok) {
+          const emceeData = await emceeResponse.json();
+          introEmceeText = emceeData.emcee_text;
+          
+          // Update rivalry with intro text
+          await supabase
+            .from('rivalries')
+            .update({ intro_emcee_text: introEmceeText })
+            .eq('id', newRivalry.id);
+            
+          newRivalry.intro_emcee_text = introEmceeText;
+        }
+      } catch (emceeError) {
+        console.error('Error generating rivalry intro:', emceeError);
+        // Continue without intro if it fails
+      }
+
       // Clear pending invite from session storage
       sessionStorage.removeItem('pendingRivalryCode');
       sessionStorage.removeItem('pendingRivalryFriendName');
       sessionStorage.removeItem('pendingRivalryFriendId');
       setPendingInvite(null);
 
-      // Update state to show first show screen
+      // Update state to show rivalry intro or first show
       setRivalry(newRivalry);
-      setCurrentState('C');
+      
+      // NEW: Show rivalry intro if we have text
+      if (newRivalry.intro_emcee_text) {
+        setRivalryIntroText(newRivalry.intro_emcee_text);
+        setShowRivalryIntro(true);
+      } else {
+        setCurrentState('C');
+      }
+      
       setShowForm(false);
     } catch (err) {
       console.error('Error starting rivalry:', err);
@@ -1185,6 +1234,20 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
       )}
       </>
+    );
+  }
+
+  // NEW: Show rivalry intro interstitial
+  if (showRivalryIntro) {
+    return (
+      <InterstitialScreen
+        emceeText={rivalryIntroText}
+        onComplete={() => {
+          setShowRivalryIntro(false);
+          setCurrentState('C');
+        }}
+        duration={5000}
+      />
     );
   }
 
