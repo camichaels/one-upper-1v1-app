@@ -5,7 +5,6 @@ import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
-import InterstitialScreen from './InterstitialScreen';
 
 
 // Avatar options
@@ -73,10 +72,6 @@ const [showCancelModal, setShowCancelModal] = useState(false);
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
-
-  // Ripley interstitial state
-  const [showRivalryIntro, setShowRivalryIntro] = useState(false);
-  const [rivalryIntroText, setRivalryIntroText] = useState('');
 
   // Determine which state to show on mount
   useEffect(() => {
@@ -504,84 +499,15 @@ useEffect(() => {
 
       if (rivalryError) throw rivalryError;
 
-     // REPLACE lines 507-541 in Screen1.jsx with this DEBUG version
-// This will help us see what's happening
-
-// NEW: Generate rivalry intro emcee line
-let introEmceeText = null;
-console.log('🎬 Starting rivalry intro generation...');
-console.log('🎬 Rivalry ID:', newRivalry.id);
-console.log('🎬 Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-console.log('🎬 Has ANON KEY:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-
-try {
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`;
-  console.log('🎬 Calling Edge Function:', url);
-  
-  const emceeResponse = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-    },
-    body: JSON.stringify({
-      rivalryId: newRivalry.id,
-      showNumber: 0,
-      triggerType: 'rivalry_intro'
-    })
-  });
-  
-  console.log('🎬 Response status:', emceeResponse.status);
-  console.log('🎬 Response ok:', emceeResponse.ok);
-  
-  if (emceeResponse.ok) {
-    const emceeData = await emceeResponse.json();
-    console.log('🎬 Emcee data:', emceeData);
-    introEmceeText = emceeData.emcee_text;
-    console.log('🎬 Intro text:', introEmceeText);
-    
-    // Update rivalry with intro text
-    const { error: updateError } = await supabase
-      .from('rivalries')
-      .update({ intro_emcee_text: introEmceeText })
-      .eq('id', newRivalry.id);
-      
-    if (updateError) {
-      console.error('🎬 Error updating rivalry:', updateError);
-    } else {
-      console.log('🎬 Successfully updated rivalry with intro text');
-    }
-      
-    newRivalry.intro_emcee_text = introEmceeText;
-  } else {
-    const errorText = await emceeResponse.text();
-    console.error('🎬 Edge Function error response:', errorText);
-  }
-} catch (emceeError) {
-  console.error('🎬 Error generating rivalry intro:', emceeError);
-  // Continue without intro if it fails
-}
-
-console.log('🎬 Final intro text:', introEmceeText);
-console.log('🎬 Will show interstitial:', !!introEmceeText);
-
       // Clear pending invite from session storage
       sessionStorage.removeItem('pendingRivalryCode');
       sessionStorage.removeItem('pendingRivalryFriendName');
       sessionStorage.removeItem('pendingRivalryFriendId');
       setPendingInvite(null);
 
-      // Update state to show rivalry intro or first show
+      // Update state to show first show screen
       setRivalry(newRivalry);
-      
-      // NEW: Show rivalry intro if we have text
-      if (newRivalry.intro_emcee_text) {
-        setRivalryIntroText(newRivalry.intro_emcee_text);
-        setShowRivalryIntro(true);
-      } else {
-        setCurrentState('C');
-      }
-      
+      setCurrentState('C');
       setShowForm(false);
     } catch (err) {
       console.error('Error starting rivalry:', err);
@@ -1259,20 +1185,6 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
       )}
       </>
-    );
-  }
-
-  // NEW: Show rivalry intro interstitial
-  if (showRivalryIntro) {
-    return (
-      <InterstitialScreen
-        emceeText={rivalryIntroText}
-        onComplete={() => {
-          setShowRivalryIntro(false);
-          setCurrentState('C');
-        }}
-        duration={5000}
-      />
     );
   }
 
