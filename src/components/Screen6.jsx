@@ -268,6 +268,35 @@ export default function Screen6({ onNavigate, showId }) {
           </div>
         )}
 
+        {/* Artifacts Section */}
+        {show.judge_data?.artifacts && show.judge_data.artifacts.length > 0 && (
+          <div className="space-y-3 mb-6">
+            {show.judge_data.artifacts.map((artifact, idx) => {
+              // Get icon and label based on artifact type
+              const artifactConfig = {
+                'celebrity_match': { icon: '⭐', label: 'Celebrity Match' },
+                'fake_headline': { icon: '📰', label: 'Fake Headline' },
+                'fact_check': { icon: '✅', label: 'Fact Check' }
+              };
+              const config = artifactConfig[artifact.type] || { icon: '💡', label: 'Artifact' };
+              
+              return (
+                <div key={idx} className="bg-slate-800/20 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">{config.icon}</span>
+                    <span className="text-sm font-bold text-slate-300">
+                      {config.label}
+                    </span>
+                  </div>
+                  <p className="text-sm text-slate-200 leading-relaxed">
+                    {artifact.text}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Back to Current Show Button */}
         <button
           onClick={() => onNavigate('screen1')}

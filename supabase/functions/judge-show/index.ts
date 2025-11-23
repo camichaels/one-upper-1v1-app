@@ -173,6 +173,20 @@ One of you judges will provide 2-3 sentence commentary on the overall rivalry ar
 - Stay in YOUR character voice
 - Be 2-3 sentences max, punchy and insightful
 
+ADDITIONAL TASK - ARTIFACTS:
+Generate 3 fun artifacts about the answers. Pick the funniest player/answer for each:
+
+1. CELEBRITY MATCH (10-15 words): Which celebrity would say this answer? Be specific.
+   Format: "[Player]'s answer sounds exactly like something [Celebrity Name] would say"
+
+2. FAKE HEADLINE (15-25 words): Write a funny news headline based on their answer.
+   Format: "Breaking: [Absurd headline referencing their actual answer]"
+   Make it punchy and absurd, like a real clickbait headline.
+
+3. FACT CHECK (20-30 words): Write a playful fact-check roast about their answer.
+   Format: "Fact Check: Did you know [absurd fact]? [Player]'s answer suggests they didn't."
+   Setup the "fact" then deliver the roast.
+
 CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation before or after.
 
 Format:
@@ -207,7 +221,24 @@ Format:
   "rivalry_comment": {
     "judge": "one of the three judge names above",
     "text": "2-3 sentence commentary on the rivalry arc"
-  }
+  },
+  "artifacts": [
+    {
+      "type": "celebrity_match",
+      "player": "${profileA.name} or ${profileB.name}",
+      "text": "Their answer sounds exactly like something [Celebrity] would say"
+    },
+    {
+      "type": "fake_headline",
+      "player": "${profileA.name} or ${profileB.name}",
+      "text": "Breaking: [Funny headline]"
+    },
+    {
+      "type": "fact_check",
+      "player": "${profileA.name} or ${profileB.name}",
+      "text": "Fact Check: [Playful roast]"
+    }
+  ]
 }`
 
     // Call Claude API
@@ -284,6 +315,14 @@ Format:
       }
     }
 
+    // Process artifacts - convert player names to profile IDs
+    const artifacts = judgeResponse.artifacts?.map((artifact: any) => ({
+      type: artifact.type,
+      player_id: artifact.player === profileA.name ? show.profile_a_id : show.profile_b_id,
+      player_name: artifact.player,
+      text: artifact.text
+    })) || []
+
     // Update show with judging results
     const { error: updateError } = await supabase
       .from('shows')
@@ -295,7 +334,8 @@ Format:
           verdict: `${judgeResponse.winner} won!`,
           scores: scores,
           banter: banter,
-          rivalry_comment: rivalryComment
+          rivalry_comment: rivalryComment,
+          artifacts: artifacts
         }
       })
       .eq('id', showId)
