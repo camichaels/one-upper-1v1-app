@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { generateCode, isValidCodeFormat, formatCodeInput } from '../utils/codeGenerator';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
@@ -62,6 +62,7 @@ export default function Screen1({ onNavigate }) {
   const [friendCode, setFriendCode] = useState('');
   const [joinError, setJoinError] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const isCreatingRivalryRef = useRef(false); // Track if currently creating rivalry (use ref to avoid closure issues)
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -200,6 +201,9 @@ useEffect(() => {
         
         if (!involvesMe) return;
         
+        // Don't show alert if I'm the one creating this rivalry
+        if (isCreatingRivalryRef.current) return;
+        
         // Don't show alert if I'm auto-accepting (I created this rivalry via /join)
         if (isAutoAccepting) return;
         
@@ -223,15 +227,61 @@ useEffect(() => {
               setHasShownJoinAlert(true);
               alert(`🎉 ${opponent.name} joined your Rivalry!`);
               
-              // Update state
-              setRivalry(newRivalry);
+              // Wait for intro_emcee_text to be populated before showing State C
+              const checkForIntroText = async () => {
+                let attempts = 0;
+                const maxAttempts = 10; // Try for ~5 seconds
+                
+                while (attempts < maxAttempts) {
+                  const { data: updatedRivalry } = await supabase
+                    .from('rivalries')
+                    .select('*')
+                    .eq('id', newRivalry.id)
+                    .single();
+                  
+                  if (updatedRivalry?.intro_emcee_text) {
+                    // Got the text! Update and navigate
+                    setRivalry(updatedRivalry);
+                    setCurrentState('C');
+                    return;
+                  }
+                  
+                  attempts++;
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
+                // Timeout - just show State C with whatever we have
+                setRivalry(newRivalry);
+                setCurrentState('C');
+              };
               
-              // Immediately transition to State C
-  setCurrentState('C');
+              checkForIntroText();
             }
           });
       }
     )
+  .on(
+    'postgres_changes',
+    {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'rivalries'
+    },
+    (payload) => {
+      // Only update rivalry data if we're already in State C
+      if (currentState !== 'C') return;
+      
+      const updatedRivalry = payload.new;
+      
+      // Check if this is MY rivalry
+      const isMyRivalry = updatedRivalry.id === rivalry?.id;
+      
+      if (!isMyRivalry) return;
+      
+      // Update rivalry state with new data
+      setRivalry(updatedRivalry);
+    }
+  )
   .on(
   'postgres_changes',
   {
@@ -483,6 +533,8 @@ useEffect(() => {
   // Auto-start rivalry with pending invite (from /join link)
   const startRivalryWithPendingInvite = async (userProfile) => {
     try {
+      isCreatingRivalryRef.current = true; // Flag that we're creating a rivalry
+      
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [userProfile.id, pendingInvite.friendId].sort();
 
@@ -499,6 +551,31 @@ useEffect(() => {
 
       if (rivalryError) throw rivalryError;
 
+      // Generate Ripley's intro text
+      try {
+        const emceeResponse = await supabase.functions.invoke('select-emcee-line', {
+          body: {
+            rivalryId: newRivalry.id,
+            showNumber: 0,
+            triggerType: 'rivalry_intro'
+          }
+        });
+
+        if (emceeResponse.data?.emcee_text) {
+          // Update rivalry with intro text
+          await supabase
+            .from('rivalries')
+            .update({ intro_emcee_text: emceeResponse.data.emcee_text })
+            .eq('id', newRivalry.id);
+          
+          // Update local rivalry object
+          newRivalry.intro_emcee_text = emceeResponse.data.emcee_text;
+        }
+      } catch (emceeErr) {
+        console.error('Failed to generate intro text:', emceeErr);
+        // Continue anyway - fallback text will show
+      }
+
       // Clear pending invite from session storage
       sessionStorage.removeItem('pendingRivalryCode');
       sessionStorage.removeItem('pendingRivalryFriendName');
@@ -509,11 +586,13 @@ useEffect(() => {
       setRivalry(newRivalry);
       setCurrentState('C');
       setShowForm(false);
+      isCreatingRivalryRef.current = false; // Clear the flag
     } catch (err) {
       console.error('Error starting rivalry:', err);
       setFormError('Failed to start rivalry. Please try again.');
       setCurrentState('B');
       setShowForm(false);
+      isCreatingRivalryRef.current = false; // Clear the flag on error too
     }
   };
 
@@ -528,6 +607,7 @@ useEffect(() => {
   const handleJoinRivalry = async () => {
     setJoinError('');
     setIsJoining(true);
+    isCreatingRivalryRef.current = true; // Flag that we're creating a rivalry
 
     try {
       const formattedCode = formatCodeInput(friendCode);
@@ -600,15 +680,42 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
 
       if (rivalryError) throw rivalryError;
 
+      // Generate Ripley's intro text
+      try {
+        const emceeResponse = await supabase.functions.invoke('select-emcee-line', {
+          body: {
+            rivalryId: newRivalry.id,
+            showNumber: 0,
+            triggerType: 'rivalry_intro'
+          }
+        });
+
+        if (emceeResponse.data?.emcee_text) {
+          // Update rivalry with intro text
+          await supabase
+            .from('rivalries')
+            .update({ intro_emcee_text: emceeResponse.data.emcee_text })
+            .eq('id', newRivalry.id);
+          
+          // Update local rivalry object
+          newRivalry.intro_emcee_text = emceeResponse.data.emcee_text;
+        }
+      } catch (emceeErr) {
+        console.error('Failed to generate intro text:', emceeErr);
+        // Continue anyway - fallback text will show
+      }
+
       // Update state
       setRivalry(newRivalry);
       setCurrentState('C');
       setFriendCode('');
       setIsJoining(false);
+      isCreatingRivalryRef.current = false; // Clear the flag
     } catch (err) {
       console.error('Error joining rivalry:', err);
       setJoinError(err.message || 'Failed to start Rivalry');
       setIsJoining(false);
+      isCreatingRivalryRef.current = false; // Clear the flag on error too
     }
   };
 
@@ -1267,13 +1374,19 @@ if (currentState === 'C') {
 
           {/* Centered content */}
           <div className="text-center">
-            <div className="text-3xl font-bold text-orange-500 mb-4">
+            <div className="text-3xl font-bold text-orange-500 mb-8">
               🎉 Rivalry Started!
             </div>
 
-            <p className="text-slate-300 text-lg mb-12">
-              You're now facing your opponent
-            </p>
+            {/* Ripley's Welcome Commentary */}
+            <div className="mb-12 px-4">
+              <p className="text-lg text-slate-200 italic leading-relaxed mb-2">
+                "{rivalry?.intro_emcee_text || "New rivalry. Let's see what you're both made of."}"
+              </p>
+              <p className="text-sm text-orange-400 font-semibold">
+                — Ripley, Your Game Host
+              </p>
+            </div>
 
             <button
               onClick={handleStartFirstShow}
