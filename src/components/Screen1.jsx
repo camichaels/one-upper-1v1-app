@@ -499,38 +499,6 @@ useEffect(() => {
 
       if (rivalryError) throw rivalryError;
 
-      // Generate rivalry intro text (silently, no UI shown)
-      try {
-        const emceeResponse = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              rivalryId: newRivalry.id,
-              showNumber: 0, // Special: indicates rivalry intro
-              triggerType: 'rivalry_intro'
-            })
-          }
-        );
-        
-        if (emceeResponse.ok) {
-          const emceeData = await emceeResponse.json();
-          
-          // Store intro text in rivalry record
-          await supabase
-            .from('rivalries')
-            .update({ intro_emcee_text: emceeData.emcee_text })
-            .eq('id', newRivalry.id);
-        }
-      } catch (emceeError) {
-        console.error('Error generating rivalry intro:', emceeError);
-        // Continue without intro if it fails - not critical
-      }
-
       // Clear pending invite from session storage
       sessionStorage.removeItem('pendingRivalryCode');
       sessionStorage.removeItem('pendingRivalryFriendName');
@@ -632,38 +600,6 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
 
       if (rivalryError) throw rivalryError;
 
-      // Generate rivalry intro text (silently, no UI shown)
-      try {
-        const emceeResponse = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-            },
-            body: JSON.stringify({
-              rivalryId: newRivalry.id,
-              showNumber: 0, // Special: indicates rivalry intro
-              triggerType: 'rivalry_intro'
-            })
-          }
-        );
-        
-        if (emceeResponse.ok) {
-          const emceeData = await emceeResponse.json();
-          
-          // Store intro text in rivalry record
-          await supabase
-            .from('rivalries')
-            .update({ intro_emcee_text: emceeData.emcee_text })
-            .eq('id', newRivalry.id);
-        }
-      } catch (emceeError) {
-        console.error('Error generating rivalry intro:', emceeError);
-        // Continue without intro if it fails - not critical
-      }
-
       // Update state
       setRivalry(newRivalry);
       setCurrentState('C');
@@ -685,7 +621,32 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         .update({ first_show_started: true })
         .eq('id', rivalry.id);
 
-      // Navigate to Screen 4 - it will create Show 1 with interstitial
+      // Get a random prompt and judges from database
+      const prompt = await getRandomPrompt();
+      const judgeObjects = await selectJudges();
+      const judgeKeys = judgeObjects.map(j => j.key);
+
+      // Create first show
+      const { data: showData, error: showError } = await supabase
+        .from('shows')
+        .insert({
+          rivalry_id: rivalry.id,
+          show_number: 1,
+          prompt_id: prompt.id,
+          prompt: prompt.text,
+          judges: judgeKeys,
+          profile_a_id: rivalry.profile_a_id,
+          profile_b_id: rivalry.profile_b_id,
+          status: 'waiting'
+        })
+        .select();
+
+      if (showError) {
+        console.error('Error creating first show:', showError);
+        return;
+      }
+
+      // Navigate to Screen 4
       onNavigate('screen4', {
         activeProfileId: profile.id,
         rivalryId: rivalry.id
@@ -1305,28 +1266,14 @@ if (currentState === 'C') {
           </div>
 
           {/* Centered content */}
-          <div className="text-center space-y-6">
-            <div className="text-3xl font-bold text-orange-500">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-orange-500 mb-4">
               🎉 Rivalry Started!
             </div>
 
-            {/* Ripley's Welcome Commentary */}
-            {rivalry?.intro_emcee_text && (
-              <div className="max-w-md mx-auto px-4 py-6">
-                <p className="text-lg text-slate-200 leading-relaxed font-medium italic">
-                  "{rivalry.intro_emcee_text}"
-                </p>
-                <p className="text-sm text-orange-400 mt-3 font-semibold">
-                  — Host Ripley
-                </p>
-              </div>
-            )}
-
-            {!rivalry?.intro_emcee_text && (
-              <p className="text-slate-300 text-lg">
-                You're now facing your opponent
-              </p>
-            )}
+            <p className="text-slate-300 text-lg mb-12">
+              You're now facing your opponent
+            </p>
 
             <button
               onClick={handleStartFirstShow}
