@@ -246,18 +246,6 @@ export default function Screen6({ onNavigate, showId }) {
           </div>
         )}
 
-        {/* Back to Current Show Button */}
-        <button
-          onClick={() => onNavigate('screen1')}
-          className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
-        >
-          Back to Current Show
-        </button>
-
-      </div>
-    </div>
-  );
-}
         {/* Rivalry Commentary Section */}
         {show.judge_data?.rivalry_comment && (
           <div className="bg-slate-800/20 rounded-lg p-4 mb-6">
@@ -280,3 +268,16 @@ export default function Screen6({ onNavigate, showId }) {
             </p>
           </div>
         )}
+
+        {/* Back to Current Show Button */}
+        <button
+          onClick={() => onNavigate('screen1')}
+          className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+        >
+          Back to Current Show
+        </button>
+
+      </div>
+    </div>
+  );
+}
