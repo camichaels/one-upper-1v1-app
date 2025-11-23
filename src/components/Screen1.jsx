@@ -1046,6 +1046,10 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 <div className="text-red-400 text-sm">{formError}</div>
               )}
 
+              <p className="text-xs text-slate-400 text-center mb-3">
+                FYI: Anyone with your phone number or profile code can access it for now. (Password protection coming soon)
+              </p>
+
               <button
                 type="submit"
                 disabled={isSubmitting}

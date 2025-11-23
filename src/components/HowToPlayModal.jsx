@@ -56,6 +56,10 @@ export default function HowToPlayModal({ onClose }) {
               <span className="text-orange-500 flex-shrink-0">•</span>
               <span>Check out judge banter and past show scores</span>
             </li>
+            <li className="flex items-start gap-2">
+              <span className="text-orange-500 flex-shrink-0">•</span>
+              <span>Create multiple profiles with your phone number to juggle different rivalries</span>
+            </li>
           </ul>
         </div>
 
