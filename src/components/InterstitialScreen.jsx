@@ -24,7 +24,7 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
   }, [autoAdvance, onComplete]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-950/20 via-slate-900 to-slate-900 px-5 py-6 flex flex-col">
+    <div className="min-h-screen bg-amber-950/10 px-5 py-6 flex flex-col">
       <Header />
       
       {/* Main Content - Vertically Centered */}

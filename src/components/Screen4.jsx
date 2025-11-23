@@ -79,14 +79,37 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
   // Auto-create Show 1 with interstitial if rivalry started but no show exists
   useEffect(() => {
-    if (loading) return; // Wait for initial load
-    if (!rivalry) return; // No rivalry loaded yet
-    if (currentShow) return; // Show already exists
-    if (isCreatingShow) return; // Already creating
-    if (!rivalry.first_show_started) return; // First show not initiated yet
+    console.log('🎬 Show 1 auto-create check:', {
+      loading,
+      rivalry: !!rivalry,
+      currentShow: !!currentShow,
+      isCreatingShow,
+      first_show_started: rivalry?.first_show_started
+    });
+    
+    if (loading) {
+      console.log('🎬 Skipping: still loading');
+      return;
+    }
+    if (!rivalry) {
+      console.log('🎬 Skipping: no rivalry');
+      return;
+    }
+    if (currentShow) {
+      console.log('🎬 Skipping: show already exists');
+      return;
+    }
+    if (isCreatingShow) {
+      console.log('🎬 Skipping: already creating');
+      return;
+    }
+    if (!rivalry.first_show_started) {
+      console.log('🎬 Skipping: first_show_started is false');
+      return;
+    }
     
     // Rivalry started but no show exists - auto-create Show 1
-    console.log('🎬 Auto-creating Show 1 with interstitial');
+    console.log('🎬 ✅ All checks passed! Auto-creating Show 1 with interstitial');
     
     async function autoCreateShow1() {
       setIsCreatingShow(true);
@@ -242,7 +265,16 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         setCountdown((prev) => {
           if (prev === null) return 30;
           if (prev <= 1) {
-            createNextShow();
+            // Auto-advance - create next show and show interstitial
+            console.log('🔴 AUTO-ADVANCE: Creating next show');
+            createNextShow().then((nextShow) => {
+              console.log('🔴 AUTO-ADVANCE: Next show created:', nextShow);
+              if (nextShow?.emcee_text) {
+                console.log('🔴 AUTO-ADVANCE: Showing interstitial');
+                setInterstitialText(nextShow.emcee_text);
+                setShowInterstitial(true);
+              }
+            });
             return null;
           }
           return prev - 1;
