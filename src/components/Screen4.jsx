@@ -788,6 +788,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const myWins = previousShows.filter(s => s.winner_id === activeProfileId).length;
   const opponentWins = previousShows.filter(s => s.winner_id === (activeProfileId === rivalry.profile_a_id ? rivalry.profile_b_id : rivalry.profile_a_id)).length;
   const iAmMicHolder = rivalry.mic_holder_id === activeProfileId;
+  const showMic = myWins > 0 || opponentWins > 0; // Only show mic if someone has won at least one show
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
@@ -806,7 +807,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               <p className="font-medium text-sm truncate text-slate-100">{myProfile.name}</p>
             </div>
             <div className="flex items-center gap-2">
-              {iAmMicHolder && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
+              {showMic && iAmMicHolder && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
               <p className="text-lg font-bold text-slate-100">{myWins} {myWins === 1 ? 'win' : 'wins'}</p>
             </div>
           </div>
@@ -822,7 +823,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               <p className="font-medium text-sm truncate text-slate-100">{opponentProfile.name}</p>
             </div>
             <div className="flex items-center gap-2">
-              {!iAmMicHolder && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
+              {showMic && !iAmMicHolder && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
               <p className="text-lg font-bold text-slate-100">{opponentWins} {opponentWins === 1 ? 'win' : 'wins'}</p>
             </div>
           </div>
