@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import Header from './Header';
@@ -67,6 +67,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [isCreatingShow, setIsCreatingShow] = useState(false);
   const [verdictDeclaration, setVerdictDeclaration] = useState('');
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const confettiShownRef = useRef(new Set()); // Track which shows have shown confetti
 
   // Load rivalry and current show
   useEffect(() => {
@@ -227,17 +228,21 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     fetchJudgeProfiles();
   }, [currentShow?.judges]);
 
-  // Confetti effect for winner
+  // Confetti effect for winner - only fires once per show
   useEffect(() => {
-    if (currentShow?.status === 'complete' && currentShow.winner_id === activeProfileId) {
+    if (currentShow?.status === 'complete' && 
+        currentShow.winner_id === activeProfileId && 
+        !confettiShownRef.current.has(currentShow.id)) {
       // Trigger confetti
       confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 }
       });
+      // Mark this show as having shown confetti
+      confettiShownRef.current.add(currentShow.id);
     }
-  }, [currentShow?.status, currentShow?.winner_id, activeProfileId]);
+  }, [currentShow?.status, currentShow?.winner_id, currentShow?.id, activeProfileId]);
 
   // Pick random verdict declaration once when verdict appears
   useEffect(() => {
@@ -897,7 +902,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         {state === 'verdict' && (
           <div className="text-center mb-6">
             <div className="flex items-center justify-center gap-2 text-2xl font-bold text-orange-500">
-              <img src={GoldenMic} alt="mic" className="w-7 h-7" />
+              {currentShow.winner_id === activeProfileId && <img src={GoldenMic} alt="mic" className="w-7 h-7" />}
               <span>{verdictDeclaration}</span>
             </div>
           </div>
