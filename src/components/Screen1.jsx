@@ -499,6 +499,38 @@ useEffect(() => {
 
       if (rivalryError) throw rivalryError;
 
+      // Generate rivalry intro text (silently, no UI shown)
+      try {
+        const emceeResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              rivalryId: newRivalry.id,
+              showNumber: 0, // Special: indicates rivalry intro
+              triggerType: 'rivalry_intro'
+            })
+          }
+        );
+        
+        if (emceeResponse.ok) {
+          const emceeData = await emceeResponse.json();
+          
+          // Store intro text in rivalry record
+          await supabase
+            .from('rivalries')
+            .update({ intro_emcee_text: emceeData.emcee_text })
+            .eq('id', newRivalry.id);
+        }
+      } catch (emceeError) {
+        console.error('Error generating rivalry intro:', emceeError);
+        // Continue without intro if it fails - not critical
+      }
+
       // Clear pending invite from session storage
       sessionStorage.removeItem('pendingRivalryCode');
       sessionStorage.removeItem('pendingRivalryFriendName');
@@ -599,6 +631,38 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         .single();
 
       if (rivalryError) throw rivalryError;
+
+      // Generate rivalry intro text (silently, no UI shown)
+      try {
+        const emceeResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify({
+              rivalryId: newRivalry.id,
+              showNumber: 0, // Special: indicates rivalry intro
+              triggerType: 'rivalry_intro'
+            })
+          }
+        );
+        
+        if (emceeResponse.ok) {
+          const emceeData = await emceeResponse.json();
+          
+          // Store intro text in rivalry record
+          await supabase
+            .from('rivalries')
+            .update({ intro_emcee_text: emceeData.emcee_text })
+            .eq('id', newRivalry.id);
+        }
+      } catch (emceeError) {
+        console.error('Error generating rivalry intro:', emceeError);
+        // Continue without intro if it fails - not critical
+      }
 
       // Update state
       setRivalry(newRivalry);

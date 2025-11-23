@@ -5,6 +5,7 @@ import Header from './Header';
 import confetti from 'canvas-confetti';
 import HowToPlayModal from './HowToPlayModal';
 import GoldenMic from '../assets/microphone.svg';
+import InterstitialScreen from './InterstitialScreen';
 
 // Winner declarations (what you see when you win)
 const winnerDeclarations = [
@@ -68,6 +69,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [verdictDeclaration, setVerdictDeclaration] = useState('');
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const confettiShownRef = useRef(new Set()); // Track which shows have shown confetti
+  const [showInterstitial, setShowInterstitial] = useState(false);
+  const [interstitialText, setInterstitialText] = useState('');
 
   // Load rivalry and current show
   useEffect(() => {
@@ -534,12 +537,46 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         return;
       }
 
+      // Get emcee text
+      let emceeText = null;
+      
+      // SPECIAL CASE: Show 1 uses rivalry intro if available
+      if (nextShowNumber === 1 && rivalry?.intro_emcee_text) {
+        emceeText = rivalry.intro_emcee_text;
+      } else {
+        // For all other shows, call Edge Function
+        try {
+          const emceeResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+              },
+              body: JSON.stringify({
+                rivalryId: rivalryId,
+                showNumber: nextShowNumber
+                // No triggerType - Edge Function auto-determines milestone vs show_transition
+              })
+            }
+          );
+          
+          if (emceeResponse.ok) {
+            const emceeData = await emceeResponse.json();
+            emceeText = emceeData.emcee_text;
+          }
+        } catch (emceeError) {
+          console.error('Error fetching emcee line:', emceeError);
+        }
+      }
+
       // Get a random prompt and judges from database
       const prompt = await getRandomPrompt();
       const judgeObjects = await selectJudges();
       const judgeKeys = judgeObjects.map(j => j.key);
 
-      // Create next show
+      // Create next show with emcee_text
       const { data: newShow, error } = await supabase
         .from('shows')
         .insert({
@@ -550,7 +587,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           judges: judgeKeys,
           profile_a_id: rivalry.profile_a_id,
           profile_b_id: rivalry.profile_b_id,
-          status: 'waiting'
+          status: 'waiting',
+          emcee_text: emceeText
         })
         .select()
         .single();
@@ -658,6 +696,17 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     if (judge) {
       setSelectedJudge(judge);
     }
+  }
+
+  // Show interstitial if active
+  if (showInterstitial) {
+    return (
+      <InterstitialScreen
+        emceeText={interstitialText}
+        onComplete={() => setShowInterstitial(false)}
+        duration={currentShow?.show_number === 1 ? 5000 : 4000}
+      />
+    );
   }
 
   if (loading) {
@@ -1206,10 +1255,15 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   <>
                     {/* Countdown button with embedded timer */}
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         setAutoAdvance(false);
                         setCountdown(null);
-                        createNextShow();
+                        await createNextShow();
+                        
+                        if (currentShow?.emcee_text) {
+                          setInterstitialText(currentShow.emcee_text);
+                          setShowInterstitial(true);
+                        }
                       }}
                       className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
                     >
@@ -1229,7 +1283,14 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   </>
                 ) : (
                   <button
-                    onClick={createNextShow}
+                    onClick={async () => {
+                      await createNextShow();
+                      
+                      if (currentShow?.emcee_text) {
+                        setInterstitialText(currentShow.emcee_text);
+                        setShowInterstitial(true);
+                      }
+                    }}
                     className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
                   >
                     NEXT SHOW →
