@@ -2,32 +2,26 @@ import { useState, useEffect } from 'react';
 import Header from './Header';
 import RipleyIcon from '../assets/ripley.svg';
 
-export default function InterstitialScreen({ emceeText, onComplete, duration = 4000 }) {
+export default function InterstitialScreen({ emceeText, onComplete, duration = 10000 }) {
   const [countdown, setCountdown] = useState(Math.ceil(duration / 1000));
-  const [progress, setProgress] = useState(100);
+  const [autoAdvance, setAutoAdvance] = useState(true);
 
   useEffect(() => {
-    // Auto-advance after duration
-    const timer = setTimeout(() => {
-      onComplete();
-    }, duration);
+    if (!autoAdvance) return;
 
-    // Countdown timer
-    const countdownInterval = setInterval(() => {
-      setCountdown((prev) => Math.max(0, prev - 1));
+    // Auto-advance countdown
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          onComplete();
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
 
-    // Progress bar animation
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => Math.max(0, prev - (100 / (duration / 100))));
-    }, 100);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(countdownInterval);
-      clearInterval(progressInterval);
-    };
-  }, [duration, onComplete]);
+    return () => clearInterval(timer);
+  }, [autoAdvance, onComplete]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-8 flex flex-col">
@@ -61,27 +55,44 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 4
             </p>
           </div>
 
-          {/* Progress Bar */}
-          <div className="w-full">
-            <div className="h-1 bg-slate-700/50 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-orange-500 transition-all ease-linear"
-                style={{ width: `${progress}%`, transitionDuration: '100ms' }}
-              ></div>
-            </div>
-          </div>
-
         </div>
       </div>
 
-      {/* Skip Button - Bottom */}
-      <div className="max-w-md mx-auto w-full">
-        <button
-          onClick={onComplete}
-          className="w-full py-3 text-slate-400 hover:text-slate-200 transition-colors text-sm font-medium"
-        >
-          Skip ({countdown}s)
-        </button>
+      {/* Buttons - Bottom (matching Screen4 verdict button treatment) */}
+      <div className="max-w-md mx-auto w-full space-y-2">
+        {autoAdvance ? (
+          <>
+            {/* Countdown button with embedded timer */}
+            <button
+              onClick={() => {
+                setAutoAdvance(false);
+                setCountdown(null);
+                onComplete();
+              }}
+              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+            >
+              {countdown !== null ? `Continue in ${countdown}s • Skip` : 'CONTINUE'}
+            </button>
+            
+            {/* Stay Here button */}
+            <button
+              onClick={() => {
+                setAutoAdvance(false);
+                setCountdown(null);
+              }}
+              className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-semibold"
+            >
+              STAY HERE
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={onComplete}
+            className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+          >
+            CONTINUE
+          </button>
+        )}
       </div>
     </div>
   );

@@ -215,8 +215,13 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
   // Fetch judge profiles when show loads
   useEffect(() => {
-    if (!currentShow?.judges) return;
+    if (!currentShow?.judges) {
+      console.log('🎭 No judges in currentShow yet');
+      return;
+    }
 
+    console.log('🎭 Fetching judge profiles for:', currentShow.judges);
+    
     async function fetchJudgeProfiles() {
       const { data, error } = await supabase
         .from('judges')
@@ -224,12 +229,15 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         .in('key', currentShow.judges);
 
       if (!error && data) {
+        console.log('🎭 Judge profiles fetched:', data);
         setJudgeProfiles(data);
+      } else {
+        console.error('🎭 Error fetching judge profiles:', error);
       }
     }
 
     fetchJudgeProfiles();
-  }, [currentShow?.judges]);
+  }, [currentShow?.judges, currentShow?.id]);
 
   // Confetti effect for winner - only fires once per show
   useEffect(() => {
@@ -723,7 +731,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           console.log('🔴 INTERSTITIAL COMPLETE, hiding');
           setShowInterstitial(false);
         }}
-        duration={currentShow?.show_number === 1 ? 5000 : 4000}
+        duration={10000}
       />
     );
   }
@@ -749,8 +757,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
             onClick={async () => {
               if (rivalry && !isCreatingShow) {
                 setIsCreatingShow(true);
+                console.log('🔴 FALLBACK: Creating show via button');
+                // Use createNextShow for consistency - but we don't have currentShow
+                // So we need to determine the next show number manually
                 try {
-                  // FIRST: Check if opponent already created a show while we were waiting
+                  // Check if opponent already created a show
                   const { data: checkShow } = await supabase
                     .from('shows')
                     .select('*')
@@ -762,7 +773,12 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     .single();
                   
                   if (checkShow) {
-                    // Show exists! Just reload
+                    // Show exists! Check for emcee text and show interstitial
+                    console.log('🔴 FALLBACK: Show already exists:', checkShow);
+                    if (checkShow.emcee_text) {
+                      setInterstitialText(checkShow.emcee_text);
+                      setShowInterstitial(true);
+                    }
                     await loadRivalryAndShow();
                     setIsCreatingShow(false);
                     return;
@@ -777,13 +793,48 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     .limit(1);
                   
                   const nextShowNumber = allShows && allShows.length > 0 ? allShows[0].show_number + 1 : 1;
+                  console.log('🔴 FALLBACK: Creating show #', nextShowNumber);
+                  
+                  // Get emcee text
+                  let emceeText = null;
+                  
+                  if (nextShowNumber === 1 && rivalry?.intro_emcee_text) {
+                    console.log('🔴 FALLBACK: Using rivalry intro text');
+                    emceeText = rivalry.intro_emcee_text;
+                  } else {
+                    console.log('🔴 FALLBACK: Fetching emcee text from Edge Function');
+                    try {
+                      const emceeResponse = await fetch(
+                        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/select-emcee-line`,
+                        {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                          },
+                          body: JSON.stringify({
+                            rivalryId: rivalryId,
+                            showNumber: nextShowNumber
+                          })
+                        }
+                      );
+                      
+                      if (emceeResponse.ok) {
+                        const emceeData = await emceeResponse.json();
+                        emceeText = emceeData.emcee_text;
+                        console.log('🔴 FALLBACK: Got emcee text:', emceeText);
+                      }
+                    } catch (emceeError) {
+                      console.error('🔴 FALLBACK: Error fetching emcee line:', emceeError);
+                    }
+                  }
                   
                   // Get random prompt and judges
                   const prompt = await getRandomPrompt();
                   const judgeObjects = await selectJudges();
                   const judgeKeys = judgeObjects.map(j => j.key);
                   
-                  // Create the show
+                  // Create the show with emcee_text
                   const { data: newShow, error } = await supabase
                     .from('shows')
                     .insert({
@@ -794,7 +845,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       judges: judgeKeys,
                       profile_a_id: rivalry.profile_a_id,
                       profile_b_id: rivalry.profile_b_id,
-                      status: 'waiting'
+                      status: 'waiting',
+                      emcee_text: emceeText
                     })
                     .select()
                     .single();
@@ -802,12 +854,20 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   if (error) {
                     // If conflict error, another player created it - just reload
                     if (error.code === '23505') {
+                      console.log('🔴 FALLBACK: Conflict, reloading');
                       await loadRivalryAndShow();
                     } else {
                       console.error('Error creating show:', error);
                       alert('Failed to create show. Please try again.');
                     }
                   } else if (newShow) {
+                    console.log('🔴 FALLBACK: Created show:', newShow);
+                    // Show interstitial if we have emcee text
+                    if (newShow.emcee_text) {
+                      console.log('🔴 FALLBACK: Showing interstitial');
+                      setInterstitialText(newShow.emcee_text);
+                      setShowInterstitial(true);
+                    }
                     // Reload to show the new show
                     await loadRivalryAndShow();
                   }
