@@ -523,6 +523,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     try {
       setAutoAdvance(true); // Reset auto-advance for next show
       const nextShowNumber = currentShow.show_number + 1;
+      console.log('🔴 createNextShow: Creating show #', nextShowNumber);
 
       // Check if show already exists (avoid race condition)
       const { data: existingShow } = await supabase
@@ -533,6 +534,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         .single();
 
       if (existingShow) {
+        console.log('🔴 createNextShow: Show already exists:', existingShow);
         setCurrentShow(existingShow);
         return existingShow; // Return the show
       }
@@ -542,8 +544,10 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       
       // SPECIAL CASE: Show 1 uses rivalry intro if available
       if (nextShowNumber === 1 && rivalry?.intro_emcee_text) {
+        console.log('🔴 createNextShow: Using rivalry intro text:', rivalry.intro_emcee_text);
         emceeText = rivalry.intro_emcee_text;
       } else {
+        console.log('🔴 createNextShow: Fetching new emcee text from Edge Function');
         // For all other shows, call Edge Function
         try {
           const emceeResponse = await fetch(
@@ -565,11 +569,16 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           if (emceeResponse.ok) {
             const emceeData = await emceeResponse.json();
             emceeText = emceeData.emcee_text;
+            console.log('🔴 createNextShow: Got emcee text:', emceeText);
+          } else {
+            console.log('🔴 createNextShow: Edge Function response not ok:', emceeResponse.status);
           }
         } catch (emceeError) {
-          console.error('Error fetching emcee line:', emceeError);
+          console.error('🔴 createNextShow: Error fetching emcee line:', emceeError);
         }
       }
+
+      console.log('🔴 createNextShow: Final emcee text to be saved:', emceeText);
 
       // Get a random prompt and judges from database
       const prompt = await getRandomPrompt();
@@ -612,12 +621,14 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         }
       } else {
         setCurrentShow(newShow);
+        console.log('🔴 createNextShow: Created new show:', newShow);
         return newShow; // Return the new show
       }
     } catch (err) {
-      console.error('Error in createNextShow:', err);
+      console.error('🔴 createNextShow: Error in createNextShow:', err);
     }
     
+    console.log('🔴 createNextShow: Returning null (failed)');
     return null; // Return null if failed
   }
 
@@ -704,10 +715,14 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
   // Show interstitial if active
   if (showInterstitial) {
+    console.log('🔴 RENDERING INTERSTITIAL with text:', interstitialText);
     return (
       <InterstitialScreen
         emceeText={interstitialText}
-        onComplete={() => setShowInterstitial(false)}
+        onComplete={() => {
+          console.log('🔴 INTERSTITIAL COMPLETE, hiding');
+          setShowInterstitial(false);
+        }}
         duration={currentShow?.show_number === 1 ? 5000 : 4000}
       />
     );
@@ -1260,13 +1275,19 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     {/* Countdown button with embedded timer */}
                     <button
                       onClick={async () => {
+                        console.log('🔴 NEXT SHOW BUTTON CLICKED');
                         setAutoAdvance(false);
                         setCountdown(null);
                         const nextShow = await createNextShow();
+                        console.log('🔴 createNextShow returned:', nextShow);
+                        console.log('🔴 nextShow.emcee_text:', nextShow?.emcee_text);
                         
                         if (nextShow?.emcee_text) {
+                          console.log('🔴 Setting interstitial text and showing');
                           setInterstitialText(nextShow.emcee_text);
                           setShowInterstitial(true);
+                        } else {
+                          console.log('🔴 NO emcee_text found, skipping interstitial');
                         }
                       }}
                       className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
@@ -1288,11 +1309,17 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                 ) : (
                   <button
                     onClick={async () => {
+                      console.log('🔴 NEXT SHOW BUTTON CLICKED');
                       const nextShow = await createNextShow();
+                      console.log('🔴 createNextShow returned:', nextShow);
+                      console.log('🔴 nextShow.emcee_text:', nextShow?.emcee_text);
                       
                       if (nextShow?.emcee_text) {
+                        console.log('🔴 Setting interstitial text and showing');
                         setInterstitialText(nextShow.emcee_text);
                         setShowInterstitial(true);
+                      } else {
+                        console.log('🔴 NO emcee_text found, skipping interstitial');
                       }
                     }}
                     className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
