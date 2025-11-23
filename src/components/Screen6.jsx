@@ -113,7 +113,6 @@ export default function Screen6({ onNavigate, showId }) {
         {/* Winner Declaration */}
         <div className="text-center mb-6">
           <div className="flex items-center justify-center gap-2 text-2xl font-bold text-orange-500">
-            <img src={GoldenMic} alt="mic" className="w-7 h-7" />
             <span>{winner.name.toUpperCase()} ONE-UPPED {loser.name.toUpperCase()}</span>
           </div>
         </div>
