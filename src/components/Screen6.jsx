@@ -258,3 +258,25 @@ export default function Screen6({ onNavigate, showId }) {
     </div>
   );
 }
+        {/* Rivalry Commentary Section */}
+        {show.judge_data?.rivalry_comment && (
+          <div className="bg-slate-800/20 rounded-lg p-4 mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">
+                {(() => {
+                  const commentJudge = judgeProfiles.find(j => j.key === show.judge_data.rivalry_comment.judge);
+                  return commentJudge?.emoji || '🎭';
+                })()}
+              </span>
+              <span className="text-sm font-bold text-slate-300">
+                {(() => {
+                  const commentJudge = judgeProfiles.find(j => j.key === show.judge_data.rivalry_comment.judge);
+                  return commentJudge?.name || 'Judge';
+                })()} • Rivalry Recap
+              </span>
+            </div>
+            <p className="text-sm text-slate-200 leading-relaxed">
+              {show.judge_data.rivalry_comment.text}
+            </p>
+          </div>
+        )}

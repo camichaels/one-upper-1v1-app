@@ -83,6 +83,47 @@ serve(async (req) => {
       )
     }
 
+    // Fetch recent rivalry history (last 5 completed shows) for rivalry commentary
+    const { data: recentShows, error: historyError } = await supabase
+      .from('shows')
+      .select('show_number, prompt, profile_a_answer, profile_b_answer, winner_id, judge_data')
+      .eq('rivalry_id', show.rivalry_id)
+      .eq('status', 'complete')
+      .order('show_number', { ascending: false })
+      .limit(5)
+
+    // Build rivalry context string
+    let rivalryContext = ''
+    if (!historyError && recentShows && recentShows.length > 0) {
+      const profileA = show.rivalry.profile_a
+      const profileB = show.rivalry.profile_b
+      
+      // Calculate stats
+      const totalShows = show.show_number - 1 // Current show hasn't been judged yet
+      const profileAWins = recentShows.filter(s => s.winner_id === profileA.id).length
+      const profileBWins = recentShows.filter(s => s.winner_id === profileB.id).length
+      
+      rivalryContext = `
+RIVALRY CONTEXT (for your commentary):
+- Total shows completed: ${totalShows}
+- Current standings: ${profileA.name} ${profileAWins} wins, ${profileB.name} ${profileBWins} wins
+- Recent shows (newest first):
+${recentShows.map((s, i) => {
+  const winner = s.winner_id === profileA.id ? profileA.name : profileB.name
+  const avgScore = s.judge_data?.scores ? 
+    Object.values(s.judge_data.scores).reduce((sum: number, data: any) => {
+      const total = (data.profile_a_score || 0) + (data.profile_b_score || 0)
+      return sum + total
+    }, 0) / (Object.keys(s.judge_data.scores).length * 2) : 0
+  
+  return `  Show ${s.show_number}: "${s.prompt}"
+    ${profileA.name}: "${s.profile_a_answer}"
+    ${profileB.name}: "${s.profile_b_answer}"
+    Winner: ${winner} (avg score: ${avgScore.toFixed(1)}/10)`
+}).join('\n')}
+`
+    }
+
     // Build prompt from template
     const profileA = show.rivalry.profile_a
     const profileB = show.rivalry.profile_b
@@ -121,6 +162,17 @@ SCORING GUIDELINES:
 - 3-4: Weak, missed the mark
 - 1-2: Terrible, completely off
 
+${rivalryContext}
+
+ADDITIONAL TASK - RIVALRY COMMENTARY:
+One of you judges will provide 2-3 sentence commentary on the overall rivalry arc. This should:
+- Comment on playing styles/strategies you're observing
+- Note rivalry dynamics (competitive? one-sided? evolving?)
+- Provide character insights about the players
+- Focus on what makes this rivalry interesting, NOT just who's ahead
+- Stay in YOUR character voice
+- Be 2-3 sentences max, punchy and insightful
+
 CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation before or after.
 
 Format:
@@ -151,7 +203,11 @@ Format:
       "one_liner": "..."
     }
   ],
-  "banter": "Judge1: comment\\nJudge2: response\\nJudge3: response\\nJudge1: final word"
+  "banter": "Judge1: comment\\nJudge2: response\\nJudge3: response\\nJudge1: final word",
+  "rivalry_comment": {
+    "judge": "one of the three judge names above",
+    "text": "2-3 sentence commentary on the rivalry arc"
+  }
 }`
 
     // Call Claude API
@@ -218,6 +274,16 @@ Format:
       }
     })
 
+    // Process rivalry commentary - convert judge name to key
+    let rivalryComment = null
+    if (judgeResponse.rivalry_comment) {
+      const commentJudge = judges.find(j => j.name === judgeResponse.rivalry_comment.judge)
+      rivalryComment = {
+        judge: commentJudge?.key || judgeResponse.rivalry_comment.judge.toLowerCase(),
+        text: judgeResponse.rivalry_comment.text
+      }
+    }
+
     // Update show with judging results
     const { error: updateError } = await supabase
       .from('shows')
@@ -228,7 +294,8 @@ Format:
         judge_data: {
           verdict: `${judgeResponse.winner} won!`,
           scores: scores,
-          banter: banter
+          banter: banter,
+          rivalry_comment: rivalryComment
         }
       })
       .eq('id', showId)
