@@ -5,6 +5,7 @@ import Header from './Header';
 import confetti from 'canvas-confetti';
 import HowToPlayModal from './HowToPlayModal';
 import GoldenMic from '../assets/microphone.svg';
+import InterstitialScreen from './InterstitialScreen';
 
 // Winner declarations (what you see when you win)
 const winnerDeclarations = [
@@ -67,6 +68,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [isCreatingShow, setIsCreatingShow] = useState(false);
   const [verdictDeclaration, setVerdictDeclaration] = useState('');
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showInterstitial, setShowInterstitial] = useState(false);
+  const [interstitialText, setInterstitialText] = useState('');
   const confettiShownRef = useRef(new Set()); // Track which shows have shown confetti
 
   // Load rivalry and current show
@@ -529,9 +532,39 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         .single();
 
       if (existingShow) {
+        // Show exists - check if it has emcee_text and show interstitial
+        if (existingShow.emcee_text && nextShowNumber > 1) {
+          setInterstitialText(existingShow.emcee_text);
+          setShowInterstitial(true);
+          // Don't load show yet - interstitial will do it via onComplete
+          setAutoAdvance(true);
+          return;
+        }
+        
+        // No emcee text or Show 1 - load directly
         setCurrentShow(existingShow);
-        setAutoAdvance(true); // Reset auto-advance for next show
+        setAutoAdvance(true);
         return;
+      }
+
+      // Get Ripley's commentary BEFORE creating show (only for Show 2+)
+      let emceeText = null;
+      if (nextShowNumber > 1) {
+        try {
+          const emceeResponse = await supabase.functions.invoke('select-emcee-line', {
+            body: {
+              rivalryId: rivalryId,
+              showNumber: nextShowNumber
+            }
+          });
+
+          if (emceeResponse.data?.emcee_text) {
+            emceeText = emceeResponse.data.emcee_text;
+          }
+        } catch (emceeErr) {
+          console.error('Failed to get emcee text:', emceeErr);
+          // Continue without emcee text
+        }
       }
 
       // Get a random prompt and judges from database
@@ -539,7 +572,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       const judgeObjects = await selectJudges();
       const judgeKeys = judgeObjects.map(j => j.key);
 
-      // Create next show
+      // Create next show (with emcee_text if we got it)
       const { data: newShow, error } = await supabase
         .from('shows')
         .insert({
@@ -550,7 +583,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           judges: judgeKeys,
           profile_a_id: rivalry.profile_a_id,
           profile_b_id: rivalry.profile_b_id,
-          status: 'waiting'
+          status: 'waiting',
+          emcee_text: emceeText
         })
         .select()
         .single();
@@ -566,15 +600,34 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
             .single();
           
           if (fetchedShow) {
+            // Show interstitial if show has emcee_text and is Show 2+
+            if (fetchedShow.emcee_text && nextShowNumber > 1) {
+              setInterstitialText(fetchedShow.emcee_text);
+              setShowInterstitial(true);
+              setAutoAdvance(true);
+              return;
+            }
+            
+            // No emcee text or Show 1 - load directly
             setCurrentShow(fetchedShow);
-            setAutoAdvance(true); // Reset auto-advance for next show
+            setAutoAdvance(true);
           }
         } else {
           console.error('Error creating next show:', error);
         }
       } else {
+        // Show created successfully
+        // Show interstitial if we have emcee_text and it's Show 2+
+        if (newShow.emcee_text && nextShowNumber > 1) {
+          setInterstitialText(newShow.emcee_text);
+          setShowInterstitial(true);
+          setAutoAdvance(true);
+          return;
+        }
+        
+        // No emcee text or Show 1 - load directly
         setCurrentShow(newShow);
-        setAutoAdvance(true); // Reset auto-advance for next show
+        setAutoAdvance(true);
       }
     } catch (err) {
       console.error('Error in createNextShow:', err);
@@ -789,6 +842,32 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const opponentWins = previousShows.filter(s => s.winner_id === (activeProfileId === rivalry.profile_a_id ? rivalry.profile_b_id : rivalry.profile_a_id)).length;
   const iAmMicHolder = rivalry.mic_holder_id === activeProfileId;
   const showMic = myWins > 0 || opponentWins > 0; // Only show mic if someone has won at least one show
+
+  // Show interstitial if flag is set
+  if (showInterstitial && interstitialText) {
+    return (
+      <InterstitialScreen
+        emceeText={interstitialText}
+        onComplete={async () => {
+          setShowInterstitial(false);
+          // Load the next show that was created
+          const nextShowNumber = currentShow.show_number + 1;
+          const { data: show } = await supabase
+            .from('shows')
+            .select('*')
+            .eq('rivalry_id', rivalryId)
+            .eq('show_number', nextShowNumber)
+            .single();
+          
+          if (show) {
+            setCurrentShow(show);
+            setAutoAdvance(true);
+          }
+        }}
+        duration={10000}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">

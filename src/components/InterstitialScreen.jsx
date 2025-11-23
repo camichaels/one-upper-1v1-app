@@ -43,9 +43,9 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
             </div>
           </div>
 
-          {/* Ripley Label - Bigger and bolder */}
+          {/* Ripley Label */}
           <div className="text-base font-bold text-orange-400 tracking-wider uppercase">
-            Host Ripley Says...
+            Ripley, Your Game Host
           </div>
 
           {/* Emcee Text - No box, just text */}
@@ -59,16 +59,12 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
       </div>
 
       {/* Buttons - Bottom (visible without scrolling) */}
-      <div className="max-w-md mx-auto w-full space-y-2 pb-4">
+      <div className="max-w-md mx-auto w-full space-y-2 pb-16">
         {autoAdvance ? (
           <>
             {/* Countdown button with embedded timer */}
             <button
-              onClick={() => {
-                setAutoAdvance(false);
-                setCountdown(null);
-                onComplete();
-              }}
+              onClick={onComplete}
               className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
             >
               {countdown !== null ? `Continue in ${countdown}s • Skip` : 'CONTINUE'}
