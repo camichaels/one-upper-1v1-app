@@ -534,7 +534,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
       if (existingShow) {
         setCurrentShow(existingShow);
-        return;
+        return existingShow; // Return the show
       }
 
       // Get emcee text
@@ -605,16 +605,20 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           
           if (fetchedShow) {
             setCurrentShow(fetchedShow);
+            return fetchedShow; // Return the show
           }
         } else {
           console.error('Error creating next show:', error);
         }
       } else {
         setCurrentShow(newShow);
+        return newShow; // Return the new show
       }
     } catch (err) {
       console.error('Error in createNextShow:', err);
     }
+    
+    return null; // Return null if failed
   }
 
   async function sendNudge() {
@@ -1258,10 +1262,10 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       onClick={async () => {
                         setAutoAdvance(false);
                         setCountdown(null);
-                        await createNextShow();
+                        const nextShow = await createNextShow();
                         
-                        if (currentShow?.emcee_text) {
-                          setInterstitialText(currentShow.emcee_text);
+                        if (nextShow?.emcee_text) {
+                          setInterstitialText(nextShow.emcee_text);
                           setShowInterstitial(true);
                         }
                       }}
@@ -1284,10 +1288,10 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                 ) : (
                   <button
                     onClick={async () => {
-                      await createNextShow();
+                      const nextShow = await createNextShow();
                       
-                      if (currentShow?.emcee_text) {
-                        setInterstitialText(currentShow.emcee_text);
+                      if (nextShow?.emcee_text) {
+                        setInterstitialText(nextShow.emcee_text);
                         setShowInterstitial(true);
                       }
                     }}
