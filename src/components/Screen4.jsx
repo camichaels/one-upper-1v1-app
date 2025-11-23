@@ -77,123 +77,6 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     loadRivalryAndShow();
   }, [activeProfileId, rivalryId]);
 
-  // Auto-create Show 1 with interstitial if rivalry started but no show exists
-  // OR show interstitial if Show 1 already exists with emcee_text
-  useEffect(() => {
-    console.log('🎬 Show 1 auto-create check:', {
-      loading,
-      rivalry: !!rivalry,
-      currentShow: !!currentShow,
-      showNumber: currentShow?.show_number,
-      hasEmceeText: !!currentShow?.emcee_text,
-      isCreatingShow,
-      first_show_started: rivalry?.first_show_started
-    });
-    
-    // If Show 1 already exists with emcee_text, show interstitial
-    if (!loading && currentShow?.show_number === 1 && currentShow?.emcee_text && !showInterstitial) {
-      console.log('🎬 Show 1 already exists with emcee text, showing interstitial');
-      setInterstitialText(currentShow.emcee_text);
-      setShowInterstitial(true);
-      return;
-    }
-    
-    if (loading) {
-      console.log('🎬 Skipping: still loading');
-      return;
-    }
-    if (!rivalry) {
-      console.log('🎬 Skipping: no rivalry');
-      return;
-    }
-    if (currentShow) {
-      console.log('🎬 Skipping: show already exists');
-      return;
-    }
-    if (isCreatingShow) {
-      console.log('🎬 Skipping: already creating');
-      return;
-    }
-    if (!rivalry.first_show_started) {
-      console.log('🎬 Skipping: first_show_started is false');
-      return;
-    }
-    
-    // Rivalry started but no show exists - auto-create Show 1
-    console.log('🎬 ✅ All checks passed! Auto-creating Show 1 with interstitial');
-    
-    async function autoCreateShow1() {
-      setIsCreatingShow(true);
-      
-      // Check one more time if opponent created it
-      const { data: checkShow } = await supabase
-        .from('shows')
-        .select('*')
-        .eq('rivalry_id', rivalryId)
-        .eq('show_number', 1)
-        .single();
-      
-      if (checkShow) {
-        console.log('🎬 Show 1 already exists, loading it');
-        if (checkShow.emcee_text) {
-          setInterstitialText(checkShow.emcee_text);
-          setShowInterstitial(true);
-        }
-        setCurrentShow(checkShow);
-        setIsCreatingShow(false);
-        return;
-      }
-      
-      // Get emcee intro text
-      const emceeText = rivalry.intro_emcee_text;
-      console.log('🎬 Using rivalry intro text:', emceeText);
-      
-      // Get random prompt and judges
-      const prompt = await getRandomPrompt();
-      const judgeObjects = await selectJudges();
-      const judgeKeys = judgeObjects.map(j => j.key);
-      
-      // Create Show 1
-      const { data: newShow, error } = await supabase
-        .from('shows')
-        .insert({
-          rivalry_id: rivalryId,
-          show_number: 1,
-          prompt_id: prompt.id,
-          prompt: prompt.text,
-          judges: judgeKeys,
-          profile_a_id: rivalry.profile_a_id,
-          profile_b_id: rivalry.profile_b_id,
-          status: 'waiting',
-          emcee_text: emceeText
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        if (error.code === '23505') {
-          // Race condition - reload
-          console.log('🎬 Conflict, reloading');
-          await loadRivalryAndShow();
-        } else {
-          console.error('Error creating Show 1:', error);
-        }
-      } else if (newShow) {
-        console.log('🎬 Show 1 created:', newShow);
-        // Show interstitial
-        if (newShow.emcee_text) {
-          setInterstitialText(newShow.emcee_text);
-          setShowInterstitial(true);
-        }
-        setCurrentShow(newShow);
-      }
-      
-      setIsCreatingShow(false);
-    }
-    
-    autoCreateShow1();
-  }, [loading, rivalry, currentShow, isCreatingShow]);
-
   // Real-time subscription for rivalry deletion
   useEffect(() => {
     if (!rivalryId) return;
@@ -1313,9 +1196,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     {currentShow.judge_data?.scores && (
                       <span className="ml-auto text-lg font-bold text-orange-500">
                         {(() => {
-                          const scores = Object.values(currentShow.judge_data.scores).map(data => 
-                            activeProfileId === currentShow.profile_a_id ? data.profile_a_score : data.profile_b_score
-                          );
+                          const scores = Object.values(currentShow.judge_data.scores)
+                            .map(data => activeProfileId === currentShow.profile_a_id ? data.profile_a_score : data.profile_b_score)
+                            .filter(score => typeof score === 'number' && !isNaN(score));
+                          
+                          if (scores.length === 0) return '—';
                           const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
                           return avg;
                         })()}
@@ -1340,9 +1225,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     {currentShow.judge_data?.scores && (
                       <span className="ml-auto text-lg font-bold text-orange-500">
                         {(() => {
-                          const scores = Object.values(currentShow.judge_data.scores).map(data => 
-                            activeProfileId === currentShow.profile_a_id ? data.profile_b_score : data.profile_a_score
-                          );
+                          const scores = Object.values(currentShow.judge_data.scores)
+                            .map(data => activeProfileId === currentShow.profile_a_id ? data.profile_b_score : data.profile_a_score)
+                            .filter(score => typeof score === 'number' && !isNaN(score));
+                          
+                          if (scores.length === 0) return '—';
                           const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
                           return avg;
                         })()}
