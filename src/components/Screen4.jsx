@@ -78,14 +78,25 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   }, [activeProfileId, rivalryId]);
 
   // Auto-create Show 1 with interstitial if rivalry started but no show exists
+  // OR show interstitial if Show 1 already exists with emcee_text
   useEffect(() => {
     console.log('🎬 Show 1 auto-create check:', {
       loading,
       rivalry: !!rivalry,
       currentShow: !!currentShow,
+      showNumber: currentShow?.show_number,
+      hasEmceeText: !!currentShow?.emcee_text,
       isCreatingShow,
       first_show_started: rivalry?.first_show_started
     });
+    
+    // If Show 1 already exists with emcee_text, show interstitial
+    if (!loading && currentShow?.show_number === 1 && currentShow?.emcee_text && !showInterstitial) {
+      console.log('🎬 Show 1 already exists with emcee text, showing interstitial');
+      setInterstitialText(currentShow.emcee_text);
+      setShowInterstitial(true);
+      return;
+    }
     
     if (loading) {
       console.log('🎬 Skipping: still loading');

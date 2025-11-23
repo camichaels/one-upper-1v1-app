@@ -24,7 +24,7 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
   }, [autoAdvance, onComplete]);
 
   return (
-    <div className="min-h-screen bg-amber-950/10 px-5 py-6 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-6 flex flex-col">
       <Header />
       
       {/* Main Content - Vertically Centered */}
@@ -33,7 +33,7 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
           
           {/* Ripley Icon - Compact */}
           <div className="relative">
-            <div className="absolute inset-0 bg-amber-500/30 blur-3xl rounded-full"></div>
+            <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full"></div>
             <div className="relative">
               <img 
                 src={RipleyIcon} 
@@ -43,9 +43,9 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
             </div>
           </div>
 
-          {/* Ripley Label - Close to icon */}
-          <div className="text-xs font-bold text-amber-400 tracking-wider uppercase -mt-2">
-            Host Ripley says...
+          {/* Ripley Label - Bigger and bolder */}
+          <div className="text-base font-bold text-orange-400 tracking-wider uppercase">
+            Host Ripley Says...
           </div>
 
           {/* Emcee Text - No box, just text */}
