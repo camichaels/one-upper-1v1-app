@@ -86,7 +86,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         table: 'rivalries',
         filter: `id=eq.${rivalryId}`
       }, (payload) => {
-        alert('😢 Rivalry Ended\n\nYour opponent cancelled the Rivalry.\n\nYour Show history has been saved.');
+        alert('😢 Rivalry Ended\n\nThis Rivalry has been cancelled.\n\nYour Show history has been saved.');
         onNavigate('screen1');
       })
       .subscribe();
@@ -518,7 +518,6 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
   async function createNextShow() {
     try {
-      setAutoAdvance(true); // Reset auto-advance for next show
       const nextShowNumber = currentShow.show_number + 1;
 
       // Check if show already exists (avoid race condition)
@@ -531,6 +530,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
       if (existingShow) {
         setCurrentShow(existingShow);
+        setAutoAdvance(true); // Reset auto-advance for next show
         return;
       }
 
@@ -567,12 +567,14 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           
           if (fetchedShow) {
             setCurrentShow(fetchedShow);
+            setAutoAdvance(true); // Reset auto-advance for next show
           }
         } else {
           console.error('Error creating next show:', error);
         }
       } else {
         setCurrentShow(newShow);
+        setAutoAdvance(true); // Reset auto-advance for next show
       }
     } catch (err) {
       console.error('Error in createNextShow:', err);
@@ -1206,11 +1208,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   <>
                     {/* Countdown button with embedded timer */}
                     <button
-                      onClick={() => {
-                        setAutoAdvance(false);
-                        setCountdown(null);
-                        createNextShow();
-                      }}
+                      onClick={createNextShow}
                       className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
                     >
                       {countdown !== null ? `Next Show in ${countdown}s • Start Now` : 'START NEXT SHOW →'}

@@ -527,7 +527,7 @@ return {
                   type="text"
                   value={createFormData.name}
                   onChange={(e) => setCreateFormData({ ...createFormData, name: e.target.value })}
-                  placeholder="Craig"
+                  placeholder="Profile name"
                   className="w-full px-3 py-2 bg-slate-700/50 border border-slate-600 rounded text-slate-100 focus:outline-none focus:border-orange-500"
                   autoFocus
                 />

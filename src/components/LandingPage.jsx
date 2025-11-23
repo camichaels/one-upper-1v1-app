@@ -87,7 +87,7 @@ export default function LandingPage() {
           {/* Judge Cards */}
           <div className="space-y-4">
             {/* Judge 1: Savage Sarah */}
-            <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+            <div className="bg-slate-700/50 rounded-lg p-4">
               <div className="flex items-start gap-4">
                 <div className="text-4xl">😈</div>
                 <div className="flex-1">
@@ -101,7 +101,7 @@ export default function LandingPage() {
             </div>
 
             {/* Judge 2: Coach Kevin */}
-            <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+            <div className="bg-slate-700/50 rounded-lg p-4">
               <div className="flex items-start gap-4">
                 <div className="text-4xl">💪</div>
                 <div className="flex-1">
@@ -115,7 +115,7 @@ export default function LandingPage() {
             </div>
 
             {/* Judge 3: Snoot Wellington III */}
-            <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-4">
+            <div className="bg-slate-700/50 rounded-lg p-4">
               <div className="flex items-start gap-4">
                 <div className="text-4xl">🎩</div>
                 <div className="flex-1">
@@ -145,7 +145,7 @@ export default function LandingPage() {
           <h2 className="text-2xl font-bold text-orange-500 text-center mb-6">WHAT YOU'RE PLAYING FOR</h2>
           
           {/* Golden Mic Callout */}
-          <div className="bg-slate-700/50 border-2 border-orange-500/50 rounded-lg p-8 text-center">
+          <div className="rounded-lg p-8 text-center">
             <img 
               src={GoldenMic} 
               alt="Golden Microphone" 
