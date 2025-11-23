@@ -7,6 +7,114 @@ import HowToPlayModal from './HowToPlayModal';
 import GoldenMic from '../assets/microphone.svg';
 import InterstitialScreen from './InterstitialScreen';
 
+// Brain Boost Messages - shown while waiting for opponent after submitting
+const waitingBrainBoosts = [
+  "Creative spark ignited",
+  "Brain boost earned",
+  "Original thinking activated",
+  "Neural pathways fired",
+  "Creativity flexed",
+  "Quick wit engaged",
+  "That was pure imagination",
+  "Improvisation unlocked",
+  "You just got sharper",
+  "Creative muscle stretched",
+  "Lateral thinking deployed",
+  "Originality confirmed",
+  "Mental agility +1",
+  "Creative range expanded",
+  "Brain workout complete",
+  "Thinking outside the box",
+  "Innovation activated",
+  "Creative confidence building",
+  "That's creative problem-solving",
+  "Wit sharpened",
+  "Clever thinking applied",
+  "Imagination unleashed",
+  "Mental flexibility increased",
+  "Creative instinct trusted",
+  "Quick thinking practiced",
+  "Originality expressed",
+  "Creative courage shown",
+  "Brain cells celebrating",
+  "Unexpected connection made",
+  "Creative flow activated",
+  "Thinking differently",
+  "Mental gymnastics complete",
+  "Creative spark captured",
+  "Improvisation skills leveled up",
+  "Wit training in progress",
+  "Creative boundaries pushed",
+  "Lateral thinking engaged",
+  "Brain plasticity at work",
+  "Creative output logged",
+  "Thinking on your feet",
+  "Cognitive flexibility +1",
+  "Creative momentum building",
+  "Mental sharpness confirmed",
+  "Originality points earned",
+  "Creative synapses firing",
+  "Quick wit demonstrated",
+  "Imagination working overtime",
+  "Creative thinking validated",
+  "Brain boost secured",
+  "Mental agility proven"
+];
+
+// Verdict Screen Brain Boosts - shown after artifacts
+const verdictBrainBoosts = [
+  "Your brain just got a little sharper.",
+  "That's creative thinking in action.",
+  "One prompt down, infinite possibilities unlocked.",
+  "You're building creative muscle with every show.",
+  "Quick thinking is a skill. You just practiced it.",
+  "Fun fact: You're training your brain while having fun.",
+  "Every answer is a mini creative workout.",
+  "This is what daily creative practice looks like.",
+  "Keep this up and you'll be unstoppable.",
+  "Your creative range is expanding.",
+  "That's the kind of thinking that solves problems.",
+  "You just exercised three mental skills: wit, speed, and originality.",
+  "Creative thinking isn't magic. It's practice. You're doing it.",
+  "Most people never flex their imagination. You just did.",
+  "Your brain loves novelty. You just gave it a treat.",
+  "Quick wit is trainable. You're training it right now.",
+  "That prompt made you think differently. That's the point.",
+  "You just proved you can think on your feet.",
+  "Creative confidence builds one answer at a time.",
+  "Your improvisation skills just got stronger.",
+  "Lateral thinking: the art of seeing connections others miss. You're practicing it.",
+  "Every creative act rewires your brain slightly. You just rewired yours.",
+  "You're not just playing a game. You're training a superpower.",
+  "Quick thinking under pressure is a learnable skill. You're learning it.",
+  "Your brain just formed new neural connections. That's how creativity works.",
+  "Most people avoid creative challenges. You're seeking them out.",
+  "That answer required courage. Creative thinking always does.",
+  "You just demonstrated mental flexibility. That's rare.",
+  "Creative problem-solving is a muscle. You're at the gym.",
+  "Your willingness to be original is what makes you interesting.",
+  "That prompt pushed you outside your comfort zone. Growth happens there.",
+  "You're practicing the skill of generating ideas on demand.",
+  "Quick wit isn't innate. It's practiced. You're practicing.",
+  "Every creative answer strengthens your mental agility.",
+  "You just proved you can think creatively under time pressure.",
+  "Your brain's pattern-recognition system just got a workout.",
+  "Creative thinking is about making unexpected connections. You just made one.",
+  "Most people think they're not creative. You're proving them wrong about yourself.",
+  "That answer came from a place of originality. Own that.",
+  "You're building a habit of creative thinking. Habits compound.",
+  "Quick thinking is valuable in every part of life. You're sharpening it.",
+  "Your brain just experienced cognitive flexibility. That's what makes you adaptable.",
+  "Creative courage is choosing to share your ideas. You just showed it.",
+  "You're not just answering prompts. You're training your mind to think differently.",
+  "That answer required improvisation. Improvisation is a superpower.",
+  "Your creative output matters. You just created something from nothing.",
+  "Quick wit is about trusting your instincts. You're learning to trust yours.",
+  "Every show is a chance to surprise yourself. Did you surprise yourself this time?",
+  "You're practicing the skill that sets innovators apart: thinking differently on purpose.",
+  "Creative thinking is a daily practice. You're showing up for it."
+];
+
 // Winner declarations (what you see when you win)
 const winnerDeclarations = [
   'YOU ONE-UPPED THEM!',
@@ -70,6 +178,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [interstitialText, setInterstitialText] = useState('');
+  const [verdictBrainBoost, setVerdictBrainBoost] = useState('');
   const confettiShownRef = useRef(new Set()); // Track which shows have shown confetti
 
   // Load rivalry and current show
@@ -276,12 +385,19 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       }
       
       setVerdictDeclaration(randomDeclaration);
+      
+      // Set brain boost message once when verdict loads
+      if (!verdictBrainBoost) {
+        const randomBoost = verdictBrainBoosts[Math.floor(Math.random() * verdictBrainBoosts.length)];
+        setVerdictBrainBoost(randomBoost);
+      }
     }
-    // Reset declaration when show changes
+    // Reset declaration and brain boost when show changes
     if (currentShow?.status !== 'complete') {
       setVerdictDeclaration('');
+      setVerdictBrainBoost('');
     }
-  }, [currentShow?.status, currentShow?.winner_id, currentShow?.id, activeProfileId, verdictDeclaration, previousShows]);
+  }, [currentShow?.status, currentShow?.winner_id, currentShow?.id, activeProfileId, verdictDeclaration, verdictBrainBoost, previousShows]);
 
   async function loadRivalryAndShow() {
     setLoading(true);
@@ -1045,7 +1161,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
 
           {/* State B: Waiting */}
           {state === 'waiting' && (
-            <div className="text-center py-8 space-y-6">
+            <div className="text-center py-8 space-y-4">
               <div className="text-green-400 text-xl font-semibold">✓ You submitted</div>
               <div className="text-slate-300 text-lg">⏳ Waiting for {opponentProfile.name}...</div>
               <button
@@ -1310,6 +1426,19 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   })}
                 </div>
               )}
+
+              {/* Brain Boost Section */}
+              <div className="bg-slate-800/20 rounded-lg p-4 mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">💡</span>
+                  <span className="text-sm font-bold text-slate-300">
+                    You Boosted Your Brain
+                  </span>
+                </div>
+                <p className="text-sm text-slate-200 leading-relaxed">
+                  {verdictBrainBoost}
+                </p>
+              </div>
 
               {/* Next Show Buttons */}
               <div className="space-y-2">
