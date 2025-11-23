@@ -685,32 +685,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         .update({ first_show_started: true })
         .eq('id', rivalry.id);
 
-      // Get a random prompt and judges from database
-      const prompt = await getRandomPrompt();
-      const judgeObjects = await selectJudges();
-      const judgeKeys = judgeObjects.map(j => j.key);
-
-      // Create first show
-      const { data: showData, error: showError } = await supabase
-        .from('shows')
-        .insert({
-          rivalry_id: rivalry.id,
-          show_number: 1,
-          prompt_id: prompt.id,
-          prompt: prompt.text,
-          judges: judgeKeys,
-          profile_a_id: rivalry.profile_a_id,
-          profile_b_id: rivalry.profile_b_id,
-          status: 'waiting'
-        })
-        .select();
-
-      if (showError) {
-        console.error('Error creating first show:', showError);
-        return;
-      }
-
-      // Navigate to Screen 4
+      // Navigate to Screen 4 - it will create Show 1 with interstitial
       onNavigate('screen4', {
         activeProfileId: profile.id,
         rivalryId: rivalry.id
@@ -1330,14 +1305,28 @@ if (currentState === 'C') {
           </div>
 
           {/* Centered content */}
-          <div className="text-center">
-            <div className="text-3xl font-bold text-orange-500 mb-4">
+          <div className="text-center space-y-6">
+            <div className="text-3xl font-bold text-orange-500">
               🎉 Rivalry Started!
             </div>
 
-            <p className="text-slate-300 text-lg mb-12">
-              You're now facing your opponent
-            </p>
+            {/* Ripley's Welcome Commentary */}
+            {rivalry?.intro_emcee_text && (
+              <div className="max-w-md mx-auto px-4 py-6">
+                <p className="text-lg text-slate-200 leading-relaxed font-medium italic">
+                  "{rivalry.intro_emcee_text}"
+                </p>
+                <p className="text-sm text-orange-400 mt-3 font-semibold">
+                  — Host Ripley
+                </p>
+              </div>
+            )}
+
+            {!rivalry?.intro_emcee_text && (
+              <p className="text-slate-300 text-lg">
+                You're now facing your opponent
+              </p>
+            )}
 
             <button
               onClick={handleStartFirstShow}
