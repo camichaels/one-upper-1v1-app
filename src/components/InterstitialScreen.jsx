@@ -24,33 +24,33 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
   }, [autoAdvance, onComplete]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 py-8 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-amber-950/20 via-slate-900 to-slate-900 px-5 py-6 flex flex-col">
       <Header />
       
-      {/* Main Content - Centered */}
-      <div className="flex-1 flex items-center justify-center">
-        <div className="max-w-md w-full text-center space-y-8">
+      {/* Main Content - Vertically Centered */}
+      <div className="flex-1 flex items-center justify-center py-4">
+        <div className="max-w-md w-full text-center space-y-6">
           
-          {/* Ripley Icon with Spotlight Effect */}
+          {/* Ripley Icon - Compact */}
           <div className="relative">
-            <div className="absolute inset-0 bg-orange-500/20 blur-3xl rounded-full"></div>
+            <div className="absolute inset-0 bg-amber-500/30 blur-3xl rounded-full"></div>
             <div className="relative">
               <img 
                 src={RipleyIcon} 
                 alt="Ripley" 
-                className="w-24 h-24 mx-auto mb-4 drop-shadow-2xl"
+                className="w-20 h-20 mx-auto drop-shadow-2xl"
               />
             </div>
           </div>
 
-          {/* Ripley Label */}
-          <div className="text-sm font-bold text-orange-500 tracking-wider uppercase">
-            Ripley • Producer
+          {/* Ripley Label - Close to icon */}
+          <div className="text-xs font-bold text-amber-400 tracking-wider uppercase -mt-2">
+            Host Ripley says...
           </div>
 
-          {/* Emcee Text */}
-          <div className="bg-slate-800/30 backdrop-blur-sm rounded-2xl p-6 border border-slate-700/50">
-            <p className="text-lg text-slate-100 leading-relaxed font-medium">
+          {/* Emcee Text - No box, just text */}
+          <div className="px-4 py-2">
+            <p className="text-xl text-slate-100 leading-relaxed font-medium">
               {emceeText}
             </p>
           </div>
@@ -58,8 +58,8 @@ export default function InterstitialScreen({ emceeText, onComplete, duration = 1
         </div>
       </div>
 
-      {/* Buttons - Bottom (matching Screen4 verdict button treatment) */}
-      <div className="max-w-md mx-auto w-full space-y-2">
+      {/* Buttons - Bottom (visible without scrolling) */}
+      <div className="max-w-md mx-auto w-full space-y-2 pb-4">
         {autoAdvance ? (
           <>
             {/* Countdown button with embedded timer */}

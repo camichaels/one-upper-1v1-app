@@ -77,6 +77,89 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     loadRivalryAndShow();
   }, [activeProfileId, rivalryId]);
 
+  // Auto-create Show 1 with interstitial if rivalry started but no show exists
+  useEffect(() => {
+    if (loading) return; // Wait for initial load
+    if (!rivalry) return; // No rivalry loaded yet
+    if (currentShow) return; // Show already exists
+    if (isCreatingShow) return; // Already creating
+    if (!rivalry.first_show_started) return; // First show not initiated yet
+    
+    // Rivalry started but no show exists - auto-create Show 1
+    console.log('🎬 Auto-creating Show 1 with interstitial');
+    
+    async function autoCreateShow1() {
+      setIsCreatingShow(true);
+      
+      // Check one more time if opponent created it
+      const { data: checkShow } = await supabase
+        .from('shows')
+        .select('*')
+        .eq('rivalry_id', rivalryId)
+        .eq('show_number', 1)
+        .single();
+      
+      if (checkShow) {
+        console.log('🎬 Show 1 already exists, loading it');
+        if (checkShow.emcee_text) {
+          setInterstitialText(checkShow.emcee_text);
+          setShowInterstitial(true);
+        }
+        setCurrentShow(checkShow);
+        setIsCreatingShow(false);
+        return;
+      }
+      
+      // Get emcee intro text
+      const emceeText = rivalry.intro_emcee_text;
+      console.log('🎬 Using rivalry intro text:', emceeText);
+      
+      // Get random prompt and judges
+      const prompt = await getRandomPrompt();
+      const judgeObjects = await selectJudges();
+      const judgeKeys = judgeObjects.map(j => j.key);
+      
+      // Create Show 1
+      const { data: newShow, error } = await supabase
+        .from('shows')
+        .insert({
+          rivalry_id: rivalryId,
+          show_number: 1,
+          prompt_id: prompt.id,
+          prompt: prompt.text,
+          judges: judgeKeys,
+          profile_a_id: rivalry.profile_a_id,
+          profile_b_id: rivalry.profile_b_id,
+          status: 'waiting',
+          emcee_text: emceeText
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        if (error.code === '23505') {
+          // Race condition - reload
+          console.log('🎬 Conflict, reloading');
+          await loadRivalryAndShow();
+        } else {
+          console.error('Error creating Show 1:', error);
+        }
+      } else if (newShow) {
+        console.log('🎬 Show 1 created:', newShow);
+        // Show interstitial
+        if (newShow.emcee_text) {
+          setInterstitialText(newShow.emcee_text);
+          setShowInterstitial(true);
+        }
+        setCurrentShow(newShow);
+      }
+      
+      setIsCreatingShow(false);
+    }
+    
+    autoCreateShow1();
+  }, [loading, rivalry, currentShow, isCreatingShow]);
+
   // Real-time subscription for rivalry deletion
   useEffect(() => {
     if (!rivalryId) return;
