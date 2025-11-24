@@ -10,10 +10,30 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [error, setError] = useState(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [allShows, setAllShows] = useState([]);
 
   useEffect(() => {
     loadSummary();
+    loadAllShows();
   }, []);
+
+  async function loadAllShows() {
+    try {
+      const { data: shows, error: showsError } = await supabase
+        .from('shows')
+        .select('*')
+        .eq('rivalry_id', rivalryId)
+        .eq('status', 'complete')
+        .order('show_number', { ascending: false });
+      
+      if (!showsError && shows) {
+        setAllShows(shows);
+      }
+    } catch (err) {
+      console.error('Failed to load shows:', err);
+    }
+  }
 
   async function loadSummary() {
     try {
@@ -169,6 +189,25 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     });
   }
 
+  // Function to skip summary and go home
+  async function handleSkipSummary() {
+    try {
+      // Mark rivalry as complete without summary
+      await supabase
+        .from('rivalries')
+        .update({ 
+          status: 'complete',
+          ended_at: new Date().toISOString()
+        })
+        .eq('id', rivalryId);
+      
+      onNavigate('screen1');
+    } catch (err) {
+      console.error('Failed to skip summary:', err);
+      onNavigate('screen1');
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -204,12 +243,14 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               </button>
             )}
           </div>
-          <button
-            onClick={handleChallengeNewFriend}
-            className="w-full px-4 py-3 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-semibold"
-          >
-            Back to Home
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleSkipSummary}
+              className="w-full px-4 py-3 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-semibold"
+            >
+              Skip Summary & Go Home
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -314,6 +355,56 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* Past Shows - Collapsible */}
+        <button
+          onClick={() => setShowHistory(!showHistory)}
+          className="w-full py-3 bg-slate-800/50 border border-slate-700 rounded-lg font-semibold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-slate-200"
+        >
+          {showHistory ? (
+            <>
+              Hide Past Shows
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </>
+          ) : (
+            <>
+              See Past Shows
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
+        </button>
+
+        {showHistory && allShows.length > 0 && (
+          <div className="space-y-3">
+            {allShows.map((show) => (
+              <button
+                key={show.id}
+                onClick={() => onNavigate('screen6', { 
+                  showId: show.id, 
+                  fromSummary: true,
+                  rivalryId: rivalryId 
+                })}
+                className="w-full bg-slate-800/50 rounded-xl p-4 border border-slate-700 hover:bg-slate-700 transition-colors text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex-1 min-w-0 mr-3">
+                    <p className="font-semibold text-slate-100">Show {show.show_number} of {RIVALRY_LENGTH}</p>
+                    <p className="text-sm text-slate-400 line-clamp-1">{show.prompt}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    {show.winner_id === activeProfileId && (
+                      <span className="text-xl">🎤</span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
         )}
 

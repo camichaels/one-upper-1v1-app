@@ -1466,7 +1466,13 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       onClick={createNextShow}
                       className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
                     >
-                      {countdown !== null ? `Next Show in ${countdown}s • Start Now` : 'START NEXT SHOW →'}
+                      {countdown !== null 
+                        ? (currentShow.show_number === RIVALRY_LENGTH 
+                            ? `Rivalry Summary in ${countdown}s • View Now` 
+                            : `Next Show in ${countdown}s • Start Now`)
+                        : (currentShow.show_number === RIVALRY_LENGTH 
+                            ? 'VIEW RIVALRY SUMMARY →' 
+                            : 'START NEXT SHOW →')}
                     </button>
                     
                     {/* Stay Here button */}
@@ -1485,9 +1491,9 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     onClick={createNextShow}
                     className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
                   >
-                    NEXT SHOW →
+                    {currentShow.show_number === RIVALRY_LENGTH ? 'VIEW RIVALRY SUMMARY →' : 'NEXT SHOW →'}
                   </button>
-                )}
+                )}}
               </div>
             </div>
           )}

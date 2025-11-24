@@ -65,6 +65,7 @@ function GameRouter({
   setShowId
 }) {
   const [currentScreen, setCurrentScreen] = useState('screen1');
+  const [fromSummary, setFromSummary] = useState(false);
 
   function handleNavigate(screenName, params = {}) {
     setCurrentScreen(screenName);
@@ -88,6 +89,12 @@ function GameRouter({
     } else {
       setShowId(null);
     }
+
+    if (params.fromSummary !== undefined) {
+      setFromSummary(params.fromSummary);
+    } else {
+      setFromSummary(false);
+    }
   }
 
   if (currentScreen === 'screen2') {
@@ -105,7 +112,14 @@ function GameRouter({
   }
 
   if (currentScreen === 'screen6') {
-    return <Screen6 onNavigate={handleNavigate} showId={showId} />;
+    return (
+      <Screen6 
+        onNavigate={handleNavigate} 
+        showId={showId} 
+        fromSummary={fromSummary}
+        rivalryId={rivalryId}
+      />
+    );
   }
 
   if (currentScreen === 'summary') {

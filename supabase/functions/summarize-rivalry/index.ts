@@ -61,6 +61,44 @@ serve(async (req) => {
       );
     }
 
+    // RACE CONDITION PREVENTION: Try to claim this rivalry for summary generation
+    // by setting status to 'summarizing'. Only one request will succeed.
+    const { data: claimResult, error: claimError } = await supabase
+      .from('rivalries')
+      .update({ status: 'summarizing' })
+      .eq('id', rivalryId)
+      .eq('status', 'active')  // Only update if still 'active'
+      .select()
+      .single();
+    
+    // If we couldn't claim it (status wasn't 'active'), someone else is generating
+    if (claimError || !claimResult) {
+      // Wait a moment and check if summary was generated
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const { data: refreshedRivalry } = await supabase
+        .from('rivalries')
+        .select('summary, status')
+        .eq('id', rivalryId)
+        .single();
+      
+      if (refreshedRivalry?.summary) {
+        const existingSummary = typeof refreshedRivalry.summary === 'string'
+          ? JSON.parse(refreshedRivalry.summary)
+          : refreshedRivalry.summary;
+        return new Response(
+          JSON.stringify(existingSummary),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Still no summary after waiting - return error so user can retry
+      return new Response(
+        JSON.stringify({ error: 'Summary generation in progress. Please wait and try again.' }),
+        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Fetch all shows for this rivalry
     const { data: shows, error: showsError } = await supabase
       .from('shows')
@@ -90,16 +128,20 @@ serve(async (req) => {
       }
 
       // Calculate total points from judge_data
+      // Structure: { scores: { judge_name: { profile_a_score: X, profile_b_score: Y } } }
       if (show.judge_data && show.judge_data.scores) {
-        const playerAScore = show.judge_data.scores
-          .filter((s: any) => s.player === 'a')
-          .reduce((sum: number, s: any) => sum + s.score, 0);
-        const playerBScore = show.judge_data.scores
-          .filter((s: any) => s.player === 'b')
-          .reduce((sum: number, s: any) => sum + s.score, 0);
+        const scores = show.judge_data.scores;
         
-        playerATotalPoints += playerAScore;
-        playerBTotalPoints += playerBScore;
+        // Iterate through each judge's scores (object keys)
+        for (const judgeName in scores) {
+          const judgeScores = scores[judgeName];
+          if (judgeScores.profile_a_score !== undefined) {
+            playerATotalPoints += judgeScores.profile_a_score;
+          }
+          if (judgeScores.profile_b_score !== undefined) {
+            playerBTotalPoints += judgeScores.profile_b_score;
+          }
+        }
       }
     });
 
@@ -132,14 +174,18 @@ serve(async (req) => {
       let playerAScore = 0;
       let playerBScore = 0;
       
-      // Calculate total scores from judge_data
+      // Calculate total scores from judge_data (object-based structure)
       if (show.judge_data && show.judge_data.scores) {
-        playerAScore = show.judge_data.scores
-          .filter((s: any) => s.player === 'a')
-          .reduce((sum: number, s: any) => sum + s.score, 0);
-        playerBScore = show.judge_data.scores
-          .filter((s: any) => s.player === 'b')
-          .reduce((sum: number, s: any) => sum + s.score, 0);
+        const scores = show.judge_data.scores;
+        for (const judgeName in scores) {
+          const judgeScores = scores[judgeName];
+          if (judgeScores.profile_a_score !== undefined) {
+            playerAScore += judgeScores.profile_a_score;
+          }
+          if (judgeScores.profile_b_score !== undefined) {
+            playerBScore += judgeScores.profile_b_score;
+          }
+        }
       }
       
       const margin = Math.abs(playerAScore - playerBScore);
