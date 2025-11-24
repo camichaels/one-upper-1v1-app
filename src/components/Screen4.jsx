@@ -646,6 +646,16 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     try {
       const nextShowNumber = currentShow.show_number + 1;
 
+      // CHECK: If we just completed the final show, go to summary instead
+      if (currentShow.show_number === RIVALRY_LENGTH) {
+        console.log(`Show ${RIVALRY_LENGTH} complete - navigating to summary`);
+        onNavigate('summary', {
+          activeProfileId,
+          rivalryId
+        });
+        return;
+      }
+
       // Check if show already exists (avoid race condition)
       const { data: existingShow } = await supabase
         .from('shows')

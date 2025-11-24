@@ -5,6 +5,7 @@ import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
 import Screen4 from './components/Screen4';
 import Screen6 from './components/Screen6';
+import RivalrySummaryScreen from './components/RivalrySummaryScreen';
 import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
@@ -105,6 +106,16 @@ function GameRouter({
 
   if (currentScreen === 'screen6') {
     return <Screen6 onNavigate={handleNavigate} showId={showId} />;
+  }
+
+  if (currentScreen === 'summary') {
+    return (
+      <RivalrySummaryScreen 
+        onNavigate={handleNavigate}
+        activeProfileId={activeProfileId}
+        rivalryId={rivalryId}
+      />
+    );
   }
 
   return <Screen1 onNavigate={handleNavigate} />;

@@ -105,6 +105,16 @@ serve(async (req)=>{
     if (triggerType === 'milestone') {
       conditions.push(`show_${showNumber}`);
     } else if (triggerType === 'show_transition' && showNumber > 1) {
+      // Check for special end-game shows first (shows 9, 10, 11)
+      if (showNumber === 9) {
+        conditions.push('show_9');
+      } else if (showNumber === 10) {
+        conditions.push('show_10');
+      } else if (showNumber === 11) {
+        conditions.push('show_11');
+      }
+      
+      // Then check game state conditions (these apply to all shows, including end-game)
       const scoreDiff = Math.abs(p1Score - p2Score);
       if (scoreDiff === 0) {
         conditions.push('tied_game');
