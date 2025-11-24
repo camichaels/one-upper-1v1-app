@@ -221,6 +221,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         table: 'rivalries',
         filter: `id=eq.${rivalryId}`
       }, (payload) => {
+        // Ignore updates if rivalry is completing/completed - prevents flash during summary generation
+        const newStatus = payload.new?.status;
+        if (newStatus === 'complete' || newStatus === 'summarizing') {
+          return;
+        }
         // Reload rivalry data to get updated mic_holder_id
         loadRivalryAndShow();
       })
@@ -262,8 +267,15 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     };
   }, [currentShow?.id]);
 
-  // Auto-advance countdown after verdict (30 seconds)
+  // Auto-advance countdown after verdict (30 seconds) - but NOT after final show
   useEffect(() => {
+    // Don't auto-advance after the final show - let players click manually
+    if (currentShow?.show_number === RIVALRY_LENGTH) {
+      setAutoAdvance(false);
+      setCountdown(null);
+      return;
+    }
+    
     if (currentShow?.status === 'complete' && autoAdvance) {
       const timer = setInterval(() => {
         setCountdown((prev) => {
@@ -280,7 +292,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
     } else {
       setCountdown(null);
     }
-  }, [currentShow?.status, autoAdvance]);
+  }, [currentShow?.status, currentShow?.show_number, autoAdvance]);
 
   // Judging timeout timer (tracks how long we've been in judging state)
   useEffect(() => {
@@ -1493,7 +1505,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   >
                     {currentShow.show_number === RIVALRY_LENGTH ? 'VIEW RIVALRY SUMMARY →' : 'NEXT SHOW →'}
                   </button>
-                )}}
+                )}
               </div>
             </div>
           )}

@@ -6,6 +6,7 @@ import GoldenMic from '../assets/microphone.svg';
 
 export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProfileId }) {
   const [loading, setLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [summary, setSummary] = useState(null);
   const [rivalry, setRivalry] = useState(null);
   const [error, setError] = useState(null);
@@ -61,7 +62,8 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         setSummary(parsedSummary);
         setLoading(false);
       } else {
-        // Generate new summary
+        // Generate new summary - show generating state
+        setIsGenerating(true);
         await generateSummary();
       }
     } catch (err) {
@@ -152,17 +154,25 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     }
   }
 
-  // Loading state
+  // Loading state - only show "generating" if we're actually generating
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="text-orange-500 text-2xl mb-4 animate-pulse">
-            ✨ Generating rivalry summary...
-          </div>
-          <div className="text-slate-400 text-sm">
-            Analyzing {RIVALRY_LENGTH} shows of creative brilliance
-          </div>
+          {isGenerating ? (
+            <>
+              <div className="text-orange-500 text-2xl mb-4 animate-pulse">
+                ✨ Generating rivalry summary...
+              </div>
+              <div className="text-slate-400 text-sm">
+                Analyzing {RIVALRY_LENGTH} shows of creative brilliance
+              </div>
+            </>
+          ) : (
+            <div className="text-slate-400 text-lg animate-pulse">
+              Loading...
+            </div>
+          )}
         </div>
       </div>
     );
@@ -292,15 +302,15 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
 
         {/* Memorable Moments */}
         {summary.memorable_moments && summary.memorable_moments.length > 0 && (
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-3">
+          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
             <h2 className="text-xl font-bold text-orange-400">Memorable Moments</h2>
-            <ul className="space-y-2">
+            <div className="space-y-4">
               {summary.memorable_moments.map((moment, index) => (
-                <li key={index} className="text-slate-200 leading-relaxed">
-                  • {moment}
-                </li>
+                <p key={index} className="text-slate-200 leading-relaxed">
+                  {moment}
+                </p>
               ))}
-            </ul>
+            </div>
           </div>
         )}
 
