@@ -370,7 +370,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
             onClick={handleChallengeNewFriend}
             className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
           >
-            Challenge a Friend
+            Start a New Rivalry
           </button>
 
           {/* Share Button */}

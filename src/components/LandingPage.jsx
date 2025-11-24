@@ -70,8 +70,8 @@ export default function LandingPage() {
                 3
               </div>
               <div>
-                <h3 className="font-bold text-slate-100 mb-1">Keep Going</h3>
-                <p className="text-slate-300 text-sm">The rivalry never ends. Can you keep winning?</p>
+                <h3 className="font-bold text-slate-100 mb-1">Win the Rivalry</h3>
+                <p className="text-slate-300 text-sm">11 shows. Most wins takes the Golden Mic.</p>
               </div>
             </div>
           </div>
@@ -153,7 +153,7 @@ export default function LandingPage() {
             />
             <h3 className="text-2xl font-bold text-orange-500 mb-3">The Golden Mic</h3>
             <p className="text-slate-200">
-              Winner of each show holds the mic... but maybe not for long, as it's back up for grabs when the next round starts.
+              Every rivalry is 11 shows. Win the most to claim the Golden Mic and bragging rights.
             </p>
           </div>
         </div>

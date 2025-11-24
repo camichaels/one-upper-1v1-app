@@ -198,22 +198,22 @@ Format:
     {
       "judge": "${judges[0].name}",
       "judge_emoji": "${judges[0].emoji}",
-      "${profileA.name.toLowerCase()}_score": 0,
-      "${profileB.name.toLowerCase()}_score": 0,
+      "player_a_score": 0,
+      "player_b_score": 0,
       "one_liner": "..."
     },
     {
       "judge": "${judges[1].name}",
       "judge_emoji": "${judges[1].emoji}",
-      "${profileA.name.toLowerCase()}_score": 0,
-      "${profileB.name.toLowerCase()}_score": 0,
+      "player_a_score": 0,
+      "player_b_score": 0,
       "one_liner": "..."
     },
     {
       "judge": "${judges[2].name}",
       "judge_emoji": "${judges[2].emoji}",
-      "${profileA.name.toLowerCase()}_score": 0,
-      "${profileB.name.toLowerCase()}_score": 0,
+      "player_a_score": 0,
+      "player_b_score": 0,
       "one_liner": "..."
     }
   ],
@@ -286,10 +286,45 @@ Format:
     const scores: Record<string, any> = {}
     judgeResponse.scores.forEach((score: any, idx: number) => {
       const judgeKey = judges[idx].key
+      
+      // Get scores with fallback - check multiple possible key formats
+      let playerAScore = score.player_a_score
+      let playerBScore = score.player_b_score
+      
+      // Fallback: try lowercase player name with underscore (legacy format)
+      if (playerAScore === undefined) {
+        const nameKey = profileA.name.toLowerCase().replace(/\s+/g, '_') + '_score'
+        playerAScore = score[nameKey]
+      }
+      if (playerBScore === undefined) {
+        const nameKey = profileB.name.toLowerCase().replace(/\s+/g, '_') + '_score'
+        playerBScore = score[nameKey]
+      }
+      
+      // Fallback: try lowercase player name with space (another legacy format)
+      if (playerAScore === undefined) {
+        const nameKey = profileA.name.toLowerCase() + '_score'
+        playerAScore = score[nameKey]
+      }
+      if (playerBScore === undefined) {
+        const nameKey = profileB.name.toLowerCase() + '_score'
+        playerBScore = score[nameKey]
+      }
+      
+      // Final fallback: default to 5 if still undefined (neutral score)
+      if (playerAScore === undefined || playerAScore === null || isNaN(playerAScore)) {
+        console.warn(`Missing player_a_score for judge ${judgeKey}, defaulting to 5`)
+        playerAScore = 5
+      }
+      if (playerBScore === undefined || playerBScore === null || isNaN(playerBScore)) {
+        console.warn(`Missing player_b_score for judge ${judgeKey}, defaulting to 5`)
+        playerBScore = 5
+      }
+      
       scores[judgeKey] = {
-        profile_a_score: score[`${profileA.name.toLowerCase()}_score`],
-        profile_b_score: score[`${profileB.name.toLowerCase()}_score`],
-        comment: score.one_liner
+        profile_a_score: playerAScore,
+        profile_b_score: playerBScore,
+        comment: score.one_liner || ''
       }
     })
 

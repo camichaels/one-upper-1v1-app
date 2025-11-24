@@ -182,6 +182,13 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [verdictBrainBoost, setVerdictBrainBoost] = useState('');
   const confettiShownRef = useRef(new Set()); // Track which shows have shown confetti
 
+  // Reset judgeView to 'scores' when show changes
+  useEffect(() => {
+    if (currentShow?.id) {
+      setJudgeView('scores');
+    }
+  }, [currentShow?.id]);
+
   // Load rivalry and current show
   useEffect(() => {
     loadRivalryAndShow();

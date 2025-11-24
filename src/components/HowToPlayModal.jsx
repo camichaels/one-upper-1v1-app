@@ -15,23 +15,23 @@ export default function HowToPlayModal({ onClose }) {
           <ul className="space-y-2 text-slate-300 text-sm">
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>One Rivalry at a Time</span>
+              <span>Every Rivalry is 11 Shows</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Every Round is a "Show"</span>
+              <span>Both Players Answer the Same Prompt</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Submit Your Best Answer</span>
+              <span>AI Judges Score You (1-10 each)</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>AI Judges Score You (1-10)</span>
+              <span>Highest Total Wins the Show</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Highest Total Gets the Mic (Until Next Show)</span>
+              <span>Most Show Wins Gets the Golden Mic</span>
             </li>
           </ul>
         </div>
