@@ -475,24 +475,40 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           profile_b_submitted_at: new Date().toISOString()
         };
 
-    // Check if both players will have submitted
-    const bothSubmitted = isProfileA
-      ? currentShow.profile_b_answer
-      : currentShow.profile_a_answer;
+    // First, update with answer
+    const { data: updatedShow, error } = await supabase
+      .from('shows')
+      .update(updateData)
+      .eq('id', currentShow.id)
+      .select()
+      .single();
 
-    if (bothSubmitted) {
-      updateData.status = 'judging';
-      
+    if (error) {
+      console.error('Error submitting answer:', error);
+      return;
+    }
+
+    // NOW check if both players have submitted (using fresh DB data)
+    const bothSubmittedNow = updatedShow.profile_a_answer && updatedShow.profile_b_answer;
+
+    if (bothSubmittedNow) {
       // Determine who submitted first (for SMS targeting and verdict notification later)
       const mySubmitTime = new Date().toISOString();
       const opponentSubmitTime = isProfileA 
-        ? currentShow.profile_b_submitted_at 
-        : currentShow.profile_a_submitted_at;
+        ? updatedShow.profile_b_submitted_at 
+        : updatedShow.profile_a_submitted_at;
       
       const iSubmittedFirst = new Date(mySubmitTime) > new Date(opponentSubmitTime);
       const firstSubmitterId = iSubmittedFirst ? opponentProfile.id : activeProfileId;
       
-      updateData.first_submitter_id = firstSubmitterId;
+      // Update status to judging with first_submitter_id
+      await supabase
+        .from('shows')
+        .update({ 
+          status: 'judging',
+          first_submitter_id: firstSubmitterId
+        })
+        .eq('id', currentShow.id);
     } else {
       // Only one player submitted - send "your_turn" SMS to opponent who hasn't submitted
       try {
@@ -513,18 +529,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       }
     }
 
-    const { error } = await supabase
-      .from('shows')
-      .update(updateData)
-      .eq('id', currentShow.id);
-
-    if (error) {
-      console.error('Error submitting answer:', error);
-      return;
-    }
-
     // If both submitted, trigger judging
-    if (bothSubmitted) {
+    if (bothSubmittedNow) {
       setIsJudgingOwner(true); // This player owns the judging process
       await triggerJudging();
     }
