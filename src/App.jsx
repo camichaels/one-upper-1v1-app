@@ -5,6 +5,7 @@ import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
 import Screen4 from './components/Screen4';
 import Screen6 from './components/Screen6';
+import Screen6Summary from './components/Screen6Summary';
 import RivalrySummaryScreen from './components/RivalrySummaryScreen';
 import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
@@ -65,7 +66,6 @@ function GameRouter({
   setShowId
 }) {
   const [currentScreen, setCurrentScreen] = useState('screen1');
-  const [fromSummary, setFromSummary] = useState(false);
 
   function handleNavigate(screenName, params = {}) {
     setCurrentScreen(screenName);
@@ -89,12 +89,6 @@ function GameRouter({
     } else {
       setShowId(null);
     }
-
-    if (params.fromSummary !== undefined) {
-      setFromSummary(params.fromSummary);
-    } else {
-      setFromSummary(false);
-    }
   }
 
   if (currentScreen === 'screen2') {
@@ -112,11 +106,14 @@ function GameRouter({
   }
 
   if (currentScreen === 'screen6') {
+    return <Screen6 onNavigate={handleNavigate} showId={showId} />;
+  }
+
+  if (currentScreen === 'screen6summary') {
     return (
-      <Screen6 
+      <Screen6Summary 
         onNavigate={handleNavigate} 
-        showId={showId} 
-        fromSummary={fromSummary}
+        showId={showId}
         rivalryId={rivalryId}
       />
     );

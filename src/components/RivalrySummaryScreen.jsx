@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
+import GoldenMic from '../assets/microphone.svg';
 
 export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProfileId }) {
   const [loading, setLoading] = useState(true);
@@ -102,63 +103,6 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     setError(null);
     setLoading(true);
     await generateSummary();
-  }
-
-  async function handleRematch() {
-    if (!rivalry) return;
-    
-    try {
-      // Determine opponent
-      const opponentId = rivalry.profile_a_id === activeProfileId 
-        ? rivalry.profile_b_id 
-        : rivalry.profile_a_id;
-      
-      // Create new rivalry with same opponent
-      const { data: newRivalry, error: rivalryError } = await supabase
-        .from('rivalries')
-        .insert({
-          profile_a_id: activeProfileId,
-          profile_b_id: opponentId,
-          status: 'active',
-          first_show_started: false,
-          started_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-      
-      if (rivalryError) throw rivalryError;
-      
-      // Get intro emcee text for new rivalry
-      const { data: emceeData, error: emceeError } = await supabase.functions.invoke('select-emcee-line', {
-        body: {
-          rivalryId: newRivalry.id,
-          showNumber: 0,
-          triggerType: 'rivalry_intro'
-        }
-      });
-      
-      if (emceeError) {
-        console.error('Failed to get intro text:', emceeError);
-      }
-      
-      // Update rivalry with intro text
-      if (emceeData?.emcee_text) {
-        await supabase
-          .from('rivalries')
-          .update({ intro_emcee_text: emceeData.emcee_text })
-          .eq('id', newRivalry.id);
-      }
-      
-      // Navigate to game with new rivalry
-      onNavigate('screen4', {
-        activeProfileId,
-        rivalryId: newRivalry.id
-      });
-      
-    } catch (err) {
-      console.error('Failed to create rematch:', err);
-      alert('Failed to start rematch. Please try again.');
-    }
   }
 
   function handleChallengeNewFriend() {
@@ -281,8 +225,10 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         
         {/* Final Score Header */}
         <div className="text-center space-y-3">
-          {/* Golden Mic - prominent display */}
-          <div className={`text-6xl ${iWon ? '' : 'opacity-40'}`}>🎤</div>
+          {/* Golden Mic - only shown for winner */}
+          {iWon && (
+            <img src={GoldenMic} alt="Golden Mic" className="w-16 h-16 mx-auto" />
+          )}
           
           <h1 className="text-3xl font-bold text-slate-100">
             {iWon ? 'You Won the Golden Mic!' : `${opponentProfile.name} Won the Golden Mic`}
@@ -385,9 +331,8 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
             {allShows.map((show) => (
               <button
                 key={show.id}
-                onClick={() => onNavigate('screen6', { 
+                onClick={() => onNavigate('screen6summary', { 
                   showId: show.id, 
-                  fromSummary: true,
                   rivalryId: rivalryId 
                 })}
                 className="w-full bg-slate-800/50 rounded-xl p-4 border border-slate-700 hover:bg-slate-700 transition-colors text-left"
@@ -410,21 +355,13 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          {/* Primary Actions */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={handleRematch}
-              className="px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
-            >
-              Rematch {opponentProfile.name}
-            </button>
-            <button
-              onClick={handleChallengeNewFriend}
-              className="px-4 py-3 bg-slate-700 border border-slate-600 text-slate-200 rounded-lg hover:bg-slate-600 transition-all font-semibold"
-            >
-              Challenge New Friend
-            </button>
-          </div>
+          {/* Primary Action */}
+          <button
+            onClick={handleChallengeNewFriend}
+            className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+          >
+            Challenge a Friend
+          </button>
 
           {/* Share Button */}
           <button
