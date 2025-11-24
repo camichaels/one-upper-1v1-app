@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
+import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import confetti from 'canvas-confetti';
 import HowToPlayModal from './HowToPlayModal';
@@ -1033,7 +1034,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         {/* Show Number Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="w-8"></div>
-          <h2 className="text-xl font-bold text-slate-300">Show #{currentShow.show_number}</h2>
+          <h2 className="text-xl font-bold text-slate-300">Show {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
@@ -1519,7 +1520,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0 mr-3">
-                      <p className="font-semibold text-slate-100">Show #{show.show_number}</p>
+                      <p className="font-semibold text-slate-100">Show {show.show_number} of {RIVALRY_LENGTH}</p>
                       <p className="text-sm text-slate-400 line-clamp-1">{show.prompt}</p>
                     </div>
                     <div className="text-right flex-shrink-0">

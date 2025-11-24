@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import GoldenMic from '../assets/microphone.svg';
 
@@ -161,7 +162,7 @@ export default function Screen6({ onNavigate, showId }) {
         
         {/* Show Number */}
         <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-slate-300">Show #{show.show_number}</h2>
+          <h2 className="text-xl font-bold text-slate-300">Show {show.show_number} of {RIVALRY_LENGTH}</h2>
         </div>
 
         {/* Winner Declaration */}
