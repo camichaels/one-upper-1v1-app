@@ -1,17 +1,28 @@
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { useEffect, useLayoutEffect } from 'react';
 
 export default function TermsPage() {
+  const navigate = useNavigate();
+
+  // Disable browser's automatic scroll restoration and scroll to top
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100">
       <div className="max-w-3xl mx-auto px-4 py-12">
         
-        {/* Back to Home */}
-        <Link 
-          to="/" 
+        {/* Back */}
+        <button 
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-orange-500 hover:text-orange-400 mb-8 transition-colors"
         >
-          ← Back to Home
-        </Link>
+          ← Back
+        </button>
 
         {/* Header */}
         <div className="mb-8">

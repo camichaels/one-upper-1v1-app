@@ -1,17 +1,28 @@
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useEffect, useLayoutEffect } from 'react';
 
 export default function PrivacyPage() {
+  const navigate = useNavigate();
+
+  // Disable browser's automatic scroll restoration and scroll to top
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100">
       <div className="max-w-3xl mx-auto px-4 py-12">
         
-        {/* Back to Home */}
-        <Link 
-          to="/" 
+        {/* Back */}
+        <button 
+          onClick={() => navigate(-1)}
           className="inline-flex items-center text-orange-500 hover:text-orange-400 mb-8 transition-colors"
         >
-          ← Back to Home
-        </Link>
+          ← Back
+        </button>
 
         {/* Header */}
         <div className="mb-8">
@@ -95,7 +106,7 @@ export default function PrivacyPage() {
             <h3 className="text-xl font-semibold text-slate-200 mb-2 mt-4">We DO NOT:</h3>
             <ul className="list-disc list-inside text-slate-300 space-y-1">
               <li>Sell your personal information to third parties</li>
-              <li>Share your phone number for unrelated marketing purposes</li>
+              <li>Share or sell your mobile number to third parties for marketing or promotional purposes</li>
             </ul>
 
             <h3 className="text-xl font-semibold text-slate-200 mb-2 mt-4">We MAY share data with:</h3>
@@ -105,6 +116,10 @@ export default function PrivacyPage() {
               <li><strong>Sponsors/Partners</strong> - May display anonymized game content for marketing</li>
               <li><strong>Law Enforcement</strong> - If required by law</li>
             </ul>
+
+            <p className="text-slate-300 mt-4 italic">
+              <strong>Mobile Number Protection:</strong> Your mobile number will never be shared with or sold to third parties for marketing or promotional purposes at any time.
+            </p>
           </section>
 
           {/* Your Rights */}

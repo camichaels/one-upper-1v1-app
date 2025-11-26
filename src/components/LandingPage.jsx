@@ -1,9 +1,18 @@
-import { Link, useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useLayoutEffect } from 'react';
 import GoldenMic from '../assets/microphone.svg';
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Disable browser's automatic scroll restoration and scroll to top
+  useLayoutEffect(() => {
+    if ('scrollRestoration' in window.history) {
+      window.history.scrollRestoration = 'manual';
+    }
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
 
   // Auto-redirect returning users who already have a profile
   useEffect(() => {
@@ -145,15 +154,18 @@ export default function LandingPage() {
           <h2 className="text-2xl font-bold text-orange-500 text-center mb-6">WHAT YOU'RE PLAYING FOR</h2>
           
           {/* Golden Mic Callout */}
-          <div className="rounded-lg p-8 text-center">
+          <div className="rounded-lg px-8 pt-8 pb-4 text-center">
             <img 
               src={GoldenMic} 
               alt="Golden Microphone" 
               className="w-24 h-24 mx-auto mb-4"
             />
             <h3 className="text-2xl font-bold text-orange-500 mb-3">The Golden Mic</h3>
-            <p className="text-slate-200">
+            <p className="text-slate-200 mb-3">
               Every rivalry is 11 shows. Win the most to claim the Golden Mic and bragging rights.
+            </p>
+            <p className="text-slate-200">
+              Plus, you can up the stakes and make the rivalry more interesting. Play for lunch, loser mows the lawn, or just eternal glory.
             </p>
           </div>
         </div>

@@ -138,7 +138,12 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
       ? summary.final_score.player_b_wins 
       : summary.final_score.player_a_wins;
     
-    const shareText = `I just ${myWins > opponentWins ? 'beat' : 'lost to'} ${opponentProfile.name} ${myWins}-${opponentWins} in a ${RIVALRY_LENGTH}-show One-Upper rivalry! 🎤\n\nChallenge me: oneupper.app`;
+    const iWon = myWins > opponentWins;
+    const stakesText = rivalry.stakes 
+      ? (iWon ? ` Won ${rivalry.stakes} from them too! 🎯` : ` I owe them ${rivalry.stakes}... 😅`)
+      : '';
+    
+    const shareText = `I just ${iWon ? 'beat' : 'lost to'} ${opponentProfile.name} ${myWins}-${opponentWins} in a ${RIVALRY_LENGTH}-show One-Upper rivalry! 🎤${stakesText}\n\nChallenge me: oneupper.app`;
     
     navigator.clipboard.writeText(shareText).then(() => {
       alert('Summary copied to clipboard!');
@@ -277,6 +282,17 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           <h1 className="text-3xl font-bold text-slate-100">
             {iWon ? 'You Won the Golden Mic!' : `${opponentProfile.name} Won the Golden Mic`}
           </h1>
+
+          {/* Stakes display */}
+          {rivalry.stakes && (
+            <p className="text-lg">
+              {iWon ? (
+                <span className="text-orange-400 font-semibold">+ {rivalry.stakes} from {opponentProfile.name} 🎯</span>
+              ) : (
+                <span className="text-slate-400">You owe {opponentProfile.name}: <span className="text-orange-400 font-semibold">{rivalry.stakes}</span> 🎯</span>
+              )}
+            </p>
+          )}
           
           <div className="text-5xl font-bold">
             <span className={iWon ? 'text-orange-500' : 'text-slate-400'}>

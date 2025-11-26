@@ -10,6 +10,39 @@ import HowToPlayModal from './HowToPlayModal';
 // Avatar options
 const AVATARS = ['😎', '🤓', '😈', '🤡', '🎃', '🦄', '🐉', '🤖'];
 
+// Stakes suggestions for the 🎲 button
+const STAKES_SUGGESTIONS = [
+  "bragging rights",
+  "a coffee",
+  "lunch",
+  "dinner",
+  "a beer",
+  "a 6 pack",
+  "$5",
+  "$10",
+  "$20",
+  "who posts embarrassing photo",
+  "who picks the movie",
+  "eternal glory",
+  "a slice of pizza",
+  "ice cream cone",
+  "donuts for the office",
+  "winner's favorite takeout",
+  "a home-cooked meal",
+  "who mows the other's lawn",
+  "who cleans the car",
+  "who buys the next 5 rounds",
+  "who has to change their profile pic",
+  "who picks karaoke song",
+  "who wears a silly hat",
+  "who admits they were wrong",
+  "public praise on social media",
+  "who picks the restaurant",
+  "who picks the playlist",
+  "who picks the next binge show",
+  "naming rights for something"
+];
+
 // Helper: Save profile to localStorage history
 function saveProfileToHistory(profile) {
   const recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
@@ -66,6 +99,8 @@ export default function Screen1({ onNavigate }) {
   const [copied, setCopied] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [stakes, setStakes] = useState(''); // What the rivalry is playing for
+  const [challengerStakes, setChallengerStakes] = useState(null); // Stakes set by challenger (fetched when joining)
 const [showCancelModal, setShowCancelModal] = useState(false);
   const [isAutoAccepting, setIsAutoAccepting] = useState(false);
   const [hasShownJoinAlert, setHasShownJoinAlert] = useState(false);
@@ -73,6 +108,13 @@ const [showCancelModal, setShowCancelModal] = useState(false);
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
+
+  // Scroll to top when currentState changes
+  useEffect(() => {
+    if (currentState) {
+      window.scrollTo(0, 0);
+    }
+  }, [currentState]);
 
   // Determine which state to show on mount
   useEffect(() => {
@@ -82,12 +124,14 @@ const [showCancelModal, setShowCancelModal] = useState(false);
         const pendingCode = sessionStorage.getItem('pendingRivalryCode');
         const pendingFriendName = sessionStorage.getItem('pendingRivalryFriendName');
         const pendingFriendId = sessionStorage.getItem('pendingRivalryFriendId');
+        const pendingStakes = sessionStorage.getItem('pendingRivalryStakes');
         
         if (pendingCode && pendingFriendName && pendingFriendId) {
           setPendingInvite({
             code: pendingCode,
             friendName: pendingFriendName,
-            friendId: pendingFriendId
+            friendId: pendingFriendId,
+            stakes: pendingStakes || null
           });
         }
 
@@ -536,6 +580,9 @@ useEffect(() => {
     try {
       isCreatingRivalryRef.current = true; // Flag that we're creating a rivalry
       
+      // Use stakes from pendingInvite (already fetched by JoinRivalry or from manual lookup)
+      const rivalryStakes = pendingInvite.stakes || null;
+      
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [userProfile.id, pendingInvite.friendId].sort();
 
@@ -545,12 +592,21 @@ useEffect(() => {
           profile_a_id: profileAId,
           profile_b_id: profileBId,
           mic_holder_id: userProfile.id, // Joiner holds mic initially
-          first_show_started: false
+          first_show_started: false,
+          stakes: rivalryStakes
         })
         .select()
         .single();
 
       if (rivalryError) throw rivalryError;
+
+      // Clear friend's pending_stakes after rivalry created
+      if (rivalryStakes) {
+        await supabase
+          .from('profiles')
+          .update({ pending_stakes: null })
+          .eq('id', pendingInvite.friendId);
+      }
 
       // Generate Ripley's intro text
       try {
@@ -581,6 +637,7 @@ useEffect(() => {
       sessionStorage.removeItem('pendingRivalryCode');
       sessionStorage.removeItem('pendingRivalryFriendName');
       sessionStorage.removeItem('pendingRivalryFriendId');
+      sessionStorage.removeItem('pendingRivalryStakes');
       setPendingInvite(null);
 
       // Update state to show first show screen
@@ -627,10 +684,10 @@ useEffect(() => {
         return;
       }
 
-      // Find friend by code
+      // Find friend by code (include pending_stakes)
 const { data: friend, error: friendError } = await supabase
   .from('profiles')
-  .select('id')
+  .select('id, pending_stakes')
   .eq('code', formattedCode)
   .single();
 
@@ -665,6 +722,9 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
   return;
 }
 
+      // Get stakes from friend's pending_stakes
+      const rivalryStakes = friend.pending_stakes || null;
+
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [profile.id, friend.id].sort();
 
@@ -674,12 +734,21 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
           profile_a_id: profileAId,
           profile_b_id: profileBId,
           mic_holder_id: profile.id, // Creator holds mic initially
-          first_show_started: false
+          first_show_started: false,
+          stakes: rivalryStakes
         })
         .select()
         .single();
 
       if (rivalryError) throw rivalryError;
+
+      // Clear friend's pending_stakes after rivalry created
+      if (rivalryStakes) {
+        await supabase
+          .from('profiles')
+          .update({ pending_stakes: null })
+          .eq('id', friend.id);
+      }
 
       // Generate Ripley's intro text
       try {
@@ -710,6 +779,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       setRivalry(newRivalry);
       setCurrentState('C');
       setFriendCode('');
+      setChallengerStakes(null); // Clear challenger stakes state
       setIsJoining(false);
       isCreatingRivalryRef.current = false; // Clear the flag
     } catch (err) {
@@ -785,9 +855,60 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
   }
 }
 
+  // Save stakes to profile's pending_stakes (fire and forget)
+  const savePendingStakes = () => {
+    if (!profile?.id) return;
+    supabase
+      .from('profiles')
+      .update({ pending_stakes: stakes.trim() || null })
+      .eq('id', profile.id)
+      .then(() => {})
+      .catch((err) => console.error('Failed to save pending stakes:', err));
+  };
+
+  // Lookup challenger's stakes when code is entered in join modal
+  const lookupChallengerStakes = async (code) => {
+    if (!code || code.length < 10) {
+      setChallengerStakes(null);
+      return;
+    }
+    
+    const formattedCode = formatCodeInput(code);
+    if (!isValidCodeFormat(formattedCode)) {
+      setChallengerStakes(null);
+      return;
+    }
+    
+    try {
+      const { data: challenger } = await supabase
+        .from('profiles')
+        .select('name, pending_stakes')
+        .eq('code', formattedCode)
+        .single();
+      
+      if (challenger) {
+        setChallengerStakes({
+          name: challenger.name,
+          stakes: challenger.pending_stakes
+        });
+      } else {
+        setChallengerStakes(null);
+      }
+    } catch (err) {
+      setChallengerStakes(null);
+    }
+  };
+
+  // Get random stakes suggestion
+  const getRandomStakes = () => {
+    const randomIndex = Math.floor(Math.random() * STAKES_SUGGESTIONS.length);
+    setStakes(STAKES_SUGGESTIONS[randomIndex]);
+  };
+
   // Copy code to clipboard
   const handleCopyCode = async () => {
     try {
+      savePendingStakes(); // Fire and forget - don't block copy
       await navigator.clipboard.writeText(profile.code);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -798,7 +919,11 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
 
   // Share via SMS (opens native SMS)
   const handleShareSMS = () => {
-    const message = `Hey! I'm playing One-Upper - it's a game where we try to one-up each other with funny stories.\n\nJoin me: https://oneupper.app/join/${profile.code}\nOr enter my code: ${profile.code}\n\nLet's see who's the better storyteller! 🎤`;
+    savePendingStakes(); // Fire and forget
+    const stakesLine = stakes.trim() ? `\nPlaying for: ${stakes.trim()} 🎯\n` : '';
+    const message = stakes.trim() 
+      ? `Hey! I challenge you to One-Upper - we answer weird prompts and AI judges decide who one-upped the other.\n${stakesLine}\nJoin me: https://oneupper.app/join/${profile.code}\n\nLet the rivalry begin! 🎤`
+      : `I challenge you to One-Upper! 🎤\n\nJoin: https://oneupper.app/join/${profile.code}\n\nLet's see who's got the better one-liners.`;
     window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
   };
 
@@ -824,6 +949,11 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
               <p className="text-xl font-bold text-orange-500">
                 {pendingInvite.friendName} just challenged you!
               </p>
+              {pendingInvite.stakes && (
+                <p className="text-slate-300 mt-2">
+                  Playing for: <span className="text-orange-400 font-semibold">🎯 {pendingInvite.stakes}</span>
+                </p>
+              )}
             </div>
           )}
 
@@ -1037,7 +1167,12 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                       Send me text notifications about my games
                     </span>
                     <p className="text-xs text-slate-400 mt-1">
-                      Get notified when it's your turn, results are ready, and more. You can change this anytime. Standard message rates may apply.
+                      Get notified when it's your turn and results are ready (~3-6 msgs per rivalry). Msg & data rates may apply. Reply STOP to opt out anytime.
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      <a href="/terms" className="text-orange-500 hover:text-orange-400 underline">Terms</a>
+                      {' | '}
+                      <a href="/privacy" className="text-orange-500 hover:text-orange-400 underline">Privacy</a>
                     </p>
                   </div>
                 </label>
@@ -1089,6 +1224,11 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                     <p className="text-xl font-bold text-orange-500 mb-1">
                       {pendingInvite.friendName} just challenged you!
                     </p>
+                    {pendingInvite.stakes && (
+                      <p className="text-slate-300 text-sm mb-2">
+                        Playing for: <span className="text-orange-400 font-semibold">🎯 {pendingInvite.stakes}</span>
+                      </p>
+                    )}
                     <p className="text-slate-300 text-sm">
                       Ready to accept, {profile.name}?
                     </p>
@@ -1202,6 +1342,39 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 <p className="text-slate-300 text-center font-medium">
                   Share your code: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
                 </p>
+
+                {/* Stakes input */}
+                <div className="space-y-1">
+                  <label className="text-sm text-slate-400">Up the stakes. Play for (optional):</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="text"
+                        value={stakes}
+                        onChange={(e) => setStakes(e.target.value.slice(0, 50))}
+                        placeholder="bragging rights? a burrito? you decide..."
+                        className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-3 pr-8 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors text-sm"
+                      />
+                      {stakes && (
+                        <button
+                          type="button"
+                          onClick={() => setStakes('')}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors text-lg font-bold"
+                        >
+                          ×
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={getRandomStakes}
+                      className="bg-slate-700 hover:bg-slate-600 text-slate-100 px-3 py-3 rounded-lg transition-colors text-lg"
+                      title="Random suggestion"
+                    >
+                      🎲
+                    </button>
+                  </div>
+                </div>
                 
                 <div className="flex gap-3">
                   <button
@@ -1248,6 +1421,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                       setShowJoinModal(false);
                       setJoinError('');
                       setFriendCode('');
+                      setChallengerStakes(null);
                     }}
                     className="text-slate-400 hover:text-slate-200 text-2xl"
                   >
@@ -1260,11 +1434,24 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 <input
                   type="text"
                   value={friendCode}
-                  onChange={(e) => setFriendCode(e.target.value)}
+                  onChange={(e) => {
+                    setFriendCode(e.target.value);
+                    lookupChallengerStakes(e.target.value);
+                  }}
                   placeholder="HAPPY-TIGER-1234"
                   className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg uppercase"
                   autoFocus
                 />
+
+                {/* Show challenger's stakes if they set any */}
+                {challengerStakes?.stakes && (
+                  <div className="bg-slate-700/50 border border-slate-600 rounded-lg p-3">
+                    <p className="text-slate-300 text-sm">
+                      <span className="font-semibold text-slate-200">{challengerStakes.name}</span> wants to play for:
+                    </p>
+                    <p className="text-orange-400 font-semibold mt-1">🎯 {challengerStakes.stakes}</p>
+                  </div>
+                )}
 
                 {joinError && (
                   <p className="text-red-400 text-sm">{joinError}</p>
@@ -1361,9 +1548,17 @@ if (currentState === 'C') {
 
           {/* Centered content */}
           <div className="text-center">
-            <div className="text-3xl font-bold text-orange-500 mb-8">
+            <div className="text-3xl font-bold text-orange-500 mb-4">
               🎉 Rivalry Started!
             </div>
+
+            {/* Show stakes if set */}
+            {rivalry?.stakes && (
+              <div className="mb-6">
+                <p className="text-slate-300 text-sm">Playing for:</p>
+                <p className="text-orange-400 font-semibold text-lg">🎯 {rivalry.stakes}</p>
+              </div>
+            )}
 
             {/* Ripley's Welcome Commentary */}
             <div className="mb-12 px-4">

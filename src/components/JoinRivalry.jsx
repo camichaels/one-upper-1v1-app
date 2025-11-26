@@ -15,10 +15,10 @@ export default function JoinRivalry() {
 
   async function checkUserStatus() {
     try {
-      // First, look up the friend's profile by code
+      // First, look up the friend's profile by code (include pending_stakes)
       const { data: friendProfile, error: friendError } = await supabase
         .from('profiles')
-        .select('name, id')
+        .select('name, id, pending_stakes')
         .eq('code', code.toUpperCase())
         .single();
 
@@ -34,10 +34,13 @@ export default function JoinRivalry() {
       if (!activeId) {
         // No profile - need to create one first
         setStatus('needs_profile');
-        // Store the code and friend's name for later
+        // Store the code, friend's name, id, and stakes for later
         sessionStorage.setItem('pendingRivalryCode', code.toUpperCase());
         sessionStorage.setItem('pendingRivalryFriendName', friendProfile.name);
         sessionStorage.setItem('pendingRivalryFriendId', friendProfile.id);
+        if (friendProfile.pending_stakes) {
+          sessionStorage.setItem('pendingRivalryStakes', friendProfile.pending_stakes);
+        }
         navigate('/play');
         return;
       }
@@ -94,6 +97,9 @@ export default function JoinRivalry() {
       sessionStorage.setItem('pendingRivalryCode', code.toUpperCase());
       sessionStorage.setItem('pendingRivalryFriendName', friendProfile.name);
       sessionStorage.setItem('pendingRivalryFriendId', friendProfile.id);
+      if (friendProfile.pending_stakes) {
+        sessionStorage.setItem('pendingRivalryStakes', friendProfile.pending_stakes);
+      }
       navigate('/play');
       
     } catch (err) {
