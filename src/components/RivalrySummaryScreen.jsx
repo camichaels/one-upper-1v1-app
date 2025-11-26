@@ -4,7 +4,7 @@ import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import GoldenMic from '../assets/microphone.svg';
 
-export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProfileId }) {
+export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProfileId, context, returnProfileId }) {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [summary, setSummary] = useState(null);
@@ -14,6 +14,9 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [isRetrying, setIsRetrying] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [allShows, setAllShows] = useState([]);
+
+  // Determine if we came from history browsing or just completed a rivalry
+  const isFromHistory = context === 'from_history';
 
   useEffect(() => {
     loadSummary();
@@ -107,6 +110,16 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     await generateSummary();
   }
 
+  function handleBack() {
+    if (isFromHistory && returnProfileId) {
+      // Go back to past rivalries list
+      onNavigate('pastRivalries', { profileId: returnProfileId });
+    } else {
+      // Go back to main screen
+      onNavigate('screen1');
+    }
+  }
+
   function handleChallengeNewFriend() {
     // Navigate back to Screen1
     onNavigate('screen1');
@@ -152,6 +165,16 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
       console.error('Failed to skip summary:', err);
       onNavigate('screen1');
     }
+  }
+
+  function handleViewShow(show) {
+    // Pass context so Screen6Summary knows where to return
+    onNavigate('screen6summary', { 
+      showId: show.id, 
+      rivalryId: rivalryId,
+      context: isFromHistory ? 'from_history' : 'from_rivalry_summary',
+      returnProfileId: returnProfileId
+    });
   }
 
   // Loading state - only show "generating" if we're actually generating
@@ -231,8 +254,19 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
       <Header />
       
-      <div className="max-w-2xl mx-auto mt-6 space-y-6 pb-24">
+      <div className="max-w-2xl mx-auto mt-2 space-y-6 pb-24">
         
+        {/* Back Button - Only show when viewing from history */}
+        {isFromHistory && (
+          <button
+            onClick={handleBack}
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <span>←</span>
+            <span>Back to History</span>
+          </button>
+        )}
+
         {/* Final Score Header */}
         <div className="text-center space-y-3">
           {/* Golden Mic - only shown for winner */}
@@ -341,10 +375,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
             {allShows.map((show) => (
               <button
                 key={show.id}
-                onClick={() => onNavigate('screen6summary', { 
-                  showId: show.id, 
-                  rivalryId: rivalryId 
-                })}
+                onClick={() => handleViewShow(show)}
                 className="w-full bg-slate-800/50 rounded-xl p-4 border border-slate-700 hover:bg-slate-700 transition-colors text-left"
               >
                 <div className="flex items-center justify-between">
@@ -354,7 +385,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
                   </div>
                   <div className="text-right flex-shrink-0">
                     {show.winner_id === activeProfileId && (
-                      <span className="text-xl">🎤</span>
+                      <img src={GoldenMic} alt="Won" className="w-6 h-6" />
                     )}
                   </div>
                 </div>
@@ -363,23 +394,35 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Different based on context */}
         <div className="space-y-3">
-          {/* Primary Action */}
-          <button
-            onClick={handleChallengeNewFriend}
-            className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
-          >
-            Start a New Rivalry
-          </button>
+          {isFromHistory ? (
+            /* Viewing from history - show back button as primary */
+            <button
+              onClick={handleBack}
+              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+            >
+              ← Back to Rivalry History
+            </button>
+          ) : (
+            /* Just completed rivalry - show start new rivalry */
+            <>
+              <button
+                onClick={handleChallengeNewFriend}
+                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+              >
+                Start a New Rivalry
+              </button>
 
-          {/* Share Button */}
-          <button
-            onClick={handleShareSummary}
-            className="w-full px-4 py-3 bg-slate-800 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-all font-semibold"
-          >
-            📋 Share Summary
-          </button>
+              {/* Share Button */}
+              <button
+                onClick={handleShareSummary}
+                className="w-full px-4 py-3 bg-slate-800 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-all font-semibold"
+              >
+                📋 Share Summary
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

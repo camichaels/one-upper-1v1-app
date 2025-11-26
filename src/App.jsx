@@ -7,6 +7,7 @@ import Screen4 from './components/Screen4';
 import Screen6 from './components/Screen6';
 import Screen6Summary from './components/Screen6Summary';
 import RivalrySummaryScreen from './components/RivalrySummaryScreen';
+import PastRivalriesList from './components/PastRivalriesList';
 import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
@@ -66,6 +67,8 @@ function GameRouter({
   setShowId
 }) {
   const [currentScreen, setCurrentScreen] = useState('screen1');
+  const [navigationContext, setNavigationContext] = useState(null); // 'from_history' | 'from_gameplay' | null
+  const [returnProfileId, setReturnProfileId] = useState(null); // For returning to past rivalries list
 
   function handleNavigate(screenName, params = {}) {
     setCurrentScreen(screenName);
@@ -89,10 +92,37 @@ function GameRouter({
     } else {
       setShowId(null);
     }
+
+    // Handle navigation context for back button behavior
+    if (params.context) {
+      setNavigationContext(params.context);
+    } else if (screenName === 'screen1' || screenName === 'screen2') {
+      // Reset context when going to main screens
+      setNavigationContext(null);
+    }
+
+    // Track which profile to return to for past rivalries
+    if (params.returnProfileId) {
+      setReturnProfileId(params.returnProfileId);
+    }
+
+    // Track profileId for pastRivalries screen
+    if (params.profileId) {
+      setReturnProfileId(params.profileId);
+    }
   }
 
   if (currentScreen === 'screen2') {
     return <Screen2 onNavigate={handleNavigate} editProfileId={editProfileId} />;
+  }
+
+  if (currentScreen === 'pastRivalries') {
+    return (
+      <PastRivalriesList 
+        onNavigate={handleNavigate} 
+        profileId={returnProfileId}
+      />
+    );
   }
 
   if (currentScreen === 'screen4') {
@@ -115,6 +145,8 @@ function GameRouter({
         onNavigate={handleNavigate} 
         showId={showId}
         rivalryId={rivalryId}
+        context={navigationContext}
+        returnProfileId={returnProfileId}
       />
     );
   }
@@ -125,6 +157,8 @@ function GameRouter({
         onNavigate={handleNavigate}
         activeProfileId={activeProfileId}
         rivalryId={rivalryId}
+        context={navigationContext}
+        returnProfileId={returnProfileId}
       />
     );
   }

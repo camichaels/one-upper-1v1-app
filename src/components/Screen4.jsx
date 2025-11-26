@@ -455,8 +455,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       setCurrentShow(currentShowData[0]);
     }
 
-    // Load previous shows
-    loadPreviousShows();
+    // Load previous shows (await to ensure scores are ready before UI renders)
+    await loadPreviousShows();
 
     setLoading(false);
   }
@@ -1096,16 +1096,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     }}
                     className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
                   >
-                    Switch Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onNavigate('screen2', { editProfileId: activeProfileId });
-                    }}
-                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
-                  >
-                    Edit Profile
+                    Your Profiles
                   </button>
                   <button
                     onClick={() => {

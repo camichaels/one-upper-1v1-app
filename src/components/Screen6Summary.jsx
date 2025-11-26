@@ -58,13 +58,16 @@ const verdictBrainBoosts = [
   "Creative thinking is a daily practice. You're showing up for it."
 ];
 
-export default function Screen6Summary({ onNavigate, showId, rivalryId }) {
+export default function Screen6Summary({ onNavigate, showId, rivalryId, context, returnProfileId }) {
   const [loading, setLoading] = useState(true);
   const [show, setShow] = useState(null);
   const [rivalry, setRivalry] = useState(null);
   const [showJudgeBanter, setShowJudgeBanter] = useState(false);
   const [judgeView, setJudgeView] = useState('scores'); // 'scores' or 'chat'
   const [judgeProfiles, setJudgeProfiles] = useState([]);
+
+  // Determine if we came from history browsing
+  const isFromHistory = context === 'from_history';
 
   useEffect(() => {
     loadShow();
@@ -124,10 +127,20 @@ export default function Screen6Summary({ onNavigate, showId, rivalryId }) {
     setLoading(false);
   }
 
+  function handleBack() {
+    // Navigate back to rivalry summary with proper context
+    onNavigate('summary', { 
+      rivalryId: rivalryId || rivalry?.id,
+      activeProfileId: returnProfileId,
+      context: isFromHistory ? 'from_history' : null,
+      returnProfileId: returnProfileId
+    });
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-        <Header />  {/* ← ADD THIS LINE */}
+        <Header />
         <div className="text-slate-400">Loading...</div>
       </div>
     );
@@ -136,7 +149,7 @@ export default function Screen6Summary({ onNavigate, showId, rivalryId }) {
   if (!show || !rivalry) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-        <Header />  {/* ← ADD THIS LINE */}
+        <Header />
         <div className="text-center">
           <div className="text-slate-400 mb-4">Show not found</div>
           <button
@@ -367,10 +380,10 @@ export default function Screen6Summary({ onNavigate, showId, rivalryId }) {
 
         {/* Back to Summary Button */}
         <button
-          onClick={() => onNavigate('summary', { rivalryId })}
+          onClick={handleBack}
           className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
         >
-          ← Return to Summary
+          ← Back to Rivalry Summary
         </button>
 
       </div>

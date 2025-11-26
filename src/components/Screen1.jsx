@@ -508,8 +508,9 @@ useEffect(() => {
         saveProfileToHistory(profile);
         window.location.reload();
       } else {
-        // Show list of profiles
-        setForgotCodeProfiles(profiles);
+        // Show list of profiles (alphabetized by name)
+        const sortedProfiles = [...profiles].sort((a, b) => a.name.localeCompare(b.name));
+        setForgotCodeProfiles(sortedProfiles);
         setIsForgotCodeLoading(false);
       }
     } catch (err) {
@@ -1139,16 +1140,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                       }}
                       className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
                     >
-                      Switch Profile
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        onNavigate && onNavigate('screen2', { editProfileId: profile.id });
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      Edit Profile
+                      Your Profiles
                     </button>
                     <button
                       onClick={() => {
@@ -1339,16 +1331,7 @@ if (currentState === 'C') {
                     }}
                     className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
                   >
-                    Switch Profile
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      onNavigate && onNavigate('screen2', { editProfileId: profile.id });
-                    }}
-                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                  >
-                    Edit Profile
+                    Your Profiles
                   </button>
                   <button
                     onClick={() => {
