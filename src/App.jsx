@@ -12,6 +12,8 @@ import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
 import JudgesPage from './components/JudgesPage';
+import AuthCallback from './components/AuthCallback';
+import VerifyPhone from './components/VerifyPhone';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import useOnlineStatus from './hooks/useOnlineStatus';
@@ -41,6 +43,10 @@ function App() {
         
         {/* Judges Page */}
         <Route path="/judges" element={<JudgesPage />} />
+        
+        {/* Auth Routes */}
+        <Route path="/auth/:token" element={<AuthCallback />} />
+        <Route path="/verify" element={<VerifyPhone />} />
         
         {/* Game Routes */}
         <Route 

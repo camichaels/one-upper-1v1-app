@@ -206,7 +206,8 @@ export default function Screen2({ onNavigate, editProfileId }) {
       avatar: profile.avatar,
       phone: profile.phone || '',
       bio: profile.bio || '',
-      sms_consent: profile.sms_consent || false
+      sms_consent: profile.sms_consent || false,
+      twilio_blocked: profile.twilio_blocked || false
     });
     setEditError('');
   }
@@ -239,6 +240,10 @@ export default function Screen2({ onNavigate, editProfileId }) {
       // Normalize phone number
       const normalizedPhone = normalizePhone(editFormData.phone);
 
+      // Check if SMS consent is changing from false to true
+      const currentProfile = profiles.find(p => p.id === profileId);
+      const consentChangedToTrue = editFormData.sms_consent && !currentProfile?.sms_consent;
+
       const { error } = await supabase
         .from('profiles')
         .update({
@@ -251,6 +256,22 @@ export default function Screen2({ onNavigate, editProfileId }) {
         .eq('id', profileId);
 
       if (error) throw error;
+
+      // Send welcome SMS if consent just changed to true
+      if (consentChangedToTrue) {
+        try {
+          await supabase.functions.invoke('send-sms', {
+            body: {
+              userId: profileId,
+              notificationType: 'welcome',
+              contextData: {}
+            }
+          });
+        } catch (smsError) {
+          console.error('Failed to send welcome SMS:', smsError);
+          // Don't fail the save if SMS fails
+        }
+      }
 
       await loadProfiles();
       setEditingProfileId(null);
@@ -385,6 +406,22 @@ export default function Screen2({ onNavigate, editProfileId }) {
         .single();
 
       if (error) throw error;
+
+      // Send welcome SMS if opted in
+      if (createFormData.sms_consent) {
+        try {
+          await supabase.functions.invoke('send-sms', {
+            body: {
+              userId: newProfile.id,
+              notificationType: 'welcome',
+              contextData: {}
+            }
+          });
+        } catch (smsError) {
+          console.error('Failed to send welcome SMS:', smsError);
+          // Don't fail the create if SMS fails
+        }
+      }
 
       // Add to recent profiles
       const recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
@@ -537,7 +574,13 @@ export default function Screen2({ onNavigate, editProfileId }) {
                       <input
                         type="checkbox"
                         checked={editFormData.sms_consent}
-                        onChange={(e) => setEditFormData({ ...editFormData, sms_consent: e.target.checked })}
+                        onChange={(e) => {
+                          // If blocked by Twilio, don't allow checking the box
+                          if (editFormData.twilio_blocked && e.target.checked) {
+                            return; // Prevent checking
+                          }
+                          setEditFormData({ ...editFormData, sms_consent: e.target.checked });
+                        }}
                         className="mt-0.5 w-5 h-5 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
                       />
                       <div className="flex-1">
@@ -550,6 +593,11 @@ export default function Screen2({ onNavigate, editProfileId }) {
                           <span className="text-slate-500"> | </span>
                           <a href="/privacy" target="_blank" className="text-orange-400 hover:text-orange-300">Privacy</a>
                         </p>
+                        {editFormData.twilio_blocked && (
+                          <p className="text-xs text-orange-400 mt-2">
+                            You previously opted out via text. To resume game messages, text START to (240) 663-8746, then check this box again (as well as on other profiles you may have).
+                          </p>
+                        )}
                       </div>
                     </label>
                   </div>

@@ -90,6 +90,7 @@ export default function Screen1({ onNavigate }) {
   const [forgotCodeProfiles, setForgotCodeProfiles] = useState([]);
   const [forgotCodeError, setForgotCodeError] = useState('');
   const [isForgotCodeLoading, setIsForgotCodeLoading] = useState(false);
+  const [forgotCodeSent, setForgotCodeSent] = useState(false); // New: tracks if SMS was sent
   
   // Join rivalry state (State B)
   const [friendCode, setFriendCode] = useState('');
@@ -565,7 +566,7 @@ useEffect(() => {
     }
   };
 
-  // Forgot code handler
+  // Forgot code handler - sends SMS verification (or bypasses on localhost for dev testing)
   const handleForgotCode = async () => {
     setForgotCodeError('');
     setIsForgotCodeLoading(true);
@@ -580,49 +581,65 @@ useEffect(() => {
         return;
       }
 
-      // Look up profiles by normalized phone number
-      const { data: profiles, error } = await supabase
-        .from('profiles')
-        .select('id, name, code, avatar, phone')
-        .eq('phone', normalizedPhone);
+      // DEV MODE: On localhost, skip SMS verification and show profiles directly
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      
+      if (isDev) {
+        // Old flow: look up profiles directly
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, name, code, avatar, phone')
+          .eq('phone', normalizedPhone);
+
+        if (error) throw error;
+
+        if (!profiles || profiles.length === 0) {
+          setForgotCodeError('No profiles found with that phone number.');
+          setIsForgotCodeLoading(false);
+          return;
+        }
+
+        if (profiles.length === 1) {
+          // Auto-resume single profile
+          const profile = profiles[0];
+          localStorage.setItem('activeProfileId', profile.id);
+          saveProfileToHistory(profile);
+          window.location.reload();
+        } else {
+          // Show list of profiles (alphabetized by name)
+          const sortedProfiles = [...profiles].sort((a, b) => a.name.localeCompare(b.name));
+          setForgotCodeProfiles(sortedProfiles);
+          setIsForgotCodeLoading(false);
+        }
+        return;
+      }
+
+      // PRODUCTION: Call send-auth edge function
+      const { data, error } = await supabase.functions.invoke('send-auth', {
+        body: { phone: normalizedPhone }
+      });
 
       if (error) throw error;
 
-      if (!profiles || profiles.length === 0) {
-        setForgotCodeError('No profiles found with that phone number.');
+      if (!data.success) {
+        if (data.reason === 'no_profiles') {
+          setForgotCodeError('No profiles found with that phone number.');
+        } else {
+          setForgotCodeError(data.message || 'Failed to send verification code.');
+        }
         setIsForgotCodeLoading(false);
         return;
       }
 
-      if (profiles.length === 1) {
-        // Auto-resume single profile
-        const profile = profiles[0];
-        localStorage.setItem('activeProfileId', profile.id);
-        // Save all profiles to history (just one in this case)
-        saveProfileToHistory(profile);
-        window.location.reload();
-      } else {
-        // Show list of profiles (alphabetized by name)
-        const sortedProfiles = [...profiles].sort((a, b) => a.name.localeCompare(b.name));
-        setForgotCodeProfiles(sortedProfiles);
-        setIsForgotCodeLoading(false);
-      }
+      // Success - show "check your texts" message
+      setForgotCodeSent(true);
+      setIsForgotCodeLoading(false);
+
     } catch (err) {
-      console.error('Error looking up profiles:', err);
-      setForgotCodeError('Failed to look up profiles. Try again.');
+      console.error('Error sending auth code:', err);
+      setForgotCodeError('Failed to send verification code. Try again.');
       setIsForgotCodeLoading(false);
     }
-  };
-
-  // Resume profile from forgot code list
-  const handleResumeFromList = (profile) => {
-    // Save ALL profiles from the list to localStorage history
-    forgotCodeProfiles.forEach(p => {
-      saveProfileToHistory(p);
-    });
-    // Set the selected one as active
-    localStorage.setItem('activeProfileId', profile.id);
-    window.location.reload();
   };
 
   // Auto-start rivalry with pending invite (from /join link)
@@ -1073,6 +1090,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                           setForgotCodePhone('');
                           setForgotCodeProfiles([]);
                           setForgotCodeError('');
+                          setForgotCodeSent(false);
                         }}
                         className="text-slate-400 hover:text-slate-200 text-2xl"
                       >
@@ -1080,7 +1098,38 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                       </button>
                     </div>
 
-                    {forgotCodeProfiles.length === 0 ? (
+                    {/* Dev mode: Show profile list if found */}
+                    {forgotCodeProfiles.length > 0 ? (
+                      <>
+                        <p className="text-slate-300">Select your profile:</p>
+                        
+                        <div className="space-y-3 max-h-96 overflow-y-auto">
+                          {forgotCodeProfiles.map((prof) => (
+                            <button
+                              key={prof.id}
+                              onClick={() => {
+                                forgotCodeProfiles.forEach(p => saveProfileToHistory(p));
+                                localStorage.setItem('activeProfileId', prof.id);
+                                window.location.reload();
+                              }}
+                              className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="text-3xl">{prof.avatar}</span>
+                                <div className="flex-1">
+                                  <div className="text-lg font-bold text-slate-100">
+                                    {prof.name}
+                                  </div>
+                                  <div className="text-sm text-orange-500 font-medium">
+                                    Code: {prof.code}
+                                  </div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    ) : !forgotCodeSent ? (
                       <>
                         <p className="text-slate-300">Enter your phone number:</p>
 
@@ -1102,34 +1151,38 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                           disabled={!forgotCodePhone.trim() || isForgotCodeLoading}
                           className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors"
                         >
-                          {isForgotCodeLoading ? 'Looking up...' : 'Find My Profile'}
+                          {isForgotCodeLoading ? 'Sending...' : 'Send Verification Code'}
                         </button>
                       </>
                     ) : (
                       <>
-                        <p className="text-slate-300">Select your profile:</p>
-                        
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                          {forgotCodeProfiles.map((prof) => (
-                            <button
-                              key={prof.id}
-                              onClick={() => handleResumeFromList(prof)}
-                              className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
+                        <div className="text-center py-4">
+                          <div className="text-4xl mb-4">📱</div>
+                          <p className="text-slate-200 text-lg mb-2">Check your texts!</p>
+                          <p className="text-slate-400 text-sm mb-4">
+                            We sent a verification link and code to your phone.
+                          </p>
+                          <p className="text-slate-400 text-sm">
+                            Tap the link in the text, or go to{' '}
+                            <a 
+                              href="/verify" 
+                              className="text-orange-400 hover:text-orange-300 underline"
                             >
-                              <div className="flex items-center gap-3">
-                                <span className="text-3xl">{prof.avatar}</span>
-                                <div className="flex-1">
-                                  <div className="text-lg font-bold text-slate-100">
-                                    {prof.name}
-                                  </div>
-                                  <div className="text-sm text-orange-500 font-medium">
-                                    Code: {prof.code}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
+                              oneupper.app/verify
+                            </a>
+                            {' '}to enter your code.
+                          </p>
                         </div>
+
+                        <button
+                          onClick={() => {
+                            setForgotCodeSent(false);
+                            setForgotCodePhone('');
+                          }}
+                          className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-3 px-6 rounded-lg transition-colors"
+                        >
+                          Try a different number
+                        </button>
                       </>
                     )}
                   </div>
