@@ -6,11 +6,26 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
+// Helper: Save profile to localStorage history
+function saveProfileToHistory(profile) {
+  const recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
+  const profileInfo = {
+    id: profile.id,
+    name: profile.name,
+    code: profile.code,
+    avatar: profile.avatar
+  };
+  
+  const updated = [profileInfo, ...recentProfiles.filter(p => p.id !== profile.id)];
+  localStorage.setItem('recentProfiles', JSON.stringify(updated.slice(0, 10)));
+}
+
 export default function AuthCallback() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState('verifying'); // 'verifying' | 'success' | 'error'
+  const [status, setStatus] = useState('verifying'); // 'verifying' | 'select_profile' | 'success' | 'error'
   const [errorMessage, setErrorMessage] = useState('');
+  const [profiles, setProfiles] = useState([]);
 
   useEffect(() => {
     async function verifyToken() {
@@ -19,6 +34,9 @@ export default function AuthCallback() {
         setErrorMessage('No token provided');
         return;
       }
+
+      // Clear any existing profile selection so user sees picker for multiple profiles
+      localStorage.removeItem('activeProfileId');
 
       try {
         // Look up the token
@@ -66,12 +84,40 @@ export default function AuthCallback() {
         };
         localStorage.setItem('authSession', JSON.stringify(session));
 
-        setStatus('success');
+        // Fetch profiles for this phone
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('phone', authToken.phone);
 
-        // Redirect to profile picker after brief delay
-        setTimeout(() => {
-          navigate('/play', { replace: true });
-        }, 1000);
+        if (profilesError) {
+          throw profilesError;
+        }
+
+console.log('Profiles found:', profilesData?.length, profilesData); 
+
+        if (!profilesData || profilesData.length === 0) {
+          setStatus('error');
+          setErrorMessage('No profiles found for this phone number.');
+          return;
+        }
+
+        // Save all profiles to history
+        profilesData.forEach(p => saveProfileToHistory(p));
+
+        if (profilesData.length === 1) {
+          // Single profile - auto-login
+          localStorage.setItem('activeProfileId', profilesData[0].id);
+          setStatus('success');
+          setTimeout(() => {
+            navigate('/play', { replace: true });
+          }, 1000);
+        } else {
+          // Multiple profiles - show picker
+          const sortedProfiles = [...profilesData].sort((a, b) => a.name.localeCompare(b.name));
+          setProfiles(sortedProfiles);
+          setStatus('select_profile');
+        }
 
       } catch (err) {
         console.error('Error verifying token:', err);
@@ -83,9 +129,14 @@ export default function AuthCallback() {
     verifyToken();
   }, [token, navigate]);
 
+  function handleSelectProfile(profile) {
+    localStorage.setItem('activeProfileId', profile.id);
+    navigate('/play', { replace: true });
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-4">
-      <div className="text-center">
+      <div className="text-center max-w-md w-full">
         {status === 'verifying' && (
           <>
             <div className="text-4xl mb-4">🔐</div>
@@ -98,7 +149,34 @@ export default function AuthCallback() {
           <>
             <div className="text-4xl mb-4">✅</div>
             <h1 className="text-xl font-bold text-white mb-2">Verified!</h1>
-            <p className="text-slate-400">Taking you to your profiles...</p>
+            <p className="text-slate-400">Taking you to your game...</p>
+          </>
+        )}
+
+        {status === 'select_profile' && (
+          <>
+            <h1 className="text-2xl font-bold text-orange-500 mb-6">Select Your Profile</h1>
+            <div className="space-y-3">
+              {profiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  onClick={() => handleSelectProfile(profile)}
+                  className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{profile.avatar}</span>
+                    <div className="flex-1">
+                      <div className="text-lg font-bold text-slate-100">
+                        {profile.name}
+                      </div>
+                      <div className="text-sm text-orange-500 font-medium">
+                        Code: {profile.code}
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
           </>
         )}
 
