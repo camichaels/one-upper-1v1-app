@@ -152,7 +152,33 @@ const [showCancelModal, setShowCancelModal] = useState(false);
           .eq('id', activeProfileId)
           .single();
 
-        if (profileError || !profileData) {
+        if (profileError) {
+          // Check if it's a network error (offline) vs profile not found
+          // PGRST116 = "not found" from .single() - this is NOT a network error
+          const isNotFoundError = profileError.code === 'PGRST116';
+          const isNetworkError = !navigator.onLine || 
+            profileError.message?.toLowerCase().includes('failed to fetch') ||
+            profileError.message?.toLowerCase().includes('network') ||
+            profileError.code === 'NETWORK_ERROR';
+          
+          if (isNetworkError && !isNotFoundError) {
+            // Offline - stay on loading or show a minimal state
+            // Don't remove the profile ID, just wait for reconnect
+            console.log('Offline - waiting for connection');
+            setLoading(false);
+            // Default to State B if we have a profile ID (assume they have a profile)
+            setCurrentState('B');
+            return;
+          }
+          
+          // Actual error (profile deleted, not found, etc.) → State A
+          localStorage.removeItem('activeProfileId');
+          setCurrentState('A');
+          setLoading(false);
+          return;
+        }
+
+        if (!profileData) {
           // Profile not found → State A
           localStorage.removeItem('activeProfileId');
           setCurrentState('A');
@@ -169,7 +195,22 @@ const { data: rivalryData, error: rivalryError } = await supabase
   .or(`profile_a_id.eq.${activeProfileId},profile_b_id.eq.${activeProfileId}`)
   .eq('status', 'active');
 
-if (rivalryError || !rivalryData || rivalryData.length === 0) {
+if (rivalryError) {
+  // Check if it's a network error
+  const isNetworkError = !navigator.onLine || 
+    rivalryError.message?.toLowerCase().includes('failed to fetch') ||
+    rivalryError.message?.toLowerCase().includes('network');
+  
+  if (isNetworkError) {
+    // Offline - show State B (challenge screen) as safe default
+    setCurrentState('B');
+    setLoading(false);
+    return;
+  }
+  // If it's some other error, continue - rivalryData will be null/empty
+}
+
+if (!rivalryData || rivalryData.length === 0) {
   // Has profile, no rivalry → State B
   setCurrentState('B');
   setLoading(false);
@@ -202,6 +243,15 @@ if (!rivalry.first_show_started) {
 }
       } catch (err) {
         console.error('Error determining state:', err);
+        
+        // Check if offline
+        if (!navigator.onLine) {
+          // Don't log out, just show State B as safe default
+          setCurrentState('B');
+          setLoading(false);
+          return;
+        }
+        
         setCurrentState('A');
         setLoading(false);
       }

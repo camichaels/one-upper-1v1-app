@@ -12,6 +12,9 @@ import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
 import JudgesPage from './components/JudgesPage';
+import OfflineBanner from './components/OfflineBanner';
+import ErrorBoundary from './components/ErrorBoundary';
+import useOnlineStatus from './hooks/useOnlineStatus';
 
 
 function App() {
@@ -19,39 +22,44 @@ function App() {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [rivalryId, setRivalryId] = useState(null);
   const [showId, setShowId] = useState(null);
+  
+  const isOnline = useOnlineStatus();
 
   return (
-    <Routes>
-      {/* Landing Page */}
-      <Route path="/" element={<LandingPage />} />
-      
-      {/* Deep Link for joining rivalry */}
-      <Route path="/join/:code" element={<JoinRivalry />} />
-      
-      {/* Legal Pages */}
-      <Route path="/privacy" element={<PrivacyPage />} />
-      <Route path="/terms" element={<TermsPage />} />
-      
-      {/* Judges Page */}
-      <Route path="/judges" element={<JudgesPage />} />
-      
-      {/* Game Routes */}
-      <Route 
-        path="/play" 
-        element={
-          <GameRouter
-            editProfileId={editProfileId}
-            setEditProfileId={setEditProfileId}
-            activeProfileId={activeProfileId}
-            setActiveProfileId={setActiveProfileId}
-            rivalryId={rivalryId}
-            setRivalryId={setRivalryId}
-            showId={showId}
-            setShowId={setShowId}
-          />
-        } 
-      />
-    </Routes>
+    <ErrorBoundary>
+      {!isOnline && <OfflineBanner />}
+      <Routes>
+        {/* Landing Page */}
+        <Route path="/" element={<LandingPage />} />
+        
+        {/* Deep Link for joining rivalry */}
+        <Route path="/join/:code" element={<JoinRivalry />} />
+        
+        {/* Legal Pages */}
+        <Route path="/privacy" element={<PrivacyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        
+        {/* Judges Page */}
+        <Route path="/judges" element={<JudgesPage />} />
+        
+        {/* Game Routes */}
+        <Route 
+          path="/play" 
+          element={
+            <GameRouter
+              editProfileId={editProfileId}
+              setEditProfileId={setEditProfileId}
+              activeProfileId={activeProfileId}
+              setActiveProfileId={setActiveProfileId}
+              rivalryId={rivalryId}
+              setRivalryId={setRivalryId}
+              showId={showId}
+              setShowId={setShowId}
+            />
+          } 
+        />
+      </Routes>
+    </ErrorBoundary>
   );
 }
 

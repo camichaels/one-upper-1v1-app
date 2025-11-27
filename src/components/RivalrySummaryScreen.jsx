@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import GoldenMic from '../assets/microphone.svg';
+import ShareCard from './ShareCard';
+import { shareAsImage } from '../utils/shareUtils';
 
 export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProfileId, context, returnProfileId }) {
   const [loading, setLoading] = useState(true);
@@ -14,6 +16,8 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [isRetrying, setIsRetrying] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [allShows, setAllShows] = useState([]);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareMessage, setShareMessage] = useState(null);
 
   // Determine if we came from history browsing or just completed a rivalry
   const isFromHistory = context === 'from_history';
@@ -125,32 +129,36 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     onNavigate('screen1');
   }
 
-  function handleShareSummary() {
-    // Simple text copy for now (stub for future image generation)
+  async function handleShareSummary() {
     if (!summary || !rivalry) return;
     
-    const myProfile = rivalry.profile_a_id === activeProfileId ? rivalry.profile_a : rivalry.profile_b;
-    const opponentProfile = rivalry.profile_a_id === activeProfileId ? rivalry.profile_b : rivalry.profile_a;
-    const myWins = rivalry.profile_a_id === activeProfileId 
-      ? summary.final_score.player_a_wins 
-      : summary.final_score.player_b_wins;
-    const opponentWins = rivalry.profile_a_id === activeProfileId 
-      ? summary.final_score.player_b_wins 
-      : summary.final_score.player_a_wins;
+    setIsSharing(true);
+    setShareMessage(null);
     
-    const iWon = myWins > opponentWins;
-    const stakesText = rivalry.stakes 
-      ? (iWon ? ` Won ${rivalry.stakes} from them too! 🎯` : ` I owe them ${rivalry.stakes}... 😅`)
-      : '';
-    
-    const shareText = `I just ${iWon ? 'beat' : 'lost to'} ${opponentProfile.name} ${myWins}-${opponentWins} in a ${RIVALRY_LENGTH}-show One-Upper rivalry! 🎤${stakesText}\n\nChallenge me: oneupper.app`;
-    
-    navigator.clipboard.writeText(shareText).then(() => {
-      alert('Summary copied to clipboard!');
-    }).catch(err => {
-      console.error('Failed to copy:', err);
-      alert('Failed to copy summary');
-    });
+    try {
+      const result = await shareAsImage({
+        elementId: 'share-card',
+        fileName: 'one-upper-result.png',
+        shareTitle: 'One-Upper Result',
+        shareText: 'Challenge me on One-Upper!\nhttps://oneupper.app'
+      });
+      
+      if (result.success) {
+        if (result.method === 'download-copy') {
+          setShareMessage('Image downloaded & text copied!');
+        } else if (result.method === 'share-text-download-image') {
+          setShareMessage('Image downloaded!');
+        }
+        // Clear message after 3 seconds
+        setTimeout(() => setShareMessage(null), 3000);
+      }
+    } catch (err) {
+      console.error('Share failed:', err);
+      setShareMessage('Share failed. Please try again.');
+      setTimeout(() => setShareMessage(null), 3000);
+    } finally {
+      setIsSharing(false);
+    }
   }
 
   // Function to skip summary and go home
@@ -180,6 +188,13 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
       context: isFromHistory ? 'from_history' : 'from_rivalry_summary',
       returnProfileId: returnProfileId
     });
+  }
+
+  // Get a random prompt from the shows for the share card
+  function getRandomPrompt() {
+    if (allShows.length === 0) return "What's the worst thing to say at a job interview?";
+    const randomShow = allShows[Math.floor(Math.random() * allShows.length)];
+    return randomShow.prompt;
   }
 
   // Loading state - only show "generating" if we're actually generating
@@ -219,7 +234,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               <button
                 onClick={handleRetry}
                 disabled={isRetrying}
-                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold disabled:opacity-50"
+                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold disabled:opacity-50"
               >
                 {isRetrying ? 'Retrying...' : 'Try Again'}
               </button>
@@ -255,9 +270,28 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const iWon = myWins > opponentWins;
   const tiebreaker = summary.final_score.tiebreaker;
 
+  // Determine winner/loser names for share card (always show winner first)
+  const winnerProfile = iWon ? myProfile : opponentProfile;
+  const loserProfile = iWon ? opponentProfile : myProfile;
+  const winnerScore = iWon ? myWins : opponentWins;
+  const loserScore = iWon ? opponentWins : myWins;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
       <Header />
+      
+      {/* Hidden ShareCard for image generation */}
+      <div className="absolute -left-[9999px] top-0">
+        <ShareCard
+          winnerName={winnerProfile.name}
+          loserName={loserProfile.name}
+          winnerScore={winnerScore}
+          loserScore={loserScore}
+          stakes={rivalry.stakes}
+          samplePrompt={getRandomPrompt()}
+          rivalryId={rivalryId}
+        />
+      </div>
       
       <div className="max-w-2xl mx-auto mt-2 space-y-6 pb-24">
         
@@ -287,9 +321,9 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           {rivalry.stakes && (
             <p className="text-lg">
               {iWon ? (
-                <span className="text-orange-400 font-semibold">+ {rivalry.stakes} from {opponentProfile.name} 🎯</span>
+                <span className="text-orange-400 font-semibold">+ {rivalry.stakes} from {opponentProfile.name}</span>
               ) : (
-                <span className="text-slate-400">You owe {opponentProfile.name}: <span className="text-orange-400 font-semibold">{rivalry.stakes}</span> 🎯</span>
+                <span className="text-slate-400">You owe {opponentProfile.name}: <span className="text-orange-400 font-semibold">{rivalry.stakes}</span></span>
               )}
             </p>
           )}
@@ -364,6 +398,20 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </div>
         )}
 
+        {/* Share Button - always visible */}
+        <button
+          onClick={handleShareSummary}
+          disabled={isSharing}
+          className="w-full px-4 py-3 bg-slate-800 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-all font-semibold disabled:opacity-50"
+        >
+          {isSharing ? 'Generating...' : 'Share Rivalry Result'}
+        </button>
+        
+        {/* Share feedback message */}
+        {shareMessage && (
+          <p className="text-center text-sm text-slate-400">{shareMessage}</p>
+        )}
+
         {/* Past Shows - Collapsible */}
         <button
           onClick={() => setShowHistory(!showHistory)}
@@ -413,7 +461,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         {/* Action Buttons - Different based on context */}
         <div className="space-y-3">
           {isFromHistory ? (
-            /* Viewing from history - show back button as primary */
+            /* Viewing from history - show back button */
             <button
               onClick={handleBack}
               className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
@@ -422,22 +470,12 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
             </button>
           ) : (
             /* Just completed rivalry - show start new rivalry */
-            <>
-              <button
-                onClick={handleChallengeNewFriend}
-                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
-              >
-                Start a New Rivalry
-              </button>
-
-              {/* Share Button */}
-              <button
-                onClick={handleShareSummary}
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-all font-semibold"
-              >
-                📋 Share Summary
-              </button>
-            </>
+            <button
+              onClick={handleChallengeNewFriend}
+              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+            >
+              Start a New Rivalry
+            </button>
           )}
         </div>
       </div>
