@@ -538,11 +538,18 @@ export default function Screen2({ onNavigate, editProfileId }) {
                         type="checkbox"
                         checked={editFormData.sms_consent}
                         onChange={(e) => setEditFormData({ ...editFormData, sms_consent: e.target.checked })}
-                        className="mt-0.5 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
+                        className="mt-0.5 w-5 h-5 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
                       />
                       <div className="flex-1">
-                        <span className="text-sm text-slate-200">Send me text notifications</span>
-                        <p className="text-xs text-slate-400 mt-0.5">Get notified about your games via SMS</p>
+                        <span className="text-sm text-slate-200">Send me text notifications about my games</span>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Get notified when it's your turn and results are ready (~3-6 msgs per rivalry). Msg & data rates may apply. Reply STOP to opt out anytime.
+                        </p>
+                        <p className="text-xs mt-1">
+                          <a href="/terms" target="_blank" className="text-orange-400 hover:text-orange-300">Terms</a>
+                          <span className="text-slate-500"> | </span>
+                          <a href="/privacy" target="_blank" className="text-orange-400 hover:text-orange-300">Privacy</a>
+                        </p>
                       </div>
                     </label>
                   </div>
@@ -724,11 +731,18 @@ export default function Screen2({ onNavigate, editProfileId }) {
                         type="checkbox"
                         checked={createFormData.sms_consent}
                         onChange={(e) => setCreateFormData({ ...createFormData, sms_consent: e.target.checked })}
-                        className="mt-0.5 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
+                        className="mt-0.5 w-5 h-5 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
                       />
                       <div className="flex-1">
-                        <span className="text-sm text-slate-200">Send me text notifications</span>
-                        <p className="text-xs text-slate-400 mt-0.5">Get notified about your games via SMS</p>
+                        <span className="text-sm text-slate-200">Send me text notifications about my games</span>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Get notified when it's your turn and results are ready (~3-6 msgs per rivalry). Msg & data rates may apply. Reply STOP to opt out anytime.
+                        </p>
+                        <p className="text-xs mt-1">
+                          <a href="/terms" target="_blank" className="text-orange-400 hover:text-orange-300">Terms</a>
+                          <span className="text-slate-500"> | </span>
+                          <a href="/privacy" target="_blank" className="text-orange-400 hover:text-orange-300">Privacy</a>
+                        </p>
                       </div>
                     </label>
                   </div>
