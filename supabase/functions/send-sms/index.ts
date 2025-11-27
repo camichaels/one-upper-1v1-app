@@ -13,29 +13,30 @@ const corsHeaders = {
 const SMS_ENABLED = true;
 
 // SMS Templates (in code for MVP)
+// Note: {profile_id} placeholder will be replaced with the recipient's profile ID
 const SMS_TEMPLATES = {
   your_turn: [
-    'One-Upper: {opponent} just answered "{prompt}" - Your turn! https://oneupper.app',
-    'One-Upper: {opponent} submitted "{prompt}" - Don\'t let them wait! https://oneupper.app',
-    'One-Upper: {opponent} answered "{prompt}" - Your move! https://oneupper.app',
-    'One-Upper: {opponent} went big on "{prompt}" - Can you top it? https://oneupper.app',
+    'One-Upper: {opponent} just answered "{prompt}" - Your turn! https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} submitted "{prompt}" - Don\'t let them wait! https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} answered "{prompt}" - Your move! https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} went big on "{prompt}" - Can you top it? https://oneupper.app/play?p={profile_id}',
   ],
   verdict_ready: [
-    'One-Upper: Results are in! See who won against {opponent}: "{prompt}" - https://oneupper.app',
-    'One-Upper: The judges have spoken! You vs {opponent} on "{prompt}" - https://oneupper.app',
-    'One-Upper: Verdict\'s in for "{prompt}"! Did you beat {opponent}? https://oneupper.app',
-    'One-Upper: Who won "{prompt}"? You or {opponent}? See results: https://oneupper.app',
+    'One-Upper: Results are in! See who won against {opponent}: "{prompt}" - https://oneupper.app/play?p={profile_id}',
+    'One-Upper: The judges have spoken! You vs {opponent} on "{prompt}" - https://oneupper.app/play?p={profile_id}',
+    'One-Upper: Verdict\'s in for "{prompt}"! Did you beat {opponent}? https://oneupper.app/play?p={profile_id}',
+    'One-Upper: Who won "{prompt}"? You or {opponent}? See results: https://oneupper.app/play?p={profile_id}',
   ],
   nudge: [
-    'One-Upper: {opponent} is waiting! Don\'t leave them hanging: https://oneupper.app',
-    'One-Upper: Don\'t leave {opponent} hanging! Your turn: https://oneupper.app',
-    'One-Upper: {opponent} wants to see what you\'ve got! Answer now: https://oneupper.app',
-    'One-Upper: {opponent} nudged you! Time to answer: https://oneupper.app',
+    'One-Upper: {opponent} is waiting! Don\'t leave them hanging: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: Don\'t leave {opponent} hanging! Your turn: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} wants to see what you\'ve got! Answer now: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} nudged you! Time to answer: https://oneupper.app/play?p={profile_id}',
   ],
   rivalry_cancelled: [
-    'One-Upper: {opponent} ended your rivalry. Your history is saved: https://oneupper.app',
-    'One-Upper: Rivalry with {opponent} has ended. Thanks for playing: https://oneupper.app',
-    'One-Upper: {opponent} cancelled your rivalry. History saved: https://oneupper.app',
+    'One-Upper: {opponent} ended your rivalry. Your history is saved: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: Rivalry with {opponent} has ended. Thanks for playing: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} cancelled your rivalry. History saved: https://oneupper.app/play?p={profile_id}',
   ],
   welcome: [
     'Welcome to One-Upper! You\'ll get updates when it\'s your turn and when results are in. Reply HELP for help, STOP to opt out. Msg & data rates may apply. ~3-6 msgs per rivalry.',
@@ -134,6 +135,8 @@ serve(async (req) => {
         : contextData.prompt;
       message = message.replace('{prompt}', truncatedPrompt);
     }
+    // Always replace profile_id with the recipient's user ID
+    message = message.replace('{profile_id}', userId);
 
     // 5. Check if SMS is globally disabled (kill switch)
     if (!SMS_ENABLED) {

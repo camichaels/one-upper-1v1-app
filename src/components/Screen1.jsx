@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { generateCode, isValidCodeFormat, formatCodeInput } from '../utils/codeGenerator';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
@@ -117,10 +118,32 @@ const [showCancelModal, setShowCancelModal] = useState(false);
     }
   }, [currentState]);
 
+  // Get URL search params for profile switching from SMS links
+  const [searchParams, setSearchParams] = useSearchParams();
+
   // Determine which state to show on mount
   useEffect(() => {
     async function determineState() {
       try {
+        // Check for profile ID in URL param (from SMS notification links)
+        const profileIdFromUrl = searchParams.get('p');
+        if (profileIdFromUrl) {
+          // Verify this profile exists before switching to it
+          const { data: urlProfile, error: urlProfileError } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', profileIdFromUrl)
+            .single();
+          
+          if (!urlProfileError && urlProfile) {
+            // Valid profile - switch to it
+            localStorage.setItem('activeProfileId', profileIdFromUrl);
+            // Clear the URL param to avoid issues on refresh
+            searchParams.delete('p');
+            setSearchParams(searchParams, { replace: true });
+          }
+        }
+
         // Check for pending invite from /join link
         const pendingCode = sessionStorage.getItem('pendingRivalryCode');
         const pendingFriendName = sessionStorage.getItem('pendingRivalryFriendName');
