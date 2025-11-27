@@ -7,12 +7,28 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 
+// Helper: Save profile to localStorage history
+function saveProfileToHistory(profile) {
+  const recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
+  const profileInfo = {
+    id: profile.id,
+    name: profile.name,
+    code: profile.code,
+    avatar: profile.avatar
+  };
+  
+  const updated = [profileInfo, ...recentProfiles.filter(p => p.id !== profile.id)];
+  localStorage.setItem('recentProfiles', JSON.stringify(updated.slice(0, 10)));
+}
+
 export default function VerifyPhone() {
   const navigate = useNavigate();
   const [phone, setPhone] = useState('');
   const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [error, setError] = useState('');
+  const [profiles, setProfiles] = useState([]);
+  const [showProfilePicker, setShowProfilePicker] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -36,6 +52,9 @@ export default function VerifyPhone() {
       }
 
       const normalizedPhone = normalizePhone(phone);
+
+      // Clear any existing profile selection so user sees picker for multiple profiles
+      localStorage.removeItem('activeProfileId');
 
       // Look up the token by phone and code
       const { data: authToken, error: fetchError } = await supabase
@@ -79,14 +98,83 @@ export default function VerifyPhone() {
       };
       localStorage.setItem('authSession', JSON.stringify(session));
 
-      // Redirect to game
-      navigate('/play', { replace: true });
+      // Fetch profiles for this phone
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('phone', normalizedPhone);
+
+      if (profilesError) {
+        throw profilesError;
+      }
+
+      if (!profilesData || profilesData.length === 0) {
+        setError('No profiles found for this phone number.');
+        setIsVerifying(false);
+        return;
+      }
+
+      // Save all profiles to history
+      profilesData.forEach(p => saveProfileToHistory(p));
+
+      if (profilesData.length === 1) {
+        // Single profile - auto-login
+        localStorage.setItem('activeProfileId', profilesData[0].id);
+        navigate('/play', { replace: true });
+      } else {
+        // Multiple profiles - show picker
+        const sortedProfiles = [...profilesData].sort((a, b) => a.name.localeCompare(b.name));
+        setProfiles(sortedProfiles);
+        setShowProfilePicker(true);
+        setIsVerifying(false);
+      }
 
     } catch (err) {
       console.error('Error verifying code:', err);
       setError('Something went wrong. Please try again.');
       setIsVerifying(false);
     }
+  }
+
+  function handleSelectProfile(profile) {
+    localStorage.setItem('activeProfileId', profile.id);
+    navigate('/play', { replace: true });
+  }
+
+  // Show profile picker if multiple profiles
+  if (showProfilePicker) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="w-full max-w-sm">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-orange-500 mb-2">ONE-UPPER 🎤</h1>
+            <p className="text-slate-300">Select your profile</p>
+          </div>
+
+          <div className="space-y-3">
+            {profiles.map((profile) => (
+              <button
+                key={profile.id}
+                onClick={() => handleSelectProfile(profile)}
+                className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">{profile.avatar}</span>
+                  <div className="flex-1">
+                    <div className="text-lg font-bold text-slate-100">
+                      {profile.name}
+                    </div>
+                    <div className="text-sm text-orange-500 font-medium">
+                      Code: {profile.code}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
