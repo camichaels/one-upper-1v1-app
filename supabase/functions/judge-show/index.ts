@@ -392,6 +392,11 @@ Format:
     // Send "verdict_ready" SMS to first submitter (they've been waiting longest)
     if (show.first_submitter_id) {
       try {
+        // Determine opponent name for the first submitter
+        const opponentName = show.first_submitter_id === show.profile_a_id 
+          ? profileB.name 
+          : profileA.name;
+        
         const smsResponse = await fetch(
           `${SUPABASE_URL}/functions/v1/send-sms`,
           {
@@ -405,7 +410,8 @@ Format:
               notificationType: 'verdict_ready',
               contextData: {
                 show_num: show.show_number,
-                prompt: show.prompt
+                prompt: show.prompt,
+                opponent: opponentName
               }
             })
           }

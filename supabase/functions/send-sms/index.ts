@@ -40,12 +40,17 @@ const SMS_TEMPLATES = {
   ],
   welcome: [
     'Welcome to One-Upper! You\'ll get updates when it\'s your turn and when results are in. Reply HELP for help, STOP to opt out. Msg & data rates may apply. ~3-6 msgs per rivalry.',
+  ],
+  rivalry_started: [
+    'One-Upper: {opponent} accepted your challenge! Game on: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: {opponent} is ready to battle! First show awaits: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: It\'s on! {opponent} joined your rivalry: https://oneupper.app/play?p={profile_id}',
   ]
 };
 
 interface RequestBody {
   userId: string;
-  notificationType: 'your_turn' | 'verdict_ready' | 'nudge' | 'rivalry_cancelled' | 'welcome';
+  notificationType: 'your_turn' | 'verdict_ready' | 'nudge' | 'rivalry_cancelled' | 'welcome' | 'rivalry_started';
   contextData: {
     opponent?: string;
     show_num?: string | number;

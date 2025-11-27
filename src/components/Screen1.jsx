@@ -730,6 +730,22 @@ useEffect(() => {
       sessionStorage.removeItem('pendingRivalryStakes');
       setPendingInvite(null);
 
+      // Send rivalry_started SMS to the friend (challenger) who shared their code
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            userId: pendingInvite.friendId,
+            notificationType: 'rivalry_started',
+            contextData: {
+              opponent: userProfile.name
+            }
+          }
+        });
+      } catch (smsErr) {
+        console.error('Failed to send rivalry_started SMS:', smsErr);
+        // Don't block - rivalry already created
+      }
+
       // Update state to show first show screen
       setRivalry(newRivalry);
       setCurrentState('C');
@@ -774,10 +790,10 @@ useEffect(() => {
         return;
       }
 
-      // Find friend by code (include pending_stakes)
+      // Find friend by code (include pending_stakes and name)
 const { data: friend, error: friendError } = await supabase
   .from('profiles')
-  .select('id, pending_stakes')
+  .select('id, name, pending_stakes')
   .eq('code', formattedCode)
   .single();
 
@@ -872,6 +888,22 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       setChallengerStakes(null); // Clear challenger stakes state
       setIsJoining(false);
       isCreatingRivalryRef.current = false; // Clear the flag
+
+      // Send rivalry_started SMS to the friend (challenger) who shared their code
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            userId: friend.id,
+            notificationType: 'rivalry_started',
+            contextData: {
+              opponent: profile.name
+            }
+          }
+        });
+      } catch (smsErr) {
+        console.error('Failed to send rivalry_started SMS:', smsErr);
+        // Don't block - rivalry already created
+      }
     } catch (err) {
       console.error('Error joining rivalry:', err);
       setJoinError(err.message || 'Failed to start Rivalry');
