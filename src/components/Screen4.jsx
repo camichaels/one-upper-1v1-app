@@ -180,6 +180,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [interstitialText, setInterstitialText] = useState('');
   const [verdictBrainBoost, setVerdictBrainBoost] = useState('');
+  const [showNudgeModal, setShowNudgeModal] = useState(false);
   const confettiShownRef = useRef(new Set()); // Track which shows have shown confetti
 
   // Reset judgeView to 'scores' when show changes
@@ -787,6 +788,8 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   }
 
   async function sendNudge() {
+    setShowNudgeModal(false); // Close modal first
+    
     try {
       // Check rate limit
       const { data: show } = await supabase
@@ -1192,7 +1195,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               <div className="text-green-400 text-xl font-semibold">✓ You submitted</div>
               <div className="text-slate-300 text-lg">⏳ Waiting for {opponentProfile.name}...</div>
               <button
-                onClick={sendNudge}
+                onClick={() => setShowNudgeModal(true)}
                 className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
               >
                 NUDGE {opponentProfile.name.toUpperCase()}
@@ -1609,6 +1612,34 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       )}
 
       {/* Cancel Rivalry Modal */}
+      {/* Nudge Confirmation Modal */}
+      {showNudgeModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-slate-100 mb-2">
+              Send a Nudge?
+            </h3>
+            <p className="text-slate-300 text-sm mb-6">
+              {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={sendNudge}
+                className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
+              >
+                Send Nudge
+              </button>
+              <button
+                onClick={() => setShowNudgeModal(false)}
+                className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showCancelModal && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
