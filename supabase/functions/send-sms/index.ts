@@ -22,10 +22,10 @@ const SMS_TEMPLATES = {
     'One-Upper: {opponent} went big on "{prompt}" - Can you top it? https://oneupper.app/play?p={profile_id}',
   ],
   verdict_ready: [
-    'One-Upper: Results are in! See who won against {opponent}: "{prompt}" - https://oneupper.app/play?p={profile_id}',
-    'One-Upper: The judges have spoken! You vs {opponent} on "{prompt}" - https://oneupper.app/play?p={profile_id}',
-    'One-Upper: Verdict\'s in for "{prompt}"! Did you beat {opponent}? https://oneupper.app/play?p={profile_id}',
-    'One-Upper: Who won "{prompt}"? You or {opponent}? See results: https://oneupper.app/play?p={profile_id}',
+    'One-Upper: Results are in! See who won against {opponent}: "{prompt}" - https://oneupper.app/play?p={profile_id}&show={show_id}',
+    'One-Upper: The judges have spoken! You vs {opponent} on "{prompt}" - https://oneupper.app/play?p={profile_id}&show={show_id}',
+    'One-Upper: Verdict\'s in for "{prompt}"! Did you beat {opponent}? https://oneupper.app/play?p={profile_id}&show={show_id}',
+    'One-Upper: Who won "{prompt}"? You or {opponent}? See results: https://oneupper.app/play?p={profile_id}&show={show_id}',
   ],
   nudge: [
     'One-Upper: {opponent} is waiting! Don\'t leave them hanging: https://oneupper.app/play?p={profile_id}',
@@ -55,6 +55,7 @@ interface RequestBody {
     opponent?: string;
     show_num?: string | number;
     prompt?: string;
+    show_id?: string;
   };
 }
 
@@ -139,6 +140,9 @@ serve(async (req) => {
         ? contextData.prompt.substring(0, 47) + '...'
         : contextData.prompt;
       message = message.replace('{prompt}', truncatedPrompt);
+    }
+    if (contextData.show_id) {
+      message = message.replace('{show_id}', contextData.show_id);
     }
     // Always replace profile_id with the recipient's user ID
     message = message.replace('{profile_id}', userId);

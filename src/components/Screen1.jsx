@@ -125,8 +125,10 @@ const [showCancelModal, setShowCancelModal] = useState(false);
   useEffect(() => {
     async function determineState() {
       try {
-        // Check for profile ID in URL param (from SMS notification links)
+        // Check for profile ID and show ID in URL params (from SMS notification links)
         const profileIdFromUrl = searchParams.get('p');
+        const showIdFromUrl = searchParams.get('show');
+        
         if (profileIdFromUrl) {
           // Verify this profile exists before switching to it
           const { data: urlProfile, error: urlProfileError } = await supabase
@@ -138,8 +140,13 @@ const [showCancelModal, setShowCancelModal] = useState(false);
           if (!urlProfileError && urlProfile) {
             // Valid profile - switch to it
             localStorage.setItem('activeProfileId', profileIdFromUrl);
-            // Clear the URL param to avoid issues on refresh
+            // Store show ID for verdict viewing if present
+            if (showIdFromUrl) {
+              sessionStorage.setItem('pendingVerdictShowId', showIdFromUrl);
+            }
+            // Clear the URL params to avoid issues on refresh
             searchParams.delete('p');
+            searchParams.delete('show');
             setSearchParams(searchParams, { replace: true });
           }
         }
@@ -251,6 +258,20 @@ if (!rivalryData || rivalryData.length === 0) {
 
 const rivalry = rivalryData[0]; // Get first rivalry from array
 setRivalry(rivalry); // ← YES, keep this but use 'rivalry' variable
+
+// Check for pending verdict from SMS link
+const pendingVerdictShowId = sessionStorage.getItem('pendingVerdictShowId');
+if (pendingVerdictShowId) {
+  sessionStorage.removeItem('pendingVerdictShowId');
+  // Navigate directly to verdict screen
+  onNavigate('screen6summary', {
+    showId: pendingVerdictShowId,
+    rivalryId: rivalry.id,
+    activeProfileId: profileData.id,
+    context: 'from_sms'
+  });
+  return;
+}
 
 // Has rivalry
 if (!rivalry.first_show_started) {
