@@ -6,6 +6,7 @@ import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
+import AboutModal from './AboutModal';
 
 
 // Avatar options
@@ -107,6 +108,7 @@ const [showCancelModal, setShowCancelModal] = useState(false);
   const [isAutoAccepting, setIsAutoAccepting] = useState(false);
   const [hasShownJoinAlert, setHasShownJoinAlert] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
@@ -453,10 +455,10 @@ useEffect(() => {
       .then(({ data: opponent }) => {
         if (opponent) {
           // Show notification
-          alert(`😢 Rivalry Ended\n\n${opponent.name} cancelled your Rivalry.\n\nYour Show history has been saved.`);
+          alert(`😢 Rivalry Ended\n\n${opponent.name} cancelled your Rivalry.\n\nYour history has been saved.`);
         } else {
           // Fallback if we can't get opponent name
-          alert(`😢 Rivalry Ended\n\nYour opponent cancelled your Rivalry.\n\nYour Show history has been saved.`);
+          alert(`😢 Rivalry Ended\n\nYour opponent cancelled your Rivalry.\n\nYour history has been saved.`);
         }
         
         // Reload to go back to State B
@@ -579,7 +581,7 @@ useEffect(() => {
 
       // Validate format
       if (!isValidCodeFormat(formattedCode)) {
-        setResumeError('Invalid code format');
+        setResumeError('Invalid Profile ID format');
         setIsResuming(false);
         return;
       }
@@ -592,7 +594,7 @@ useEffect(() => {
         .single();
 
       if (error || !existingProfile) {
-        setResumeError('Code not found. Check your code and try again.');
+        setResumeError('Profile ID not found. Check and try again.');
         setIsResuming(false);
         return;
       }
@@ -799,7 +801,7 @@ useEffect(() => {
 
       // Validate format
       if (!isValidCodeFormat(formattedCode)) {
-        setJoinError('Invalid code format');
+        setJoinError('Invalid Profile ID format');
         setIsJoining(false);
         return;
       }
@@ -819,7 +821,7 @@ const { data: friend, error: friendError } = await supabase
   .single();
 
 if (friendError || !friend) {
-  setJoinError('Code not found. Check with your friend.');
+  setJoinError('Profile ID not found. Check with your friend.');
   setIsJoining(false);
   return;
 }
@@ -1120,7 +1122,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 </p>
                 <input
                   type="text"
-                  placeholder="Enter your code"
+                  placeholder="ENTER YOUR PROFILE ID"
                   value={resumeCode}
                   onChange={(e) => setResumeCode(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 uppercase focus:outline-none focus:border-orange-500 transition-colors mb-3"
@@ -1147,7 +1149,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                     onClick={() => setShowForgotCodeModal(true)}
                     className="text-sm text-slate-400 hover:text-orange-500 underline transition-colors"
                   >
-                    Forgot your code?
+                    Forgot your Profile ID?
                   </button>
                 </div>
               </div>
@@ -1197,7 +1199,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                                     {prof.name}
                                   </div>
                                   <div className="text-sm text-orange-500 font-medium">
-                                    Code: {prof.code}
+                                    Profile ID: {prof.code}
                                   </div>
                                 </div>
                               </div>
@@ -1446,20 +1448,29 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                     <button
                       onClick={() => {
                         setShowMenu(false);
-                        setShowHowToPlay(true);
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      How to Play
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
                         onNavigate && onNavigate('screen2');
                       }}
                       className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
                     >
                       Your Profiles
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowAbout(true);
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      About One-Upper
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowHowToPlay(true);
+                      }}
+                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                    >
+                      How to Play
                     </button>
                     <button
                       onClick={() => {
@@ -1519,7 +1530,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 </h3>
                 
                 <p className="text-slate-300 text-center font-medium">
-                  Share your code: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
+                  Share your Profile ID: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
                 </p>
 
                 {/* Stakes input */}
@@ -1581,7 +1592,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                   onClick={() => setShowJoinModal(true)}
                   className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
                 >
-                  Enter Code
+                  Join with Friend's ID
                 </button>
               </div>
             </>
@@ -1608,7 +1619,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                   </button>
                 </div>
 
-                <p className="text-slate-300">Enter friend's code:</p>
+                <p className="text-slate-300">Enter friend's Profile ID:</p>
 
                 <input
                   type="text"
@@ -1653,6 +1664,11 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       {showHowToPlay && (
         <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
       )}
+
+      {/* About Modal */}
+      {showAbout && (
+        <AboutModal onClose={() => setShowAbout(false)} />
+      )}
       </>
     );
   }
@@ -1684,20 +1700,29 @@ if (currentState === 'C') {
                   <button
                     onClick={() => {
                       setShowMenu(false);
-                      setShowHowToPlay(true);
-                    }}
-                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                  >
-                    How to Play
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
                       onNavigate && onNavigate('screen2');
                     }}
                     className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
                   >
                     Your Profiles
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowAbout(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                  >
+                    About One-Upper
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowHowToPlay(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
+                  >
+                    How to Play
                   </button>
                   <button
                     onClick={() => {
@@ -1753,7 +1778,7 @@ if (currentState === 'C') {
               onClick={handleStartFirstShow}
               className="w-full py-4 bg-orange-500 text-white font-semibold rounded-lg shadow-lg hover:bg-orange-400 transition-all"
             >
-              Start First Show
+              Start First Round
             </button>
           </div>
         </div>
@@ -1791,6 +1816,11 @@ if (currentState === 'C') {
       {/* How to Play Modal */}
       {showHowToPlay && (
         <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+      )}
+
+      {/* About Modal */}
+      {showAbout && (
+        <AboutModal onClose={() => setShowAbout(false)} />
       )}
     </>
   );

@@ -5,6 +5,7 @@ import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import confetti from 'canvas-confetti';
 import HowToPlayModal from './HowToPlayModal';
+import AboutModal from './AboutModal';
 import GoldenMic from '../assets/microphone.svg';
 import InterstitialScreen from './InterstitialScreen';
 
@@ -67,7 +68,7 @@ const verdictBrainBoosts = [
   "Your brain just got a little sharper.",
   "That's creative thinking in action.",
   "One prompt down, infinite possibilities unlocked.",
-  "You're building creative muscle with every show.",
+  "You're building creative muscle with every round.",
   "Quick thinking is a skill. You just practiced it.",
   "Fun fact: You're training your brain while having fun.",
   "Every answer is a mini creative workout.",
@@ -111,7 +112,7 @@ const verdictBrainBoosts = [
   "That answer required improvisation. Improvisation is a superpower.",
   "Your creative output matters. You just created something from nothing.",
   "Quick wit is about trusting your instincts. You're learning to trust yours.",
-  "Every show is a chance to surprise yourself. Did you surprise yourself this time?",
+  "Every round is a chance to surprise yourself. Did you surprise yourself this time?",
   "You're practicing the skill that sets innovators apart: thinking differently on purpose.",
   "Creative thinking is a daily practice. You're showing up for it."
 ];
@@ -177,6 +178,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
   const [isCreatingShow, setIsCreatingShow] = useState(false);
   const [verdictDeclaration, setVerdictDeclaration] = useState('');
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showAbout, setShowAbout] = useState(false);
   const [showInterstitial, setShowInterstitial] = useState(false);
   const [interstitialText, setInterstitialText] = useState('');
   const [verdictBrainBoost, setVerdictBrainBoost] = useState('');
@@ -207,7 +209,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         table: 'rivalries',
         filter: `id=eq.${rivalryId}`
       }, (payload) => {
-        alert('😢 Rivalry Ended\n\nThis Rivalry has been cancelled.\n\nYour Show history has been saved.');
+        alert('😢 Rivalry Ended\n\nThis Rivalry has been cancelled.\n\nYour history has been saved.');
         onNavigate('screen1');
       })
       .subscribe();
@@ -395,13 +397,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           }
         }
         
-        // Add streak callout at milestones: 3, 5, 10
+        // Add streak callout at milestones: 3, 5 (5 = perfect sweep!)
         if (winStreak === 3) {
-          randomDeclaration += ' 🔥 3-SHOW STREAK!';
+          randomDeclaration += ' 🔥 3-ROUND STREAK!';
         } else if (winStreak === 5) {
-          randomDeclaration += ' 🔥🔥 5-SHOW STREAK!';
-        } else if (winStreak === 10) {
-          randomDeclaration += ' 🔥🔥🔥 10-SHOW STREAK! LEGENDARY!';
+          randomDeclaration += ' 🔥🔥🔥 PERFECT SWEEP!';
         }
       }
       
@@ -580,7 +580,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error judging show:', errorData);
-        alert('Failed to judge the show. Please try again.');
+        alert('Failed to judge the round. Please try again.');
         return;
       }
 
@@ -885,7 +885,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         <Header />
         <div className="text-center">
           <div className="text-slate-400 mb-4">
-            {isCreatingShow ? 'Creating show...' : 'No active show found'}
+            {isCreatingShow ? 'Creating round...' : 'No active round found'}
           </div>
           <button
             onClick={async () => {
@@ -947,7 +947,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       await loadRivalryAndShow();
                     } else {
                       console.error('Error creating show:', error);
-                      alert('Failed to create show. Please try again.');
+                      alert('Failed to create round. Please try again.');
                     }
                   } else if (newShow) {
                     // Reload to show the new show
@@ -967,7 +967,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
             disabled={isCreatingShow}
             className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {rivalry ? (isCreatingShow ? 'Creating...' : 'Start Next Show') : 'Back to Home'}
+            {rivalry ? (isCreatingShow ? 'Creating...' : 'Start Next Round') : 'Back to Home'}
           </button>
         </div>
       </div>
@@ -1066,7 +1066,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         {/* Show Number Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="w-8"></div>
-          <h2 className="text-xl font-bold text-slate-300">Show {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+          <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
@@ -1086,20 +1086,29 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                   <button
                     onClick={() => {
                       setShowMenu(false);
-                      setShowHowToPlay(true);
-                    }}
-                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
-                  >
-                    How to Play
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
                       onNavigate('screen2');
                     }}
                     className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
                   >
                     Your Profiles
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowAbout(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
+                  >
+                    About One-Upper
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMenu(false);
+                      setShowHowToPlay(true);
+                    }}
+                    className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
+                  >
+                    How to Play
                   </button>
                   <button
                     onClick={() => {
@@ -1252,7 +1261,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                           disabled={isRetrying}
                           className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
                         >
-                          Skip This Show
+                          Skip This Round
                         </button>
                       </div>
                     </div>
@@ -1482,10 +1491,10 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                       {countdown !== null 
                         ? (currentShow.show_number === RIVALRY_LENGTH 
                             ? `Rivalry Summary in ${countdown}s • View Now` 
-                            : `Next Show in ${countdown}s • Start Now`)
+                            : `Next Round in ${countdown}s • Start Now`)
                         : (currentShow.show_number === RIVALRY_LENGTH 
                             ? 'VIEW RIVALRY SUMMARY →' 
-                            : 'START NEXT SHOW →')}
+                            : 'START NEXT ROUND →')}
                     </button>
                     
                     {/* Stay Here button */}
@@ -1504,7 +1513,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                     onClick={createNextShow}
                     className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
                   >
-                    {currentShow.show_number === RIVALRY_LENGTH ? 'VIEW RIVALRY SUMMARY →' : 'NEXT SHOW →'}
+                    {currentShow.show_number === RIVALRY_LENGTH ? 'VIEW RIVALRY SUMMARY →' : 'NEXT ROUND →'}
                   </button>
                 )}
               </div>
@@ -1520,14 +1529,14 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
           >
             {showHistory ? (
               <>
-                Hide Past Shows
+                Hide Past Rounds
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                 </svg>
               </>
             ) : (
               <>
-                See Past Shows
+                See Past Rounds
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
@@ -1549,7 +1558,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0 mr-3">
-                      <p className="font-semibold text-slate-100">Show {show.show_number} of {RIVALRY_LENGTH}</p>
+                      <p className="font-semibold text-slate-100">Round {show.show_number} of {RIVALRY_LENGTH}</p>
                       <p className="text-sm text-slate-400 line-clamp-1">{show.prompt}</p>
                     </div>
                     <div className="text-right flex-shrink-0">
@@ -1647,7 +1656,7 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
               Cancel Rivalry?
             </h3>
             <p className="text-slate-300 text-sm mb-4">
-              This will end your Rivalry with {opponentProfile.name}. Your Show history will be saved, but your opponent will be notified.
+              This will end your Rivalry with {opponentProfile.name}. Your history will be saved, but your opponent will be notified.
             </p>
             <p className="text-slate-400 text-sm mb-6">This cannot be undone.</p>
             <div className="space-y-2">
@@ -1673,12 +1682,12 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
             <h3 className="text-lg font-bold text-slate-100 mb-2">
-              ⚠️ Skip This Show?
+              ⚠️ Skip This Round?
             </h3>
             <p className="text-slate-300 text-sm mb-4">
-              This show won't count toward your rivalry stats.
+              This round won't count toward your rivalry stats.
             </p>
-            <p className="text-slate-400 text-sm mb-6">A new show will start immediately.</p>
+            <p className="text-slate-400 text-sm mb-6">A new round will start immediately.</p>
             <div className="space-y-2">
               <button
                 onClick={handleSkipShow}
@@ -1700,6 +1709,11 @@ export default function Screen4({ onNavigate, activeProfileId, rivalryId }) {
       {/* How to Play Modal */}
       {showHowToPlay && (
         <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+      )}
+
+      {/* About Modal */}
+      {showAbout && (
+        <AboutModal onClose={() => setShowAbout(false)} />
       )}
     </div>
   );

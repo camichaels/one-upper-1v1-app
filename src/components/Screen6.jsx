@@ -9,7 +9,7 @@ const verdictBrainBoosts = [
   "Your brain just got a little sharper.",
   "That's creative thinking in action.",
   "One prompt down, infinite possibilities unlocked.",
-  "You're building creative muscle with every show.",
+  "You're building creative muscle with every round.",
   "Quick thinking is a skill. You just practiced it.",
   "Fun fact: You're training your brain while having fun.",
   "Every answer is a mini creative workout.",
@@ -53,7 +53,7 @@ const verdictBrainBoosts = [
   "That answer required improvisation. Improvisation is a superpower.",
   "Your creative output matters. You just created something from nothing.",
   "Quick wit is about trusting your instincts. You're learning to trust yours.",
-  "Every show is a chance to surprise yourself. Did you surprise yourself this time?",
+  "Every round is a chance to surprise yourself. Did you surprise yourself this time?",
   "You're practicing the skill that sets innovators apart: thinking differently on purpose.",
   "Creative thinking is a daily practice. You're showing up for it."
 ];
@@ -138,7 +138,7 @@ export default function Screen6({ onNavigate, showId }) {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
         <Header />  {/* ← ADD THIS LINE */}
         <div className="text-center">
-          <div className="text-slate-400 mb-4">Show not found</div>
+          <div className="text-slate-400 mb-4">Round not found</div>
           <button
             onClick={() => onNavigate('screen1')}
             className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
@@ -160,9 +160,9 @@ export default function Screen6({ onNavigate, showId }) {
       <Header />
       <div className="max-w-md mx-auto">
         
-        {/* Show Number */}
+        {/* Round Number */}
         <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-slate-300">Show {show.show_number} of {RIVALRY_LENGTH}</h2>
+          <h2 className="text-xl font-bold text-slate-300">Round {show.show_number} of {RIVALRY_LENGTH}</h2>
         </div>
 
         {/* Winner Declaration */}
@@ -365,12 +365,12 @@ export default function Screen6({ onNavigate, showId }) {
           </p>
         </div>
 
-        {/* Back to Current Show Button */}
+        {/* Back to Current Round Button */}
         <button
           onClick={() => onNavigate('screen1')}
           className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
         >
-          Back to Current Show
+          Back to Current Round
         </button>
 
       </div>

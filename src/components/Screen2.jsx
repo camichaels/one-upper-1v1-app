@@ -635,7 +635,7 @@ export default function Screen2({ onNavigate, editProfileId }) {
                           <span className="text-orange-500 font-semibold">(active profile)</span>
                         )}
                       </div>
-                      <div className="text-sm text-slate-400">Code: {profile.code}</div>
+                      <div className="text-sm text-slate-400">Profile ID: {profile.code}</div>
                     </div>
                   </div>
 

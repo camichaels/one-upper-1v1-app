@@ -6,38 +6,43 @@
 // ============================================================================
 
 /**
- * Number of shows in a complete rivalry.
+ * Number of rounds in a complete rivalry.
  * 
  * IMPORTANT: This is the single source of truth for rivalry length.
  * Changing this number will affect:
- * - UI displays (show numbering)
+ * - UI displays (round numbering)
  * - Game logic (when to trigger summary)
  * - Database queries (completion checks)
- * - Emcee line selection (special lines for final shows)
+ * - Emcee line selection (special lines for final rounds)
  * 
- * Current: 11 shows (odd number prevents W/L ties, ~2 weeks to complete)
+ * Current: 5 rounds (odd number prevents W/L ties, completable in one session)
+ * 
+ * NOTE ON INTERNAL NAMING:
+ * - Database uses "shows" table and "show_number" column (legacy naming)
+ * - UI displays "Round" to users
+ * - This is intentional - DB rename was deemed too risky
  * 
  * NOTE: Changing this mid-deployment affects IN-PROGRESS rivalries.
  * - Completed rivalries (status='complete') are not affected
  * - In-progress rivalries will extend/contract to new length
  * - Best practice: Wait for active rivalries to complete before changing
  */
-export const RIVALRY_LENGTH = 11;
+export const RIVALRY_LENGTH = 5;
 
 /**
- * Show numbers that trigger special emcee lines.
+ * Round numbers that trigger special emcee lines.
  * Automatically calculated based on RIVALRY_LENGTH.
  */
 export const SPECIAL_SHOWS = {
-  PENULTIMATE: RIVALRY_LENGTH - 1,  // Second-to-last show (e.g., show 10 if length is 11)
-  FINALE: RIVALRY_LENGTH,            // Final show (e.g., show 11)
+  PENULTIMATE: RIVALRY_LENGTH - 1,  // Second-to-last round (e.g., round 4 if length is 5)
+  FINALE: RIVALRY_LENGTH,            // Final round (e.g., round 5)
 };
 
 /**
- * Milestone shows that trigger special commentary.
- * Currently fixed at shows 5 and 10.
+ * Milestone rounds that trigger special commentary.
+ * For 5-round rivalries, round 3 is the midpoint.
  */
-export const MILESTONE_SHOWS = [5, 10];
+export const MILESTONE_SHOWS = [3];
 
 // ============================================================================
 // AI COST LIMITS
@@ -55,9 +60,9 @@ export const MAX_SUMMARY_RETRIES = 3;
 
 /**
  * Reserved for future features:
- * - Variable match lengths (Quick: 7, Standard: 11, Marathon: 21)
+ * - Variable match lengths (Quick: 5, Extended: 11)
  * - Concurrent rivalries (multiple active at once)
- * - Season structure (every N shows = season)
+ * - Season structure
  */
 
 export default {
