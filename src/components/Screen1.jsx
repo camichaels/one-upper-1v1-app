@@ -1363,10 +1363,6 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 <div className="text-red-400 text-sm">{formError}</div>
               )}
 
-              <p className="text-xs text-slate-400 text-center mb-3">
-                FYI: Anyone with your phone number or profile code can access it for now. (Password protection coming soon)
-              </p>
-
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -1396,37 +1392,17 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
         <div className="max-w-md mx-auto space-y-6">
-          {/* Welcome Header with Menu */}
-          <div className="relative text-center">
-            <div className="space-y-1">
-              {pendingInvite ? (
-                <>
-                  <div className="text-center mb-4">
-                    <p className="text-xl font-bold text-orange-500 mb-1">
-                      {pendingInvite.friendName} just challenged you!
-                    </p>
-                    {pendingInvite.stakes && (
-                      <p className="text-slate-300 text-sm mb-2">
-                        Playing for: <span className="text-orange-400 font-semibold">🎯 {pendingInvite.stakes}</span>
-                      </p>
-                    )}
-                    <p className="text-slate-300 text-sm">
-                      Ready to accept, {profile.name}?
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2 className="text-2xl font-bold text-slate-100">
-                    Welcome, {profile.name}!
-                  </h2>
-                  <p className="text-slate-300">
-                    Ready to start a rivalry for the ages?
-                  </p>
-                </>
-              )}
+          
+          {/* Greeting Row - Centered text with menu on right */}
+          <div className="relative">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-100">
+                Hi, {profile.name}! {profile.avatar}
+              </h2>
+              <p className="text-slate-400 text-sm mt-1">
+                Your Profile ID: <span className="text-slate-300">{profile.code}</span>
+              </p>
             </div>
-            
             <div className="absolute top-0 right-0">
               <button 
                 onClick={() => setShowMenu(!showMenu)}
@@ -1499,8 +1475,18 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
               <p className="text-slate-400">Hold tight!</p>
             </div>
           ) : pendingInvite ? (
-            /* Show Accept Challenge flow (shouldn't reach here due to auto-accept) */
+            /* Show Accept Challenge flow */
             <div className="space-y-4">
+              <div className="text-center">
+                <p className="text-xl font-bold text-orange-500 mb-1">
+                  {pendingInvite.friendName} challenged you!
+                </p>
+                {pendingInvite.stakes && (
+                  <p className="text-slate-300 text-sm mb-2">
+                    Playing for: <span className="text-orange-400 font-semibold">🎯 {pendingInvite.stakes}</span>
+                  </p>
+                )}
+              </div>
               <button
                 onClick={handleAcceptPendingInvite}
                 disabled={isJoining}
@@ -1524,18 +1510,19 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
           ) : (
             /* Show normal Challenge/Join options */
             <>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <h3 className="text-xl font-bold text-orange-500 text-center">
-                  Challenge a Friend
+                  Start a Rivalry
                 </h3>
                 
-                <p className="text-slate-300 text-center font-medium">
-                  Share your Profile ID: <span className="text-slate-100 font-bold tracking-wide">{profile.code}</span>
+                <p className="text-slate-300 text-center text-sm">
+                  Send your ID to a friend.<br />
+                  Then it's 5 rounds, 1 winner, and 0 mercy.
                 </p>
 
                 {/* Stakes input */}
                 <div className="space-y-1">
-                  <label className="text-sm text-slate-400">Up the stakes. Play for (optional):</label>
+                  <label className="text-sm text-slate-400">Up the stakes! Tell them what you're playing for:</label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
@@ -1571,13 +1558,13 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                     onClick={handleCopyCode}
                     className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
                   >
-                    {copied ? '✓ Copied!' : 'Copy'}
+                    {copied ? '✓ Copied!' : 'Copy my ID'}
                   </button>
                   <button
                     onClick={handleShareSMS}
                     className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
                   >
-                    Share via SMS
+                    Share ID via Text
                   </button>
                 </div>
               </div>
@@ -1585,14 +1572,19 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
               {/* Join a Friend Section */}
               <div className="space-y-3 pt-4">
                 <h3 className="text-xl font-bold text-orange-500 text-center">
-                  Got a Friend Invite?
+                  Join a Friend's Rivalry
                 </h3>
+                
+                <p className="text-slate-300 text-center text-sm">
+                  Been challenged?<br />
+                  Enter their ID and start one-upping.
+                </p>
                 
                 <button
                   onClick={() => setShowJoinModal(true)}
                   className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
                 >
-                  Join with Friend's ID
+                  Enter Friend's ID
                 </button>
               </div>
             </>

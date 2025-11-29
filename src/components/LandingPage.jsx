@@ -80,7 +80,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <h3 className="font-bold text-slate-100 mb-1">Win the Rivalry</h3>
-                <p className="text-slate-300 text-sm">11 shows. Most wins takes the Golden Mic.</p>
+                <p className="text-slate-300 text-sm">5 rounds. Most wins takes the Golden Mic.</p>
               </div>
             </div>
           </div>
@@ -162,7 +162,7 @@ export default function LandingPage() {
             />
             <h3 className="text-2xl font-bold text-orange-500 mb-3">The Golden Mic</h3>
             <p className="text-slate-200 mb-3">
-              Every rivalry is 11 shows. Win the most to claim the Golden Mic and bragging rights.
+              Every rivalry is 5 rounds. Win the most to claim the Golden Mic and bragging rights.
             </p>
             <p className="text-slate-200">
               Plus, you can up the stakes and make the rivalry more interesting. Play for lunch, loser mows the lawn, or just eternal glory.

@@ -15,7 +15,7 @@ export default function HowToPlayModal({ onClose }) {
           <ul className="space-y-2 text-slate-300 text-sm">
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Every Rivalry is 11 Shows</span>
+              <span>Every Rivalry is 5 Rounds</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
@@ -27,11 +27,11 @@ export default function HowToPlayModal({ onClose }) {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Highest Total Wins the Show</span>
+              <span>Highest Total Wins the Round</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Most Show Wins Gets the Golden Mic</span>
+              <span>Most Round Wins Gets the Golden Mic</span>
             </li>
           </ul>
         </div>
@@ -50,11 +50,11 @@ export default function HowToPlayModal({ onClose }) {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>The mic shows who won each show</span>
+              <span>The mic shows who won each round</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Check out judge banter and past show scores</span>
+              <span>Check out judge banter and past round scores</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
