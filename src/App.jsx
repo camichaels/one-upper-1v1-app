@@ -9,6 +9,7 @@ import Screen6Summary from './components/Screen6Summary';
 import RivalrySummaryScreen from './components/RivalrySummaryScreen';
 import PastRivalriesList from './components/PastRivalriesList';
 import JoinRivalry from './components/JoinRivalry';
+import VerifyPhone from './components/VerifyPhone';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
 import JudgesPage from './components/JudgesPage';
@@ -42,6 +43,9 @@ function App() {
         
         {/* Judges Page */}
         <Route path="/judges" element={<JudgesPage />} />
+        
+        {/* Phone Verification */}
+        <Route path="/verify" element={<VerifyPhone />} />
         
         {/* Game Routes */}
         <Route 
