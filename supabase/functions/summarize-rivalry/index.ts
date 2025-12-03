@@ -28,50 +28,6 @@ Examples of Ripley's tone:
 - "Bold swings, not all of them landed. But I respect the commitment."
 - "The judges wanted weird. You gave them weird. Simple math."`;
 
-// Judge personalities for context
-const JUDGES: Record<string, { name: string; emoji: string; description: string }> = {
-  savage: {
-    name: "Savage",
-    emoji: "💀",
-    description: "Brutal honesty, zero patience for safe answers. Rewards boldness and risk-taking. Will destroy boring responses."
-  },
-  snoot: {
-    name: "Professor Snoot",
-    emoji: "🧐",
-    description: "Intellectual elitist who values wit, wordplay, and clever construction. Disdains low-brow humor but secretly enjoys a good pun."
-  },
-  diva: {
-    name: "Diva",
-    emoji: "✨",
-    description: "Drama queen who wants entertainment and flair. Short attention span — loses interest if you ramble. Loves confidence."
-  },
-  coach: {
-    name: "Coach",
-    emoji: "📣",
-    description: "Enthusiastic hype-man who rewards energy and commitment. Doesn't care if it's dumb as long as you went for it."
-  },
-  reaper: {
-    name: "The Reaper",
-    emoji: "💀",
-    description: "Dark humor aficionado. Loves morbid twists and gallows humor. The edgier the better."
-  },
-  wholesome: {
-    name: "Wholesome Wendy",
-    emoji: "🌻",
-    description: "Finds the good in everything. Rewards heartfelt answers and genuine creativity. Hates meanness."
-  },
-  chaos: {
-    name: "Chaos Gremlin",
-    emoji: "🎲",
-    description: "Unpredictable wildcard. Loves absurdity, randomness, and answers that make no sense but somehow work."
-  },
-  robot: {
-    name: "RoboJudge 3000",
-    emoji: "🤖",
-    description: "Analyzes answers with cold logic. Appreciates structure and cleverness. Does not compute 'vibes'."
-  }
-};
-
 serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -172,11 +128,30 @@ serve(async (req) => {
       );
     }
 
-    // Get judge info for this rivalry
-    const rivalryJudges = (rivalry.judges || []).map((judgeKey: string) => {
-      const judge = JUDGES[judgeKey] || { name: judgeKey, emoji: '⚖️', description: 'A judge' };
-      return { key: judgeKey, ...judge };
-    });
+    // Fetch judge profiles from database (only the ones used in this rivalry)
+    const judgeKeys = rivalry.judges || [];
+    let rivalryJudges: Array<{ key: string; name: string; emoji: string; description: string }> = [];
+    
+    if (judgeKeys.length > 0) {
+      const { data: judgesData, error: judgesError } = await supabase
+        .from('judges')
+        .select('key, name, emoji, description')
+        .in('key', judgeKeys);
+      
+      if (!judgesError && judgesData) {
+        rivalryJudges = judgesData;
+      }
+    }
+    
+    // Fallback if no judges found
+    if (rivalryJudges.length === 0) {
+      rivalryJudges = judgeKeys.map((key: string) => ({
+        key,
+        name: key.charAt(0).toUpperCase() + key.slice(1),
+        emoji: '⚖️',
+        description: 'A judge'
+      }));
+    }
 
     // Calculate scores and stats
     let playerAWins = 0;

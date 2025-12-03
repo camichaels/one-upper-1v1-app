@@ -257,7 +257,29 @@ if (rivalryError) {
 }
 
 if (!rivalryData || rivalryData.length === 0) {
-  // Has profile, no rivalry → State B
+  // No active rivalry - check for unseen completed rivalries first
+  const isProfileA = true; // We'll check both columns
+  
+  const { data: unseenRivalry, error: unseenError } = await supabase
+    .from('rivalries')
+    .select('*, profile_a:profiles!rivalries_profile_a_id_fkey(id, name), profile_b:profiles!rivalries_profile_b_id_fkey(id, name)')
+    .eq('status', 'complete')
+    .or(`profile_a_id.eq.${activeProfileId},profile_b_id.eq.${activeProfileId}`)
+    .or(`and(profile_a_id.eq.${activeProfileId},profile_a_seen_summary.eq.false),and(profile_b_id.eq.${activeProfileId},profile_b_seen_summary.eq.false)`)
+    .limit(1)
+    .maybeSingle();
+  
+  if (!unseenError && unseenRivalry) {
+    // Route to summary screen for this unseen rivalry
+    onNavigate('summary', {
+      rivalryId: unseenRivalry.id,
+      activeProfileId: activeProfileId,
+      context: 'from_unseen'
+    });
+    return;
+  }
+  
+  // Has profile, no active rivalry, no unseen summaries → State B
   setCurrentState('B');
   setLoading(false);
   

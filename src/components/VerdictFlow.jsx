@@ -161,7 +161,10 @@ export default function VerdictFlow({
   function getVerdictLine() {
     const isWinner = currentShow.winner_id === activeProfileId;
     const winnerScore = getTotalScore(currentShow.winner_id);
-    const loserScore = getTotalScore(currentShow.loser_id);
+    const loserId = currentShow.winner_id === currentShow.profile_a_id 
+      ? currentShow.profile_b_id 
+      : currentShow.profile_a_id;
+    const loserScore = getTotalScore(loserId);
     const scoreDiff = winnerScore - loserScore;
     
     // Filter out current show to avoid double-counting
@@ -287,7 +290,10 @@ export default function VerdictFlow({
 
   // Calculate scores and standings
   const winnerScore = getTotalScore(currentShow.winner_id);
-  const loserScore = getTotalScore(currentShow.loser_id);
+  const loserId = currentShow.winner_id === currentShow.profile_a_id 
+    ? currentShow.profile_b_id 
+    : currentShow.profile_a_id;
+  const loserScore = getTotalScore(loserId);
   const winnerName = getWinnerName();
   // Check if this was a tiebreaker (from judge_data or by comparing scores)
   const isTie = currentShow.judge_data?.was_tiebreaker || winnerScore === loserScore;
@@ -695,7 +701,7 @@ export default function VerdictFlow({
                 <span className="text-xl font-bold text-slate-400">{loserScore}</span>
               </div>
               <p className="text-slate-200 text-sm">
-                {currentShow.loser_id === currentShow.profile_a_id 
+                {loserId === currentShow.profile_a_id 
                   ? currentShow.profile_a_answer 
                   : currentShow.profile_b_answer}
               </p>

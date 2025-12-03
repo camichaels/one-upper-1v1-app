@@ -162,6 +162,8 @@ SCORING GUIDELINES:
 - 3-4: Weak, missed the mark
 - 1-2: Terrible, completely off
 
+IMPORTANT - NO TIES: Each judge MUST give different scores to each player. Do NOT give both players the same score. Even if answers are close in quality, find a reason to prefer one — creativity, timing, risk-taking, anything. A 1-point difference is fine. Ties are unsatisfying for players.
+
 ${rivalryContext}
 
 ADDITIONAL TASK - RIVALRY COMMENTARY:

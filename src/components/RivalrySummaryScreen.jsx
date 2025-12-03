@@ -168,6 +168,28 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     loadAllShows();
   }, []);
 
+  // Mark summary as seen when it loads successfully
+  useEffect(() => {
+    if (summary && rivalry && activeProfileId) {
+      markSummaryAsSeen();
+    }
+  }, [summary, rivalry, activeProfileId]);
+
+  async function markSummaryAsSeen() {
+    try {
+      const isProfileA = activeProfileId === rivalry.profile_a_id;
+      const column = isProfileA ? 'profile_a_seen_summary' : 'profile_b_seen_summary';
+      
+      await supabase
+        .from('rivalries')
+        .update({ [column]: true })
+        .eq('id', rivalryId);
+    } catch (err) {
+      // Non-critical - don't block the UI if this fails
+      console.error('Failed to mark summary as seen:', err);
+    }
+  }
+
   // Trigger mic animation for winner after summary loads (only once ever)
   useEffect(() => {
     if (summary && rivalry && !animationTriggered) {

@@ -10,6 +10,7 @@ import RivalrySummaryScreen from './components/RivalrySummaryScreen';
 import PastRivalriesList from './components/PastRivalriesList';
 import JoinRivalry from './components/JoinRivalry';
 import VerifyPhone from './components/VerifyPhone';
+import AuthCallback from './components/AuthCallback';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
 import JudgesPage from './components/JudgesPage';
@@ -46,6 +47,7 @@ function App() {
         
         {/* Phone Verification */}
         <Route path="/verify" element={<VerifyPhone />} />
+        <Route path="/auth/:token" element={<AuthCallback />} />
         
         {/* Game Routes */}
         <Route 
