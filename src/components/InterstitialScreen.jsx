@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import GoldenMic from '../assets/microphone.svg';
 
 export default function InterstitialScreen({ emceeText, onComplete }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col items-center justify-center p-6">
-      {/* Golden Mic logo */}
-      <img src={GoldenMic} alt="One-Upper" className="w-20 h-20 mb-6" />
+      {/* One-Upper logo */}
+      <img src="/logo-wide.png" alt="One-Upper" className="h-16 mb-6" />
       
       {/* Ripley label - consistent with verdict flow */}
       <div className="flex items-center gap-2 mb-6">
