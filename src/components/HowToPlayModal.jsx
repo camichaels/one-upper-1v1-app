@@ -1,5 +1,3 @@
-import { useState } from 'react';
-
 export default function HowToPlayModal({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
@@ -23,15 +21,19 @@ export default function HowToPlayModal({ onClose }) {
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>AI Judges Score You (1-10 each)</span>
+              <span>3 AI Judges Score You (1-10 each)</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Highest Total Wins the Round</span>
+              <span>Highest Total Score Wins the Round</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Most Round Wins Gets the Golden Mic</span>
+              <span>Tied Score? First to Submit Wins!</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-orange-500 flex-shrink-0">•</span>
+              <span>Most Round Wins Gets the Golden Mic 🎤</span>
             </li>
           </ul>
         </div>
@@ -42,25 +44,45 @@ export default function HowToPlayModal({ onClose }) {
           <ul className="space-y-2 text-slate-300 text-sm">
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Be funny, creative, or outrageous (it's a head-on duel with your buddy)</span>
+              <span>Be funny, creative, or outrageous</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Check out the judges' personalities before answering (find ways to appeal to them)</span>
+              <span>Check out the judges' personalities (find ways to appeal to them)</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>The mic shows who won each round</span>
+              <span>Speed matters when it's close!</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
               <span>Check out judge banter and past round scores</span>
             </li>
-            <li className="flex items-start gap-2">
-              <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Create multiple profiles with your phone number to juggle different rivalries</span>
-            </li>
           </ul>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-slate-600 my-6"></div>
+
+        {/* About Section */}
+        <div className="mb-6">
+          <h3 className="text-lg font-bold text-slate-100 mb-3">About One-Upper</h3>
+          <p className="text-slate-300 text-sm mb-4">
+            One-Upper turns the age-old art of one-upping your friends into a proper competition. 
+            Challenge someone, answer creative prompts, and let AI judges decide who's got the better wit.
+          </p>
+          <p className="text-slate-400 text-sm mb-4">
+            Built for friendly rivalries, bragging rights, and those moments when you just 
+            <em> know</em> you can top whatever they just said.
+          </p>
+          <div className="text-center space-y-2">
+            <p className="text-slate-400 text-sm">
+              Ideas? <a href="mailto:hello@oneupper.app" className="text-orange-400 hover:text-orange-300">hello@oneupper.app</a>
+            </p>
+            <p className="text-slate-500 text-xs">
+              Made with ❤️ for competitive friends everywhere
+            </p>
+          </div>
         </div>
 
         {/* Close Button */}

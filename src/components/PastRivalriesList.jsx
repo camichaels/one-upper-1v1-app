@@ -49,13 +49,31 @@ export default function PastRivalriesList({ onNavigate, profileId }) {
         const isProfileA = rivalry.profile_a_id === profileId;
         const opponent = isProfileA ? rivalry.profile_b : rivalry.profile_a;
         
-        // Get scores from summary
+        // Get scores from summary - handle both old and new format
         const summary = rivalry.summary || {};
         const finalScore = summary.final_score || {};
         
-        const myWins = isProfileA ? finalScore.player_a_wins : finalScore.player_b_wins;
-        const opponentWins = isProfileA ? finalScore.player_b_wins : finalScore.player_a_wins;
-        const iWon = summary.winner_id === profileId;
+        // New format has winner_id inside final_score, old format has it at top level
+        const winnerId = finalScore.winner_id || summary.winner_id;
+        const iWon = winnerId === profileId;
+        
+        // New format uses winner_wins/loser_wins, old format uses player_a_wins/player_b_wins
+        let myWins, opponentWins;
+        
+        if (finalScore.winner_wins !== undefined) {
+          // New format
+          if (iWon) {
+            myWins = finalScore.winner_wins;
+            opponentWins = finalScore.loser_wins;
+          } else {
+            myWins = finalScore.loser_wins;
+            opponentWins = finalScore.winner_wins;
+          }
+        } else {
+          // Old format
+          myWins = isProfileA ? finalScore.player_a_wins : finalScore.player_b_wins;
+          opponentWins = isProfileA ? finalScore.player_b_wins : finalScore.player_a_wins;
+        }
 
         return {
           id: rivalry.id,

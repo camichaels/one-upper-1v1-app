@@ -6,6 +6,135 @@ import GoldenMic from '../assets/microphone.svg';
 import ShareCard from './ShareCard';
 import { shareAsImage } from '../utils/shareUtils';
 
+// Helper function to normalize old summary format to new format
+function normalizeSummary(summary, rivalry) {
+  // Check if it's already new format (has ai_generated)
+  if (summary.ai_generated) {
+    return summary;
+  }
+
+  // Old format detected - convert to new format
+  const profileA = rivalry.profile_a;
+  const profileB = rivalry.profile_b;
+  
+  // Determine winner from old format (winner_id was at top level)
+  const winnerId = summary.winner_id || summary.final_score?.winner_id;
+  const isWinnerA = winnerId === profileA?.id;
+  
+  const winnerProfile = isWinnerA ? profileA : profileB;
+  const loserProfile = isWinnerA ? profileB : profileA;
+  
+  const winnerWins = isWinnerA 
+    ? (summary.final_score?.player_a_wins || 0)
+    : (summary.final_score?.player_b_wins || 0);
+  const loserWins = isWinnerA 
+    ? (summary.final_score?.player_b_wins || 0)
+    : (summary.final_score?.player_a_wins || 0);
+
+  // Build normalized summary
+  return {
+    final_score: {
+      winner_id: winnerId,
+      winner_name: winnerProfile?.name || 'Winner',
+      loser_name: loserProfile?.name || 'Opponent',
+      winner_wins: winnerWins,
+      loser_wins: loserWins,
+      winner_total_points: isWinnerA 
+        ? (summary.final_score?.player_a_total_points || 0)
+        : (summary.final_score?.player_b_total_points || 0),
+      loser_total_points: isWinnerA
+        ? (summary.final_score?.player_b_total_points || 0)
+        : (summary.final_score?.player_a_total_points || 0),
+      tiebreaker: summary.final_score?.tiebreaker || null
+    },
+    ai_generated: {
+      headline: "A Rivalry for the Ages", // Fallback headline for old rivalries
+      ripley_analysis: summary.analysis || "A hard-fought rivalry between two competitors.",
+      ripley_tip: "Keep practicing and come back stronger next time.",
+      winner_style: {
+        short: summary.player_profiles?.player_a_style && isWinnerA 
+          ? truncateStyle(summary.player_profiles.player_a_style)
+          : summary.player_profiles?.player_b_style && !isWinnerA
+            ? truncateStyle(summary.player_profiles.player_b_style)
+            : "Creative competitor",
+        detail: isWinnerA 
+          ? (summary.player_profiles?.player_a_style || "Brought their A-game.")
+          : (summary.player_profiles?.player_b_style || "Brought their A-game.")
+      },
+      loser_style: {
+        short: summary.player_profiles?.player_b_style && isWinnerA
+          ? truncateStyle(summary.player_profiles.player_b_style)
+          : summary.player_profiles?.player_a_style && !isWinnerA
+            ? truncateStyle(summary.player_profiles.player_a_style)
+            : "Worthy opponent",
+        detail: isWinnerA
+          ? (summary.player_profiles?.player_b_style || "Put up a good fight.")
+          : (summary.player_profiles?.player_a_style || "Put up a good fight.")
+      }
+    },
+    stats: {
+      // Old format didn't have stats, so we provide null values
+      biggest_blowout: null,
+      closest_round: null,
+      judges_favorite: null,
+      unanimous_rounds: null
+    }
+  };
+}
+
+// Helper to extract first 2-3 words from a longer style description
+function truncateStyle(styleText) {
+  if (!styleText) return "Creative player";
+  const words = styleText.split(' ').slice(0, 3).join(' ');
+  return words.length > 25 ? words.substring(0, 25) + '...' : words;
+}
+
+// Stats configuration for carousel - format functions receive (stat, allShows, rivalry)
+const STAT_CONFIGS = [
+  {
+    key: 'biggest_blowout',
+    emoji: '🔥',
+    label: 'Biggest Blowout',
+    format: (stat) => stat ? `Round ${stat.round}: ${stat.winner_name} (+${stat.margin})` : null,
+    getContext: (stat, allShows) => {
+      if (!stat || !allShows) return null;
+      const show = allShows.find(s => s.show_number === stat.round);
+      return show ? `"${show.prompt}"` : null;
+    }
+  },
+  {
+    key: 'closest_round',
+    emoji: '😤',
+    label: 'Closest Round',
+    format: (stat) => stat ? `Round ${stat.round}: ${stat.winner_name} (+${stat.margin})` : null,
+    getContext: (stat, allShows) => {
+      if (!stat || !allShows) return null;
+      const show = allShows.find(s => s.show_number === stat.round);
+      return show ? `"${show.prompt}"` : null;
+    }
+  },
+  {
+    key: 'judges_favorite',
+    emoji: '💕',
+    label: "Judge's Favorite",
+    format: (stat) => stat ? `${stat.judge_emoji} ${stat.judge_name} loved ${stat.favored_player}` : null,
+    getContext: (stat) => stat ? `(+${stat.avg_margin} avg point edge)` : null
+  },
+  {
+    key: 'unanimous_rounds',
+    emoji: '🎯',
+    label: 'Unanimous Decisions',
+    format: (stat, allShows, rivalry, activeProfileId) => {
+      if (stat === null || stat === undefined) return null;
+      return `${stat} round${stat !== 1 ? 's' : ''} with full judge agreement`;
+    },
+    getContext: (stat, allShows) => {
+      // We'd need to know which rounds were unanimous - for now just show count
+      return null;
+    }
+  }
+];
+
 export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProfileId, context, returnProfileId }) {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -18,14 +147,49 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [allShows, setAllShows] = useState([]);
   const [isSharing, setIsSharing] = useState(false);
   const [shareMessage, setShareMessage] = useState(null);
+  
+  // New state for animations and UI
+  const [showMicAnimation, setShowMicAnimation] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
+  const [currentStatIndex, setCurrentStatIndex] = useState(0);
+  const [showStyleModal, setShowStyleModal] = useState(null); // 'winner' | 'loser' | null
+  const [animationTriggered, setAnimationTriggered] = useState(false);
 
   // Determine if we came from history browsing or just completed a rivalry
   const isFromHistory = context === 'from_history';
+  const isReturningFromRound = context === 'from_rivalry_summary';
+
+  // Check if we've already shown animation for this rivalry
+  const animationKey = `micAnimation_${rivalryId}`;
+  const hasSeenAnimation = sessionStorage.getItem(animationKey) === 'true';
 
   useEffect(() => {
     loadSummary();
     loadAllShows();
   }, []);
+
+  // Trigger mic animation for winner after summary loads (only once ever)
+  useEffect(() => {
+    if (summary && rivalry && !animationTriggered) {
+      setAnimationTriggered(true);
+      
+      const iWon = summary.final_score.winner_id === activeProfileId;
+      const shouldAnimate = iWon && !isFromHistory && !isReturningFromRound && !hasSeenAnimation;
+      
+      if (shouldAnimate) {
+        setShowMicAnimation(true);
+        sessionStorage.setItem(animationKey, 'true');
+        // After animation, reveal content
+        setTimeout(() => {
+          setShowMicAnimation(false);
+          setAnimationComplete(true);
+        }, 2500);
+      } else {
+        // No animation - show content immediately
+        setAnimationComplete(true);
+      }
+    }
+  }, [summary, rivalry, animationTriggered]);
 
   async function loadAllShows() {
     try {
@@ -66,7 +230,9 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         const parsedSummary = typeof rivalryData.summary === 'string' 
           ? JSON.parse(rivalryData.summary) 
           : rivalryData.summary;
-        setSummary(parsedSummary);
+        // Normalize to new format (handles old rivalries)
+        const normalizedSummary = normalizeSummary(parsedSummary, rivalryData);
+        setSummary(normalizedSummary);
         setLoading(false);
       } else {
         // Generate new summary - show generating state
@@ -92,12 +258,38 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
       
       setSummary(data);
       setLoading(false);
+      setIsGenerating(false);
       setIsRetrying(false);
       setError(null);
     } catch (err) {
       console.error('Failed to generate summary:', err);
+      
+      // Wait a few seconds - the edge function might still be completing
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      
+      // Check if summary was actually generated despite the error (race condition / timeout)
+      const { data: checkRivalry } = await supabase
+        .from('rivalries')
+        .select('summary')
+        .eq('id', rivalryId)
+        .single();
+      
+      if (checkRivalry?.summary) {
+        // Summary exists! Use it instead of showing error
+        const parsedSummary = typeof checkRivalry.summary === 'string'
+          ? JSON.parse(checkRivalry.summary)
+          : checkRivalry.summary;
+        setSummary(parsedSummary);
+        setLoading(false);
+        setIsGenerating(false);
+        setIsRetrying(false);
+        setError(null);
+        return;
+      }
+      
       setError('Failed to generate AI summary. Please try again.');
       setLoading(false);
+      setIsGenerating(false);
       setIsRetrying(false);
     }
   }
@@ -190,6 +382,15 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     });
   }
 
+  // Stats carousel navigation
+  function handleNextStat() {
+    setCurrentStatIndex((prev) => (prev + 1) % STAT_CONFIGS.length);
+  }
+
+  function handlePrevStat() {
+    setCurrentStatIndex((prev) => (prev - 1 + STAT_CONFIGS.length) % STAT_CONFIGS.length);
+  }
+
   // Get a random prompt from the shows for the share card
   function getRandomPrompt() {
     if (allShows.length === 0) return "What's the worst thing to say at a job interview?";
@@ -197,18 +398,19 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     return randomShow.prompt;
   }
 
-  // Loading state - only show "generating" if we're actually generating
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
         <div className="text-center">
           {isGenerating ? (
             <>
-              <div className="text-orange-500 text-2xl mb-4 animate-pulse">
-                ✨ Generating rivalry summary...
+              <div className="text-6xl mb-4 animate-pulse">🎙️</div>
+              <div className="text-orange-500 text-xl mb-2">
+                Ripley is reviewing the tapes...
               </div>
               <div className="text-slate-400 text-sm">
-                Analyzing {RIVALRY_LENGTH} shows of creative brilliance
+                Analyzing {RIVALRY_LENGTH} rounds of creative chaos
               </div>
             </>
           ) : (
@@ -258,23 +460,59 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     return null;
   }
 
-  // Determine which profile is "me" and which is opponent
-  const myProfile = rivalry.profile_a_id === activeProfileId ? rivalry.profile_a : rivalry.profile_b;
-  const opponentProfile = rivalry.profile_a_id === activeProfileId ? rivalry.profile_b : rivalry.profile_a;
-  const myWins = rivalry.profile_a_id === activeProfileId 
-    ? summary.final_score.player_a_wins 
-    : summary.final_score.player_b_wins;
-  const opponentWins = rivalry.profile_a_id === activeProfileId 
-    ? summary.final_score.player_b_wins 
-    : summary.final_score.player_a_wins;
-  const iWon = myWins > opponentWins;
+  // Determine win/loss using new summary structure
+  const iWon = summary.final_score.winner_id === activeProfileId;
+  const winnerName = summary.final_score.winner_name;
+  const loserName = summary.final_score.loser_name;
+  const winnerWins = summary.final_score.winner_wins;
+  const loserWins = summary.final_score.loser_wins;
   const tiebreaker = summary.final_score.tiebreaker;
 
-  // Determine winner/loser names for share card (always show winner first)
-  const winnerProfile = iWon ? myProfile : opponentProfile;
-  const loserProfile = iWon ? opponentProfile : myProfile;
-  const winnerScore = iWon ? myWins : opponentWins;
-  const loserScore = iWon ? opponentWins : myWins;
+  // Get profiles
+  const myProfile = rivalry.profile_a_id === activeProfileId ? rivalry.profile_a : rivalry.profile_b;
+  const opponentProfile = rivalry.profile_a_id === activeProfileId ? rivalry.profile_b : rivalry.profile_a;
+
+  // Determine which style is mine vs opponent (with safe fallbacks)
+  const defaultStyle = { short: "Creative competitor", detail: "Brought their best to this rivalry." };
+  const winnerStyle = summary.ai_generated?.winner_style || defaultStyle;
+  const loserStyle = summary.ai_generated?.loser_style || defaultStyle;
+  const myStyle = iWon ? winnerStyle : loserStyle;
+  const opponentStyle = iWon ? loserStyle : winnerStyle;
+
+  // Get current stat for carousel (with safe fallback for old rivalries)
+  const currentStatConfig = STAT_CONFIGS[currentStatIndex];
+  const currentStatValue = summary.stats?.[currentStatConfig.key] ?? null;
+  const currentStatDisplay = currentStatConfig.format(currentStatValue);
+  const currentStatContext = currentStatConfig.getContext ? currentStatConfig.getContext(currentStatValue, allShows) : null;
+  
+  // Check if any stats are available (for old rivalries, may be all null)
+  const hasAnyStats = summary.stats && Object.values(summary.stats).some(v => v !== null && v !== undefined);
+
+  // Winner animation screen
+  if (showMicAnimation) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="text-center animate-pulse">
+          <img 
+            src={GoldenMic} 
+            alt="Golden Mic" 
+            className="w-32 h-32 mx-auto mb-6 drop-shadow-[0_0_30px_rgba(251,191,36,0.5)]"
+          />
+          <h1 className="text-3xl font-bold text-orange-400 mb-2">
+            You Won!
+          </h1>
+          <p className="text-slate-300">
+            The Golden Mic is yours
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for animation to complete before showing content
+  if (!animationComplete) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
@@ -283,17 +521,17 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
       {/* Hidden ShareCard for image generation */}
       <div className="absolute -left-[9999px] top-0">
         <ShareCard
-          winnerName={winnerProfile.name}
-          loserName={loserProfile.name}
-          winnerScore={winnerScore}
-          loserScore={loserScore}
+          winnerName={winnerName}
+          loserName={loserName}
+          winnerScore={winnerWins}
+          loserScore={loserWins}
           stakes={rivalry.stakes}
           samplePrompt={getRandomPrompt()}
           rivalryId={rivalryId}
         />
       </div>
       
-      <div className="max-w-2xl mx-auto mt-2 space-y-6 pb-24">
+      <div className="max-w-2xl mx-auto mt-2 space-y-5 pb-24">
         
         {/* Back Button - Only show when viewing from history */}
         {isFromHistory && (
@@ -306,127 +544,161 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </button>
         )}
 
-        {/* Final Score Header */}
+        {/* Golden Mic + Headline + Score */}
         <div className="text-center space-y-3">
-          {/* Golden Mic - only shown for winner */}
-          {iWon && (
-            <img src={GoldenMic} alt="Golden Mic" className="w-16 h-16 mx-auto" />
-          )}
+          {/* Golden Mic */}
+          <img 
+            src={GoldenMic} 
+            alt="Golden Mic" 
+            className={`w-16 h-16 mx-auto ${iWon ? 'drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]' : 'opacity-50 grayscale'}`}
+          />
           
-          <h1 className="text-3xl font-bold text-slate-100">
-            {iWon ? 'You Won the Golden Mic!' : `${opponentProfile.name} Won the Golden Mic`}
+          {/* AI-Generated Headline */}
+          <h1 className="text-2xl font-bold text-slate-100 px-4">
+            "{summary.ai_generated?.headline || 'A Rivalry for the Ages'}"
           </h1>
 
-          {/* Stakes display */}
-          {rivalry.stakes && (
-            <p className="text-lg">
-              {iWon ? (
-                <span className="text-orange-400 font-semibold">+ {rivalry.stakes} from {opponentProfile.name}</span>
-              ) : (
-                <span className="text-slate-400">You owe {opponentProfile.name}: <span className="text-orange-400 font-semibold">{rivalry.stakes}</span></span>
-              )}
-            </p>
-          )}
-          
-          <div className="text-5xl font-bold">
-            <span className={iWon ? 'text-orange-500' : 'text-slate-400'}>
-              {myWins}
-            </span>
-            <span className="text-slate-500 mx-3">-</span>
-            <span className={!iWon ? 'text-orange-500' : 'text-slate-400'}>
-              {opponentWins}
-            </span>
+          {/* Score: Winner: X • Loser: Y */}
+          <div className="text-xl text-slate-300">
+            <span className="text-orange-400 font-bold">{winnerName}: {winnerWins}</span>
+            <span className="text-slate-500 mx-2">•</span>
+            <span>{loserName}: {loserWins}</span>
           </div>
+
+          {/* Tiebreaker if applicable */}
           {tiebreaker && (
             <p className="text-sm text-slate-400">
               {tiebreaker}
             </p>
           )}
-          <p className="text-slate-300">
-            vs {opponentProfile.name} {opponentProfile.avatar}
+
+          {/* Stakes display */}
+          {rivalry.stakes && (
+            <p className="text-base">
+              {iWon ? (
+                <span className="text-orange-400 font-semibold">🎯 You won: {rivalry.stakes}</span>
+              ) : (
+                <span className="text-slate-400">🎯 You owe: <span className="text-orange-400 font-semibold">{rivalry.stakes}</span></span>
+              )}
+            </p>
+          )}
+        </div>
+
+        {/* Ripley Analysis */}
+        <div className="bg-slate-800/50 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">🎙️</span>
+            <span className="text-orange-400 font-semibold">Ripley</span>
+          </div>
+          <p className="text-slate-200 leading-relaxed">
+            {summary.ai_generated?.ripley_analysis || "A hard-fought rivalry between two worthy competitors."}
           </p>
         </div>
 
-        {/* Rivalry Analysis */}
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
-          <h2 className="text-xl font-bold text-orange-400">Rivalry Analysis</h2>
-          <p className="text-slate-200 leading-relaxed whitespace-pre-line">
-            {summary.analysis}
-          </p>
-        </div>
-
-        {/* Player Profiles */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* My Profile */}
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-2">
-            <div className="text-center">
-              <div className="text-3xl mb-2">{myProfile.avatar}</div>
-              <p className="font-semibold text-slate-100">{myProfile.name}</p>
-              <p className="text-sm text-slate-400">You</p>
+        {/* Stats Carousel - only show if we have stats data */}
+        {hasAnyStats && currentStatDisplay && (
+          <div className="bg-slate-800/50 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <button 
+                onClick={handlePrevStat}
+                className="text-slate-400 hover:text-slate-200 p-2 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              <div className="text-center flex-1">
+                <div className="text-sm text-slate-400 mb-1">
+                  {currentStatConfig.emoji} {currentStatConfig.label}
+                </div>
+                <div className="text-slate-200 font-medium">
+                  {currentStatDisplay}
+                </div>
+                {currentStatContext && (
+                  <div className="text-xs text-slate-400 mt-1 line-clamp-1">
+                    {currentStatContext}
+                  </div>
+                )}
+              </div>
+              
+              <button 
+                onClick={handleNextStat}
+                className="text-slate-400 hover:text-slate-200 p-2 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
             </div>
-            <div className="text-center pt-2 border-t border-slate-700">
-              <p className="text-xs text-slate-400 mb-1">Your Style</p>
-              <p className="text-sm text-slate-200">{summary.player_profiles.player_a_style}</p>
-            </div>
-          </div>
-
-          {/* Opponent Profile */}
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-2">
-            <div className="text-center">
-              <div className="text-3xl mb-2">{opponentProfile.avatar}</div>
-              <p className="font-semibold text-slate-100">{opponentProfile.name}</p>
-              <p className="text-sm text-slate-400">Opponent</p>
-            </div>
-            <div className="text-center pt-2 border-t border-slate-700">
-              <p className="text-xs text-slate-400 mb-1">Their Style</p>
-              <p className="text-sm text-slate-200">{summary.player_profiles.player_b_style}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Memorable Moments */}
-        {summary.memorable_moments && summary.memorable_moments.length > 0 && (
-          <div className="bg-slate-800 border border-slate-700 rounded-lg p-6 space-y-4">
-            <h2 className="text-xl font-bold text-orange-400">Memorable Moments</h2>
-            <div className="space-y-4">
-              {summary.memorable_moments.map((moment, index) => (
-                <p key={index} className="text-slate-200 leading-relaxed">
-                  {moment}
-                </p>
+            
+            {/* Dots indicator */}
+            <div className="flex justify-center gap-1 mt-3">
+              {STAT_CONFIGS.map((_, idx) => (
+                <div 
+                  key={idx}
+                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    idx === currentStatIndex ? 'bg-orange-400' : 'bg-slate-600'
+                  }`}
+                />
               ))}
             </div>
           </div>
         )}
 
-        {/* Share Button - always visible */}
-        <button
-          onClick={handleShareSummary}
-          disabled={isSharing}
-          className="w-full px-4 py-3 bg-slate-800 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-700 transition-all font-semibold disabled:opacity-50"
-        >
-          {isSharing ? 'Generating...' : 'Share Rivalry Result'}
-        </button>
-        
-        {/* Share feedback message */}
-        {shareMessage && (
-          <p className="text-center text-sm text-slate-400">{shareMessage}</p>
-        )}
+        {/* Player Style Cards */}
+        <div className="grid grid-cols-2 gap-3">
+          {/* My Style */}
+          <button
+            onClick={() => setShowStyleModal('me')}
+            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center hover:bg-slate-700/50 transition-colors"
+          >
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="text-2xl">{myProfile.avatar}</span>
+              <span className="font-semibold text-slate-100 text-sm">{myProfile.name}</span>
+            </div>
+            <p className="text-orange-400 text-sm font-medium">"{myStyle.short}"</p>
+          </button>
 
-        {/* Past Shows - Collapsible */}
+          {/* Opponent Style */}
+          <button
+            onClick={() => setShowStyleModal('opponent')}
+            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center hover:bg-slate-700/50 transition-colors"
+          >
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <span className="text-2xl">{opponentProfile.avatar}</span>
+              <span className="font-semibold text-slate-100 text-sm">{opponentProfile.name}</span>
+            </div>
+            <p className="text-orange-400 text-sm font-medium">"{opponentStyle.short}"</p>
+          </button>
+        </div>
+
+        {/* Ripley's Tip */}
+        <div className="bg-slate-800/50 rounded-xl p-5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">🎙️</span>
+            <span className="text-orange-400 font-semibold">Ripley's Tip</span>
+          </div>
+          <p className="text-slate-200 leading-relaxed">
+            {summary.ai_generated?.ripley_tip || "Keep practicing and come back stronger next time."}
+          </p>
+        </div>
+
+        {/* Past Rounds - Collapsible */}
         <button
           onClick={() => setShowHistory(!showHistory)}
-          className="w-full py-3 bg-slate-800/50 border border-slate-700 rounded-lg font-semibold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-slate-200"
+          className="w-full py-3 bg-slate-800/50 border border-slate-700 rounded-xl font-semibold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-slate-200"
         >
           {showHistory ? (
             <>
-              Hide Past Shows
+              Hide Past Rounds
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
             </>
           ) : (
             <>
-              See Past Shows
+              See Past Rounds
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -444,7 +716,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0 mr-3">
-                    <p className="font-semibold text-slate-100">Show {show.show_number} of {RIVALRY_LENGTH}</p>
+                    <p className="font-semibold text-slate-100">Round {show.show_number} of {RIVALRY_LENGTH}</p>
                     <p className="text-sm text-slate-400 line-clamp-1">{show.prompt}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -458,27 +730,82 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </div>
         )}
 
-        {/* Action Buttons - Different based on context */}
-        <div className="space-y-3">
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={handleShareSummary}
+            disabled={isSharing}
+            className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 text-slate-200 rounded-xl hover:bg-slate-600 transition-all font-semibold disabled:opacity-50"
+          >
+            {isSharing ? '...' : 'Share'}
+          </button>
+          
           {isFromHistory ? (
-            /* Viewing from history - show back button */
             <button
               onClick={handleBack}
-              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+              className="flex-[2] px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
             >
-              ← Back to Rivalry History
+              ← Back to History
             </button>
           ) : (
-            /* Just completed rivalry - show start new rivalry */
             <button
               onClick={handleChallengeNewFriend}
-              className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
+              className="flex-[2] px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
             >
-              Start a New Rivalry
+              New Rivalry
             </button>
           )}
         </div>
+        
+        {/* Share feedback message */}
+        {shareMessage && (
+          <p className="text-center text-sm text-slate-400">{shareMessage}</p>
+        )}
       </div>
+
+      {/* Style Detail Modal */}
+      {showStyleModal && (
+        <div 
+          className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
+          onClick={() => setShowStyleModal(null)}
+        >
+          <div 
+            className="bg-slate-800 border border-slate-600 rounded-2xl p-6 max-w-sm w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {showStyleModal === 'me' ? (
+              <>
+                <div className="text-center mb-4">
+                  <span className="text-5xl">{myProfile.avatar}</span>
+                  <h3 className="text-xl font-bold text-slate-100 mt-2">{myProfile.name}</h3>
+                  <p className="text-orange-400 font-medium mt-1">"{myStyle.short}"</p>
+                </div>
+                <p className="text-slate-300 text-center leading-relaxed">
+                  {myStyle.detail?.endsWith('.') ? myStyle.detail : `${myStyle.detail}.`}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-4">
+                  <span className="text-5xl">{opponentProfile.avatar}</span>
+                  <h3 className="text-xl font-bold text-slate-100 mt-2">{opponentProfile.name}</h3>
+                  <p className="text-orange-400 font-medium mt-1">"{opponentStyle.short}"</p>
+                </div>
+                <p className="text-slate-300 text-center leading-relaxed">
+                  {opponentStyle.detail?.endsWith('.') ? opponentStyle.detail : `${opponentStyle.detail}.`}
+                </p>
+              </>
+            )}
+            
+            <button
+              onClick={() => setShowStyleModal(null)}
+              className="w-full mt-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

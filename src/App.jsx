@@ -3,7 +3,7 @@ import { useState } from 'react';
 import LandingPage from './components/LandingPage';
 import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
-import Screen4 from './components/Screen4';
+import GameplayScreen from './components/GameplayScreen';
 import Screen6 from './components/Screen6';
 import Screen6Summary from './components/Screen6Summary';
 import RivalrySummaryScreen from './components/RivalrySummaryScreen';
@@ -12,8 +12,6 @@ import JoinRivalry from './components/JoinRivalry';
 import PrivacyPage from './components/PrivacyPage';
 import TermsPage from './components/TermsPage';
 import JudgesPage from './components/JudgesPage';
-import AuthCallback from './components/AuthCallback';
-import VerifyPhone from './components/VerifyPhone';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import useOnlineStatus from './hooks/useOnlineStatus';
@@ -24,6 +22,7 @@ function App() {
   const [activeProfileId, setActiveProfileId] = useState(null);
   const [rivalryId, setRivalryId] = useState(null);
   const [showId, setShowId] = useState(null);
+  const [verdictStep, setVerdictStep] = useState(1); // Preserved across navigation
   
   const isOnline = useOnlineStatus();
 
@@ -44,10 +43,6 @@ function App() {
         {/* Judges Page */}
         <Route path="/judges" element={<JudgesPage />} />
         
-        {/* Auth Routes */}
-        <Route path="/auth/:token" element={<AuthCallback />} />
-        <Route path="/verify" element={<VerifyPhone />} />
-        
         {/* Game Routes */}
         <Route 
           path="/play" 
@@ -61,6 +56,8 @@ function App() {
               setRivalryId={setRivalryId}
               showId={showId}
               setShowId={setShowId}
+              verdictStep={verdictStep}
+              setVerdictStep={setVerdictStep}
             />
           } 
         />
@@ -78,7 +75,9 @@ function GameRouter({
   rivalryId,
   setRivalryId,
   showId,
-  setShowId
+  setShowId,
+  verdictStep,
+  setVerdictStep
 }) {
   const [currentScreen, setCurrentScreen] = useState('screen1');
   const [navigationContext, setNavigationContext] = useState(null); // 'from_history' | 'from_gameplay' | null
@@ -139,12 +138,15 @@ function GameRouter({
     );
   }
 
-  if (currentScreen === 'screen4') {
+  // Use GameplayScreen for gameplay
+  if (currentScreen === 'gameplay' || currentScreen === 'screen4') {
     return (
-      <Screen4 
+      <GameplayScreen 
         onNavigate={handleNavigate} 
         activeProfileId={activeProfileId}
         rivalryId={rivalryId}
+        verdictStep={verdictStep}
+        setVerdictStep={setVerdictStep}
       />
     );
   }

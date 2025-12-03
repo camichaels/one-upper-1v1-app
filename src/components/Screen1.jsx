@@ -45,6 +45,15 @@ const STAKES_SUGGESTIONS = [
   "naming rights for something"
 ];
 
+// Prompt categories
+const PROMPT_CATEGORIES = [
+  { key: 'random', label: 'Surprise Me', emoji: '🔀' },
+  { key: 'pop_culture', label: 'Pop Culture', emoji: '🌟' },
+  { key: 'deep_think', label: 'Deep Think', emoji: '🤔' },
+  { key: 'edgy', label: 'More Edgy', emoji: '🌶️' },
+  { key: 'absurd', label: 'Totally Absurd', emoji: '😂' },
+];
+
 // Helper: Save profile to localStorage history
 function saveProfileToHistory(profile) {
   const recentProfiles = JSON.parse(localStorage.getItem('recentProfiles') || '[]');
@@ -104,11 +113,15 @@ export default function Screen1({ onNavigate }) {
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [stakes, setStakes] = useState(''); // What the rivalry is playing for
   const [challengerStakes, setChallengerStakes] = useState(null); // Stakes set by challenger (fetched when joining)
-const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [isAutoAccepting, setIsAutoAccepting] = useState(false);
   const [hasShownJoinAlert, setHasShownJoinAlert] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showAbout, setShowAbout] = useState(false);
+
+  // New state for collapsible Start section
+  const [showStartExpanded, setShowStartExpanded] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('random');
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
@@ -275,19 +288,12 @@ if (pendingVerdictShowId) {
   return;
 }
 
-// Has rivalry
-if (!rivalry.first_show_started) {
-  // First show hasn't started → State C
-  setCurrentState('C');
-  setLoading(false);
-} else {
-  // First show started → Redirect to Screen 4
-  onNavigate('screen4', { 
-    activeProfileId: profileData.id,
-    rivalryId: rivalry.id
-  });
-  return;
-}
+// Has rivalry - always go to screen4 (intro flow will show if needed)
+onNavigate('screen4', { 
+  activeProfileId: profileData.id,
+  rivalryId: rivalry.id
+});
+return;
       } catch (err) {
         console.error('Error determining state:', err);
         
@@ -368,35 +374,11 @@ useEffect(() => {
               setHasShownJoinAlert(true);
               alert(`🎉 ${opponent.name} joined your Rivalry!`);
               
-              // Wait for intro_emcee_text to be populated before showing State C
-              const checkForIntroText = async () => {
-                let attempts = 0;
-                const maxAttempts = 10; // Try for ~5 seconds
-                
-                while (attempts < maxAttempts) {
-                  const { data: updatedRivalry } = await supabase
-                    .from('rivalries')
-                    .select('*')
-                    .eq('id', newRivalry.id)
-                    .single();
-                  
-                  if (updatedRivalry?.intro_emcee_text) {
-                    // Got the text! Update and navigate
-                    setRivalry(updatedRivalry);
-                    setCurrentState('C');
-                    return;
-                  }
-                  
-                  attempts++;
-                  await new Promise(resolve => setTimeout(resolve, 500));
-                }
-                
-                // Timeout - just show State C with whatever we have
-                setRivalry(newRivalry);
-                setCurrentState('C');
-              };
-              
-              checkForIntroText();
+              // Navigate directly to gameplay - the intro flow will show there
+              onNavigate('screen4', {
+                activeProfileId: profile.id,
+                rivalryId: newRivalry.id
+              });
             }
           });
       }
@@ -696,6 +678,10 @@ useEffect(() => {
       // Use stakes from pendingInvite (already fetched by JoinRivalry or from manual lookup)
       const rivalryStakes = pendingInvite.stakes || null;
       
+      // Select 3 judges for the entire rivalry
+      const judgeObjects = await selectJudges();
+      const judgeKeys = judgeObjects.map(j => j.key);
+      
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [userProfile.id, pendingInvite.friendId].sort();
 
@@ -706,7 +692,9 @@ useEffect(() => {
           profile_b_id: profileBId,
           mic_holder_id: userProfile.id, // Joiner holds mic initially
           first_show_started: false,
-          stakes: rivalryStakes
+          stakes: rivalryStakes,
+          judges: judgeKeys,
+          prompt_category: 'random'
         })
         .select()
         .single();
@@ -769,11 +757,12 @@ useEffect(() => {
         // Don't block - rivalry already created
       }
 
-      // Update state to show first show screen
-      setRivalry(newRivalry);
-      setCurrentState('C');
-      setShowForm(false);
-      isCreatingRivalryRef.current = false; // Clear the flag
+      // Navigate directly to gameplay - the intro flow will show there
+      isCreatingRivalryRef.current = false;
+      onNavigate('screen4', {
+        activeProfileId: userProfile.id,
+        rivalryId: newRivalry.id
+      });
     } catch (err) {
       console.error('Error starting rivalry:', err);
       setFormError('Failed to start rivalry. Please try again.');
@@ -854,6 +843,10 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       // Get stakes from friend's pending_stakes
       const rivalryStakes = friend.pending_stakes || null;
 
+      // Select 3 judges for the entire rivalry
+      const judgeObjects = await selectJudges();
+      const judgeKeys = judgeObjects.map(j => j.key);
+
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [profile.id, friend.id].sort();
 
@@ -864,7 +857,9 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
           profile_b_id: profileBId,
           mic_holder_id: profile.id, // Creator holds mic initially
           first_show_started: false,
-          stakes: rivalryStakes
+          stakes: rivalryStakes,
+          judges: judgeKeys,
+          prompt_category: selectedCategory // Use selected category
         })
         .select()
         .single();
@@ -904,14 +899,6 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         // Continue anyway - fallback text will show
       }
 
-      // Update state
-      setRivalry(newRivalry);
-      setCurrentState('C');
-      setFriendCode('');
-      setChallengerStakes(null); // Clear challenger stakes state
-      setIsJoining(false);
-      isCreatingRivalryRef.current = false; // Clear the flag
-
       // Send rivalry_started SMS to the friend (challenger) who shared their code
       try {
         await supabase.functions.invoke('send-sms', {
@@ -927,6 +914,13 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         console.error('Failed to send rivalry_started SMS:', smsErr);
         // Don't block - rivalry already created
       }
+
+      // Navigate directly to gameplay - the intro flow will show there
+      isCreatingRivalryRef.current = false;
+      onNavigate('screen4', {
+        activeProfileId: profile.id,
+        rivalryId: newRivalry.id
+      });
     } catch (err) {
       console.error('Error joining rivalry:', err);
       setJoinError(err.message || 'Failed to start Rivalry');
@@ -1066,6 +1060,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
   const handleShareSMS = () => {
     savePendingStakes(); // Fire and forget
     const stakesLine = stakes.trim() ? `\nPlaying for: ${stakes.trim()} 🎯\n` : '';
+    const categoryLabel = PROMPT_CATEGORIES.find(c => c.key === selectedCategory)?.label || 'Anything Goes';
     const message = stakes.trim() 
       ? `Hey! I challenge you to One-Upper - we answer weird prompts and AI judges decide who one-upped the other.\n${stakesLine}\nJoin me: https://oneupper.app/join/${profile.code}\n\nLet the rivalry begin! 🎤`
       : `I challenge you to One-Upper! 🎤\n\nJoin: https://oneupper.app/join/${profile.code}\n\nLet's see who's got the better one-liners.`;
@@ -1117,252 +1112,113 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
 
               {/* Resume Section */}
               <div className="mt-8">
-                <p className="text-slate-300 text-center mb-4 text-lg">
-                  Already have a profile?
+                <p className="text-slate-400 text-center text-sm mb-3">
+                  Been here before?
                 </p>
+                
                 <input
                   type="text"
-                  placeholder="ENTER YOUR PROFILE ID"
                   value={resumeCode}
                   onChange={(e) => setResumeCode(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 uppercase focus:outline-none focus:border-orange-500 transition-colors mb-3"
+                  placeholder="Enter your Profile ID"
+                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg uppercase"
                 />
                 
                 {resumeError && (
-                  <div className="flex items-start gap-2 text-red-400 text-sm mb-3">
-                    <span>❌</span>
-                    <span>{resumeError}</span>
-                  </div>
+                  <p className="text-red-400 text-sm mt-1">{resumeError}</p>
                 )}
-
+                
                 <button
                   onClick={handleResume}
-                  disabled={isResuming || !resumeCode.trim()}
-                  className="w-full py-3 bg-slate-600/50 text-slate-200 font-medium rounded-lg border border-slate-500 hover:bg-slate-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!resumeCode.trim() || isResuming}
+                  className="w-full mt-3 py-3 bg-slate-600/50 text-slate-200 font-medium rounded-lg border border-slate-500 hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isResuming ? 'Getting you in...' : 'Get back in!'}
+                  {isResuming ? 'Resuming...' : 'Resume'}
                 </button>
-
+                
                 {/* Forgot Code Link */}
-                <div className="mt-3 text-center">
-                  <button
-                    onClick={() => setShowForgotCodeModal(true)}
-                    className="text-sm text-slate-400 hover:text-orange-500 underline transition-colors"
-                  >
-                    Forgot your Profile ID?
-                  </button>
-                </div>
+                <button
+                  onClick={() => setShowForgotCodeModal(true)}
+                  className="w-full mt-2 text-slate-400 text-sm hover:text-slate-300 transition-colors"
+                >
+                  Forgot your Profile ID?
+                </button>
               </div>
-
-              {/* Forgot Code Modal */}
-              {showForgotCodeModal && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                  <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full space-y-4 border border-slate-700">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-2xl font-bold text-orange-500">
-                        Find Your Profile
-                      </h3>
-                      <button
-                        onClick={() => {
-                          setShowForgotCodeModal(false);
-                          setForgotCodePhone('');
-                          setForgotCodeProfiles([]);
-                          setForgotCodeError('');
-                          setForgotCodeSent(false);
-                        }}
-                        className="text-slate-400 hover:text-slate-200 text-2xl"
-                      >
-                        ✕
-                      </button>
-                    </div>
-
-                    {/* Dev mode: Show profile list if found */}
-                    {forgotCodeProfiles.length > 0 ? (
-                      <>
-                        <p className="text-slate-300">Select your profile:</p>
-                        
-                        <div className="space-y-3 max-h-96 overflow-y-auto">
-                          {forgotCodeProfiles.map((prof) => (
-                            <button
-                              key={prof.id}
-                              onClick={() => {
-                                forgotCodeProfiles.forEach(p => saveProfileToHistory(p));
-                                localStorage.setItem('activeProfileId', prof.id);
-                                window.location.reload();
-                              }}
-                              className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
-                            >
-                              <div className="flex items-center gap-3">
-                                <span className="text-3xl">{prof.avatar}</span>
-                                <div className="flex-1">
-                                  <div className="text-lg font-bold text-slate-100">
-                                    {prof.name}
-                                  </div>
-                                  <div className="text-sm text-orange-500 font-medium">
-                                    Profile ID: {prof.code}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    ) : !forgotCodeSent ? (
-                      <>
-                        <p className="text-slate-300">Enter your phone number:</p>
-
-                        <input
-                          type="tel"
-                          value={forgotCodePhone}
-                          onChange={(e) => setForgotCodePhone(e.target.value)}
-                          placeholder="415-555-1234"
-                          className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                          autoFocus
-                        />
-
-                        {forgotCodeError && (
-                          <p className="text-red-400 text-sm">{forgotCodeError}</p>
-                        )}
-
-                        <button
-                          onClick={handleForgotCode}
-                          disabled={!forgotCodePhone.trim() || isForgotCodeLoading}
-                          className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors"
-                        >
-                          {isForgotCodeLoading ? 'Sending...' : 'Send Verification Code'}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <div className="text-center py-4">
-                          <div className="text-4xl mb-4">📱</div>
-                          <p className="text-slate-200 text-lg mb-2">Check your texts!</p>
-                          <p className="text-slate-400 text-sm mb-4">
-                            We sent a verification link and code to your phone.
-                          </p>
-                          <p className="text-slate-400 text-sm">
-                            Tap the link in the text, or go to{' '}
-                            <a 
-                              href="/verify" 
-                              className="text-orange-400 hover:text-orange-300 underline"
-                            >
-                              oneupper.app/verify
-                            </a>
-                            {' '}to enter your code.
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            setForgotCodeSent(false);
-                            setForgotCodePhone('');
-                          }}
-                          className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-medium py-3 px-6 rounded-lg transition-colors"
-                        >
-                          Try a different number
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
             </>
           ) : (
-            <form onSubmit={handleCreateProfile} className="space-y-5">
+            /* Profile Creation Form */
+            <form onSubmit={handleCreateProfile} className="space-y-4">
+              <h3 className="text-xl font-bold text-orange-500 mb-4">
+                Create Your Profile
+              </h3>
+              
+              {/* Avatar Picker */}
               <div>
-                <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Name:
+                <label className="text-sm text-slate-400 mb-2 block">
+                  Pick your avatar
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {AVATARS.map((av) => (
+                    <button
+                      key={av}
+                      type="button"
+                      onClick={() => setFormData({ ...formData, avatar: av })}
+                      className={`text-3xl p-2 rounded-lg transition-all ${
+                        formData.avatar === av
+                          ? 'bg-orange-500'
+                          : 'bg-slate-700 hover:bg-slate-600'
+                      }`}
+                    >
+                      {av}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Name Input */}
+              <div>
+                <label className="text-sm text-slate-400 mb-1 block">
+                  What should we call you?
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Craig"
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
-                  autoFocus
+                  placeholder="Your name"
+                  maxLength={20}
+                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
-
+              
+              {/* Phone Input */}
               <div>
-                <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Pick an avatar:
-                </label>
-                <div className="grid grid-cols-4 gap-3">
-                  {AVATARS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setFormData({ ...formData, avatar: emoji })}
-                      className={`text-3xl py-3 bg-slate-700/50 rounded-lg border-2 transition-all ${
-                        formData.avatar === emoji
-                          ? 'border-orange-500 bg-slate-600/60 scale-105'
-                          : 'border-transparent hover:border-slate-500'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Phone:
+                <label className="text-sm text-slate-400 mb-1 block">
+                  Phone number (optional, for notifications)
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="415-555-1234"
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
-                  required
+                  placeholder="(555) 123-4567"
+                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
-                <p className="text-xs text-slate-500 mt-1">US phone number (10 digits)</p>
+                {formData.phone && (
+                  <label className="flex items-center gap-2 mt-2 text-sm text-slate-400">
+                    <input
+                      type="checkbox"
+                      checked={formData.sms_consent}
+                      onChange={(e) => setFormData({ ...formData, sms_consent: e.target.checked })}
+                      className="rounded border-slate-600"
+                    />
+                    I agree to receive SMS notifications
+                  </label>
+                )}
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Bio <span className="text-slate-500 font-normal">(optional):</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.bio}
-                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  placeholder="Pun enthusiast"
-                  maxLength={50}
-                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
-                />
-                <p className="text-xs text-slate-500 mt-1">Max 50 characters</p>
-              </div>
-
-              <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formData.sms_consent}
-                    onChange={(e) => setFormData({ ...formData, sms_consent: e.target.checked })}
-                    className="mt-1 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
-                  />
-                  <div className="flex-1">
-                    <span className="text-sm text-slate-200">
-                      Send me text notifications about my games
-                    </span>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Get notified when it's your turn and results are ready (~3-6 msgs per rivalry). Msg & data rates may apply. Reply STOP to opt out anytime.
-                    </p>
-                    <p className="text-xs text-slate-500 mt-1">
-                      <a href="/terms" className="text-orange-500 hover:text-orange-400 underline">Terms</a>
-                      {' | '}
-                      <a href="/privacy" className="text-orange-500 hover:text-orange-400 underline">Privacy</a>
-                    </p>
-                  </div>
-                </label>
-              </div>
-
+              
               {formError && (
-                <div className="text-red-400 text-sm">{formError}</div>
+                <p className="text-red-400 text-sm">{formError}</p>
               )}
-
+              
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -1379,6 +1235,92 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 Cancel
               </button>
             </form>
+          )}
+
+          {/* Forgot Code Modal */}
+          {showForgotCodeModal && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-slate-800 rounded-xl p-6 max-w-md w-full space-y-4 border border-slate-700 max-h-[85vh] overflow-y-auto">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xl font-bold text-orange-500">
+                    Find Your Profile
+                  </h3>
+                  <button
+                    onClick={() => {
+                      setShowForgotCodeModal(false);
+                      setForgotCodePhone('');
+                      setForgotCodeProfiles([]);
+                      setForgotCodeError('');
+                      setForgotCodeSent(false);
+                    }}
+                    className="text-slate-400 hover:text-slate-200 text-2xl"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                {forgotCodeSent ? (
+                  /* SMS Sent confirmation */
+                  <div className="text-center py-4">
+                    <div className="text-4xl mb-3">📱</div>
+                    <p className="text-slate-200 mb-2">Check your texts!</p>
+                    <p className="text-slate-400 text-sm">
+                      We sent a link to sign in to your profile(s).
+                    </p>
+                  </div>
+                ) : forgotCodeProfiles.length > 0 ? (
+                  /* Show list of profiles (dev mode) */
+                  <div className="space-y-2">
+                    <p className="text-slate-300 text-sm">
+                      Found {forgotCodeProfiles.length} profile{forgotCodeProfiles.length > 1 ? 's' : ''} with that number:
+                    </p>
+                    {forgotCodeProfiles.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          localStorage.setItem('activeProfileId', p.id);
+                          saveProfileToHistory(p);
+                          window.location.reload();
+                        }}
+                        className="w-full bg-slate-700 hover:bg-slate-600 text-left p-3 rounded-lg transition-colors"
+                      >
+                        <span className="text-xl mr-2">{p.avatar}</span>
+                        <span className="text-slate-100">{p.name}</span>
+                        <span className="text-slate-400 text-sm ml-2">{p.code}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  /* Phone input */
+                  <>
+                    <p className="text-slate-300 text-sm">
+                      Enter the phone number you used to create your profile:
+                    </p>
+                    
+                    <input
+                      type="tel"
+                      value={forgotCodePhone}
+                      onChange={(e) => setForgotCodePhone(e.target.value)}
+                      placeholder="(555) 123-4567"
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      autoFocus
+                    />
+                    
+                    {forgotCodeError && (
+                      <p className="text-red-400 text-sm">{forgotCodeError}</p>
+                    )}
+                    
+                    <button
+                      onClick={handleForgotCode}
+                      disabled={!forgotCodePhone.trim() || isForgotCodeLoading}
+                      className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+                    >
+                      {isForgotCodeLoading ? 'Looking up...' : 'Find My Profile'}
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -1508,86 +1450,113 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
               </button>
             </div>
           ) : (
-            /* Show normal Challenge/Join options */
-            <>
+            /* Show normal Challenge/Join options - Collapsible */
+            <div className="space-y-4">
+              {/* Start a Rivalry - Collapsible */}
               <div className="space-y-4">
-                <h3 className="text-xl font-bold text-orange-500 text-center">
-                  Start a Rivalry
-                </h3>
+                <button
+                  onClick={() => setShowStartExpanded(!showStartExpanded)}
+                  className="w-full bg-orange-500 hover:bg-orange-400 text-white py-4 px-6 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>Start a Rivalry</span>
+                  {showStartExpanded ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  )}
+                </button>
                 
-                <p className="text-slate-300 text-center text-sm">
-                  Send your ID to a friend.<br />
-                  Then it's 5 rounds, 1 winner, and 0 mercy.
-                </p>
+                {/* Expanded Start Content */}
+                {showStartExpanded && (
+                  <div className="bg-slate-800/50 rounded-xl p-4 space-y-4">
+                    {/* Category Pills */}
+                    <div className="space-y-2">
+                      <label className="text-sm text-slate-400">Category:</label>
+                      <div className="flex flex-wrap gap-2">
+                        {PROMPT_CATEGORIES.map((cat) => (
+                          <button
+                            key={cat.key}
+                            type="button"
+                            onClick={() => setSelectedCategory(cat.key)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              selectedCategory === cat.key
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                            }`}
+                          >
+                            {cat.emoji} {cat.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                {/* Stakes input */}
-                <div className="space-y-1">
-                  <label className="text-sm text-slate-400">Up the stakes! Tell them what you're playing for:</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <input
-                        type="text"
-                        value={stakes}
-                        onChange={(e) => setStakes(e.target.value.slice(0, 50))}
-                        placeholder="bragging rights? a burrito? you decide..."
-                        className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-3 pr-8 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors text-sm"
-                      />
-                      {stakes && (
+                    {/* Stakes input */}
+                    <div className="space-y-2">
+                      <label className="text-sm text-slate-400">Up the stakes (optional):</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            type="text"
+                            value={stakes}
+                            onChange={(e) => setStakes(e.target.value.slice(0, 50))}
+                            placeholder="bragging rights? a burrito?"
+                            className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-3 pr-8 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors text-sm"
+                          />
+                          {stakes && (
+                            <button
+                              type="button"
+                              onClick={() => setStakes('')}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors text-lg font-bold"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
                         <button
                           type="button"
-                          onClick={() => setStakes('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors text-lg font-bold"
+                          onClick={getRandomStakes}
+                          className="bg-slate-700 hover:bg-slate-600 text-slate-100 px-3 py-3 rounded-lg transition-colors text-lg border border-slate-600"
+                          title="Random suggestion"
                         >
-                          ×
+                          🎲
                         </button>
-                      )}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={getRandomStakes}
-                      className="bg-slate-700 hover:bg-slate-600 text-slate-100 px-3 py-3 rounded-lg transition-colors text-lg"
-                      title="Random suggestion"
-                    >
-                      🎲
-                    </button>
+                    
+                    {/* Share buttons */}
+                    <div className="space-y-2">
+                      <label className="text-sm text-slate-400">Share your ID to get started:</label>
+                      <div className="flex gap-3">
+                        <button
+                          onClick={handleCopyCode}
+                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors border border-slate-600"
+                        >
+                          {copied ? '✓ Copied!' : 'Copy my ID'}
+                        </button>
+                        <button
+                          onClick={handleShareSMS}
+                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors border border-slate-600"
+                        >
+                          Share via Text
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <button
-                    onClick={handleCopyCode}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    {copied ? '✓ Copied!' : 'Copy my ID'}
-                  </button>
-                  <button
-                    onClick={handleShareSMS}
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
-                  >
-                    Share ID via Text
-                  </button>
-                </div>
+                )}
               </div>
 
-              {/* Join a Friend Section */}
-              <div className="space-y-3 pt-4">
-                <h3 className="text-xl font-bold text-orange-500 text-center">
-                  Join a Friend's Rivalry
-                </h3>
-                
-                <p className="text-slate-300 text-center text-sm">
-                  Been challenged?<br />
-                  Enter their ID and start one-upping.
-                </p>
-                
-                <button
-                  onClick={() => setShowJoinModal(true)}
-                  className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors"
-                >
-                  Enter Friend's ID
-                </button>
-              </div>
-            </>
+              {/* Join a Friend Section - Simple button */}
+              <button
+                onClick={() => setShowJoinModal(true)}
+                className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-4 px-6 rounded-xl font-medium transition-colors border border-slate-600"
+              >
+                Join a Friend's Rivalry
+              </button>
+            </div>
           )}
 
           {/* Join Modal */}

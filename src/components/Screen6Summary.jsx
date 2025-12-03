@@ -206,8 +206,8 @@ export default function Screen6Summary({ onNavigate, showId, rivalryId, context,
                 <span className="ml-auto text-lg font-bold text-orange-500">
                   {(() => {
                     const scores = Object.values(show.judge_data.scores).map(data => data.profile_a_score);
-                    const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
-                    return avg;
+                    const total = scores.reduce((a, b) => a + b, 0);
+                    return total;
                   })()}
                 </span>
               )}
@@ -231,8 +231,8 @@ export default function Screen6Summary({ onNavigate, showId, rivalryId, context,
                 <span className="ml-auto text-lg font-bold text-orange-500">
                   {(() => {
                     const scores = Object.values(show.judge_data.scores).map(data => data.profile_b_score);
-                    const avg = (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1);
-                    return avg;
+                    const total = scores.reduce((a, b) => a + b, 0);
+                    return total;
                   })()}
                 </span>
               )}

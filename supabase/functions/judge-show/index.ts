@@ -279,11 +279,11 @@ Format:
     // Parse Claude's response
     const judgeResponse = JSON.parse(judgeResponseText)
 
-    // Map response to database format
-    const winnerId = judgeResponse.winner === profileA.name ? show.profile_a_id : show.profile_b_id
-
     // Build scores object using judge KEYS (not names)
     const scores: Record<string, any> = {}
+    let profileATotalScore = 0
+    let profileBTotalScore = 0
+    
     judgeResponse.scores.forEach((score: any, idx: number) => {
       const judgeKey = judges[idx].key
       
@@ -321,12 +321,45 @@ Format:
         playerBScore = 5
       }
       
+      // Accumulate totals for winner determination
+      profileATotalScore += playerAScore
+      profileBTotalScore += playerBScore
+      
       scores[judgeKey] = {
         profile_a_score: playerAScore,
         profile_b_score: playerBScore,
         comment: score.one_liner || ''
       }
     })
+
+    // Determine winner based on actual calculated scores (not Claude's suggestion)
+    // TIEBREAKER: If scores are equal, first submitter wins
+    let winnerId: string
+    let loserId: string
+    let wasTiebreaker = false
+    
+    if (profileATotalScore > profileBTotalScore) {
+      winnerId = show.profile_a_id
+      loserId = show.profile_b_id
+    } else if (profileBTotalScore > profileATotalScore) {
+      winnerId = show.profile_b_id
+      loserId = show.profile_a_id
+    } else {
+      // TIE! First submitter wins
+      wasTiebreaker = true
+      console.log(`TIE DETECTED: ${profileATotalScore} - ${profileBTotalScore}. Using first_submitter_id as tiebreaker.`)
+      
+      if (show.first_submitter_id) {
+        winnerId = show.first_submitter_id
+        loserId = show.first_submitter_id === show.profile_a_id ? show.profile_b_id : show.profile_a_id
+        console.log(`Tiebreaker winner: ${winnerId} (first submitter)`)
+      } else {
+        // Fallback if somehow first_submitter_id is not set: profile_a wins
+        console.warn('No first_submitter_id found for tiebreaker, defaulting to profile_a')
+        winnerId = show.profile_a_id
+        loserId = show.profile_b_id
+      }
+    }
 
     // Parse banter into structured format with judge KEYS
     const banterLines = judgeResponse.banter.split('\n').filter((line: string) => line.trim())
@@ -358,6 +391,9 @@ Format:
       text: artifact.text
     })) || []
 
+    // Get winner name for verdict
+    const winnerName = winnerId === show.profile_a_id ? profileA.name : profileB.name
+
     // Update show with judging results
     const { error: updateError } = await supabase
       .from('shows')
@@ -366,11 +402,14 @@ Format:
         winner_id: winnerId,
         judged_at: new Date().toISOString(),
         judge_data: {
-          verdict: `${judgeResponse.winner} won!`,
+          verdict: `${winnerName} won!`,
           scores: scores,
           banter: banter,
           rivalry_comment: rivalryComment,
-          artifacts: artifacts
+          artifacts: artifacts,
+          was_tiebreaker: wasTiebreaker,
+          profile_a_total: profileATotalScore,
+          profile_b_total: profileBTotalScore
         }
       })
       .eq('id', showId)
@@ -429,7 +468,13 @@ Format:
     }
 
     return new Response(
-      JSON.stringify({ success: true, winner_id: winnerId }),
+      JSON.stringify({ 
+        success: true, 
+        winner_id: winnerId,
+        was_tiebreaker: wasTiebreaker,
+        profile_a_total: profileATotalScore,
+        profile_b_total: profileBTotalScore
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 

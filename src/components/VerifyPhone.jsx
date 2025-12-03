@@ -144,34 +144,36 @@ export default function VerifyPhone() {
   // Show profile picker if multiple profiles
   if (showProfilePicker) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-4">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-orange-500 mb-2">ONE-UPPER 🎤</h1>
-            <p className="text-slate-300">Select your profile</p>
-          </div>
+      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 overflow-y-auto">
+        <div className="min-h-screen flex items-center justify-center p-4">
+          <div className="w-full max-w-sm my-8">
+            <div className="text-center mb-6">
+              <h1 className="text-2xl font-bold text-orange-500 mb-2">ONE-UPPER 🎤</h1>
+              <p className="text-slate-300">Select your profile</p>
+            </div>
 
-          <div className="space-y-3">
-            {profiles.map((profile) => (
-              <button
-                key={profile.id}
-                onClick={() => handleSelectProfile(profile)}
-                className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-3xl">{profile.avatar}</span>
-                  <div className="flex-1">
-                    <div className="text-lg font-bold text-slate-100">
-                      {profile.name}
+            <div className="space-y-3">
+              {profiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  onClick={() => handleSelectProfile(profile)}
+                  className="w-full bg-slate-700/50 hover:bg-slate-700 border border-slate-600 rounded-lg p-4 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{profile.avatar}</span>
+                    <div className="flex-1">
+                      <div className="text-lg font-bold text-slate-100">
+                        {profile.name}
+                      </div>
+                      <div className="text-sm text-orange-500 font-medium">
+                        Code: {profile.code}
+                      </div>
                     </div>
-                    <div className="text-sm text-orange-500 font-medium">
-                      Code: {profile.code}
-                    </div>
-                  </div>
                 </div>
               </button>
             ))}
           </div>
+        </div>
         </div>
       </div>
     );

@@ -1,3 +1,22 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Orbiting judges animation */
+@keyframes orbit {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.judges-orbit {
+  animation: orbit 8s linear infinite;
+}
+
+/* Counter-rotate the emoji so it stays upright while orbiting */
+.judge-item-inner {
+  animation: orbit 8s linear infinite reverse;
+}

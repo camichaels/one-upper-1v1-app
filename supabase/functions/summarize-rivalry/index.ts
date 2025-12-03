@@ -8,7 +8,69 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY')!;
 
-const RIVALRY_LENGTH = 11; // Must match config.js
+const RIVALRY_LENGTH = 5; // Must match config.js
+
+// Ripley's personality - reusable across functions
+const RIPLEY_PROFILE = `You are Ripley, the emcee of One-Upper. Your voice is:
+- Witty and sharp, but never mean
+- Sports announcer meets late-night host
+- Short punchy sentences, not verbose
+- You celebrate boldness and creativity
+- You know the judges personally and comment on their quirks
+- You want players to come back — encouraging even to losers
+- Slightly sardonic, but warm underneath
+- You speak directly to players ("you", not "they")
+
+Examples of Ripley's tone:
+- "That wasn't a rivalry, that was a clinic."
+- "Savage ate that up. You read the room."
+- "Close one. Three more points and we're having a different conversation."
+- "Bold swings, not all of them landed. But I respect the commitment."
+- "The judges wanted weird. You gave them weird. Simple math."`;
+
+// Judge personalities for context
+const JUDGES: Record<string, { name: string; emoji: string; description: string }> = {
+  savage: {
+    name: "Savage",
+    emoji: "💀",
+    description: "Brutal honesty, zero patience for safe answers. Rewards boldness and risk-taking. Will destroy boring responses."
+  },
+  snoot: {
+    name: "Professor Snoot",
+    emoji: "🧐",
+    description: "Intellectual elitist who values wit, wordplay, and clever construction. Disdains low-brow humor but secretly enjoys a good pun."
+  },
+  diva: {
+    name: "Diva",
+    emoji: "✨",
+    description: "Drama queen who wants entertainment and flair. Short attention span — loses interest if you ramble. Loves confidence."
+  },
+  coach: {
+    name: "Coach",
+    emoji: "📣",
+    description: "Enthusiastic hype-man who rewards energy and commitment. Doesn't care if it's dumb as long as you went for it."
+  },
+  reaper: {
+    name: "The Reaper",
+    emoji: "💀",
+    description: "Dark humor aficionado. Loves morbid twists and gallows humor. The edgier the better."
+  },
+  wholesome: {
+    name: "Wholesome Wendy",
+    emoji: "🌻",
+    description: "Finds the good in everything. Rewards heartfelt answers and genuine creativity. Hates meanness."
+  },
+  chaos: {
+    name: "Chaos Gremlin",
+    emoji: "🎲",
+    description: "Unpredictable wildcard. Loves absurdity, randomness, and answers that make no sense but somehow work."
+  },
+  robot: {
+    name: "RoboJudge 3000",
+    emoji: "🤖",
+    description: "Analyzes answers with cold logic. Appreciates structure and cleverness. Does not compute 'vibes'."
+  }
+};
 
 serve(async (req) => {
   const corsHeaders = {
@@ -62,18 +124,15 @@ serve(async (req) => {
     }
 
     // RACE CONDITION PREVENTION: Try to claim this rivalry for summary generation
-    // by setting status to 'summarizing'. Only one request will succeed.
     const { data: claimResult, error: claimError } = await supabase
       .from('rivalries')
       .update({ status: 'summarizing' })
       .eq('id', rivalryId)
-      .eq('status', 'active')  // Only update if still 'active'
+      .eq('status', 'active')
       .select()
       .single();
     
-    // If we couldn't claim it (status wasn't 'active'), someone else is generating
     if (claimError || !claimResult) {
-      // Wait a moment and check if summary was generated
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       const { data: refreshedRivalry } = await supabase
@@ -92,7 +151,6 @@ serve(async (req) => {
         );
       }
       
-      // Still no summary after waiting - return error so user can retry
       return new Response(
         JSON.stringify({ error: 'Summary generation in progress. Please wait and try again.' }),
         { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -114,11 +172,31 @@ serve(async (req) => {
       );
     }
 
-    // Calculate final scores
+    // Get judge info for this rivalry
+    const rivalryJudges = (rivalry.judges || []).map((judgeKey: string) => {
+      const judge = JUDGES[judgeKey] || { name: judgeKey, emoji: '⚖️', description: 'A judge' };
+      return { key: judgeKey, ...judge };
+    });
+
+    // Calculate scores and stats
     let playerAWins = 0;
     let playerBWins = 0;
     let playerATotalPoints = 0;
     let playerBTotalPoints = 0;
+
+    // Per-judge tracking for "Judge's Favorite" stat
+    const judgeScoreDiffs: Record<string, { total: number; count: number; name: string; emoji: string }> = {};
+
+    // Track per-round data for stats
+    const roundStats: Array<{
+      round: number;
+      winnerName: string;
+      winnerId: string;
+      margin: number;
+      playerAScore: number;
+      playerBScore: number;
+      unanimous: boolean;
+    }> = [];
 
     shows.forEach(show => {
       if (show.winner_id === rivalry.profile_a.id) {
@@ -127,26 +205,76 @@ serve(async (req) => {
         playerBWins++;
       }
 
-      // Calculate total points from judge_data
-      // Structure: { scores: { judge_name: { profile_a_score: X, profile_b_score: Y } } }
+      let playerAScore = 0;
+      let playerBScore = 0;
+      let judgeVotes = { a: 0, b: 0 };
+
       if (show.judge_data && show.judge_data.scores) {
         const scores = show.judge_data.scores;
         
-        // Iterate through each judge's scores (object keys)
         for (const judgeName in scores) {
           const judgeScores = scores[judgeName];
-          if (judgeScores.profile_a_score !== undefined) {
-            playerATotalPoints += judgeScores.profile_a_score;
-          }
-          if (judgeScores.profile_b_score !== undefined) {
-            playerBTotalPoints += judgeScores.profile_b_score;
+          const aScore = judgeScores.profile_a_score || 0;
+          const bScore = judgeScores.profile_b_score || 0;
+          
+          playerAScore += aScore;
+          playerBScore += bScore;
+          playerATotalPoints += aScore;
+          playerBTotalPoints += bScore;
+
+          // Track who each judge voted for
+          if (aScore > bScore) judgeVotes.a++;
+          else if (bScore > aScore) judgeVotes.b++;
+
+          // Track per-judge score differences (positive = favors A)
+          const judgeKey = judgeName.toLowerCase().replace(/\s+/g, '');
+          const matchedJudge = rivalryJudges.find((j: any) => 
+            j.name.toLowerCase() === judgeName.toLowerCase() || j.key === judgeKey
+          );
+          
+          if (matchedJudge) {
+            if (!judgeScoreDiffs[matchedJudge.key]) {
+              judgeScoreDiffs[matchedJudge.key] = { 
+                total: 0, 
+                count: 0, 
+                name: matchedJudge.name, 
+                emoji: matchedJudge.emoji 
+              };
+            }
+            judgeScoreDiffs[matchedJudge.key].total += (aScore - bScore);
+            judgeScoreDiffs[matchedJudge.key].count++;
           }
         }
       }
+
+      const margin = Math.abs(playerAScore - playerBScore);
+      const winnerName = show.winner_id === rivalry.profile_a.id 
+        ? rivalry.profile_a.name 
+        : rivalry.profile_b.name;
+      
+      // Check if unanimous (all judges agreed)
+      const totalJudges = Object.keys(show.judge_data?.scores || {}).length;
+      const unanimous = (judgeVotes.a === totalJudges || judgeVotes.b === totalJudges);
+
+      roundStats.push({
+        round: show.show_number,
+        winnerName,
+        winnerId: show.winner_id,
+        margin,
+        playerAScore,
+        playerBScore,
+        unanimous
+      });
     });
 
     // Determine winner with tiebreaker logic
     let winnerId = rivalry.profile_a.id;
+    let winnerName = rivalry.profile_a.name;
+    let loserName = rivalry.profile_b.name;
+    let winnerWins = playerAWins;
+    let loserWins = playerBWins;
+    let winnerTotalPoints = playerATotalPoints;
+    let loserTotalPoints = playerBTotalPoints;
     let tiebreaker = null;
 
     if (playerAWins > playerBWins) {
@@ -162,88 +290,119 @@ serve(async (req) => {
         winnerId = rivalry.profile_b.id;
         tiebreaker = `Won ${playerBTotalPoints}-${playerATotalPoints} on total points`;
       } else {
-        // Both W/L and points tied - use show 11 winner (extremely rare)
+        // Both tied - use final show winner
         const finalShow = shows.find(s => s.show_number === RIVALRY_LENGTH);
         winnerId = finalShow?.winner_id || rivalry.profile_a.id;
-        tiebreaker = 'Won on final show tiebreaker';
+        tiebreaker = 'Won on final round tiebreaker';
       }
     }
 
-    // Prepare show summaries for AI (show number, prompt, both answers, scores, winner)
-    const showSummaries = shows.map(show => {
-      let playerAScore = 0;
-      let playerBScore = 0;
-      
-      // Calculate total scores from judge_data (object-based structure)
-      if (show.judge_data && show.judge_data.scores) {
-        const scores = show.judge_data.scores;
-        for (const judgeName in scores) {
-          const judgeScores = scores[judgeName];
-          if (judgeScores.profile_a_score !== undefined) {
-            playerAScore += judgeScores.profile_a_score;
-          }
-          if (judgeScores.profile_b_score !== undefined) {
-            playerBScore += judgeScores.profile_b_score;
-          }
-        }
+    // Set winner/loser names and scores correctly
+    if (winnerId === rivalry.profile_b.id) {
+      winnerName = rivalry.profile_b.name;
+      loserName = rivalry.profile_a.name;
+      winnerWins = playerBWins;
+      loserWins = playerAWins;
+      winnerTotalPoints = playerBTotalPoints;
+      loserTotalPoints = playerATotalPoints;
+    }
+
+    // Calculate computed stats
+    const biggestBlowout = roundStats.reduce((max, r) => r.margin > max.margin ? r : max, roundStats[0]);
+    const closestRound = roundStats.reduce((min, r) => r.margin < min.margin ? r : min, roundStats[0]);
+    const unanimousRounds = roundStats.filter(r => r.unanimous).length;
+
+    // Judge's favorite - find judge with biggest avg score diff
+    let judgesFavorite = null;
+    let maxAvgDiff = 0;
+    
+    for (const judgeKey in judgeScoreDiffs) {
+      const judge = judgeScoreDiffs[judgeKey];
+      const avgDiff = Math.abs(judge.total / judge.count);
+      if (avgDiff > maxAvgDiff) {
+        maxAvgDiff = avgDiff;
+        const favoredPlayer = judge.total > 0 ? rivalry.profile_a.name : rivalry.profile_b.name;
+        judgesFavorite = {
+          judge_name: judge.name,
+          judge_emoji: judge.emoji,
+          favored_player: favoredPlayer,
+          avg_margin: Math.round(avgDiff * 10) / 10
+        };
       }
-      
-      const margin = Math.abs(playerAScore - playerBScore);
-      const winner = show.winner_id === rivalry.profile_a.id ? 'Player A' : 'Player B';
+    }
+
+    // Prepare show summaries for AI
+    const showSummaries = shows.map(show => {
+      const rs = roundStats.find(r => r.round === show.show_number)!;
       
       return {
-        show_number: show.show_number,
+        round: show.show_number,
         prompt: show.prompt,
+        player_a_name: rivalry.profile_a.name,
         player_a_answer: show.profile_a_answer,
-        player_a_score: playerAScore,
+        player_a_score: rs.playerAScore,
+        player_b_name: rivalry.profile_b.name,
         player_b_answer: show.profile_b_answer,
-        player_b_score: playerBScore,
-        winner: winner,
-        margin: margin
+        player_b_score: rs.playerBScore,
+        winner: rs.winnerName,
+        margin: rs.margin,
+        unanimous: rs.unanimous
       };
     });
 
+    // Build judge context string
+    const judgeContext = rivalryJudges.map((j: any) => 
+      `- ${j.name} ${j.emoji}: ${j.description}`
+    ).join('\n');
+
     // Call Claude API for analysis
-    const claudePrompt = `You are analyzing a completed ${RIVALRY_LENGTH}-show creative rivalry between two players. Generate a compelling summary.
+    const claudePrompt = `${RIPLEY_PROFILE}
 
-PLAYERS:
-- Player A: ${rivalry.profile_a.name}
-- Player B: ${rivalry.profile_b.name}
+JUDGES FOR THIS RIVALRY:
+${judgeContext}
 
-FINAL SCORE:
-- Player A: ${playerAWins} wins (${playerATotalPoints} total points)
-- Player B: ${playerBWins} wins (${playerBTotalPoints} total points)
-- Winner: ${winnerId === rivalry.profile_a.id ? 'Player A' : 'Player B'}
+RIVALRY RESULTS:
+- Winner: ${winnerName} (${winnerWins} rounds, ${winnerTotalPoints} total points)
+- Loser: ${loserName} (${loserWins} rounds, ${loserTotalPoints} total points)
+${tiebreaker ? `- Tiebreaker: ${tiebreaker}` : ''}
 
-SHOWS (${shows.length} total):
+ROUND BY ROUND:
 ${showSummaries.map(s => `
-Show ${s.show_number}: "${s.prompt}"
-- ${rivalry.profile_a.name}: "${s.player_a_answer}" (${s.player_a_score} points)
-- ${rivalry.profile_b.name}: "${s.player_b_answer}" (${s.player_b_score} points)
-- Winner: ${s.winner} (+${s.margin} margin)
+Round ${s.round}: "${s.prompt}"
+- ${s.player_a_name}: "${s.player_a_answer}" (${s.player_a_score} points)
+- ${s.player_b_name}: "${s.player_b_answer}" (${s.player_b_score} points)
+- Winner: ${s.winner} (+${s.margin} margin)${s.unanimous ? ' [UNANIMOUS]' : ''}
 `).join('\n')}
 
-Generate a JSON response with this structure:
+Generate a JSON response as Ripley analyzing this rivalry:
+
 {
-  "analysis": "2-3 sentence narrative about the rivalry arc. Use the scores to identify patterns: Were games close or blowouts? Any comeback stories? Momentum shifts? Make it engaging and specific to what happened.",
-  "player_profiles": {
-    "player_a_style": "One sentence describing Player A's creative style based on their answers (e.g., 'Bold risk-taker', 'Witty wordsmith', 'Absurdist humor')",
-    "player_b_style": "One sentence describing Player B's creative style based on their answers"
+  "headline": "A 5-8 word headline capturing this rivalry's essence. Make it memorable — like a sports headline or movie title. Can reference a standout moment, the winner, or the rivalry's vibe.",
+  
+  "ripley_analysis": "3-4 sentences in Ripley's voice. Cover: the overall arc, one specific standout moment (reference an actual answer or round), and note any judge dynamics that mattered. Punchy, not verbose.",
+  
+  "ripley_tip": "1-2 sentences of forward-looking advice for BOTH players based on patterns in THIS rivalry. Address each by name. Be specific — reference actual tendencies you noticed. Encouraging but honest.",
+  
+  "winner_style": {
+    "short": "2-4 words capturing their creative vibe (e.g., 'Clever wordsmith', 'Chaotic genius', 'Relatable storyteller')",
+    "detail": "One sentence explaining their approach based on their answers"
   },
-  "memorable_moments": [
-    "Brief description of 1-2 standout shows - focus on close games, big upsets, or particularly clever answers"
-  ]
+  
+  "loser_style": {
+    "short": "2-4 words capturing their creative vibe",
+    "detail": "One sentence explaining their approach based on their answers"
+  }
 }
 
 Requirements:
-- Keep analysis under 100 words
-- Be specific - mention actual prompts/answers when relevant
-- Note if games were consistently close (margins <5) or if one player dominated
-- Use player names (${rivalry.profile_a.name} and ${rivalry.profile_b.name}), not "Player A/B"
-- Focus on what made this rivalry unique
-- Celebrate creativity, not just winning
+- Use player names (${rivalry.profile_a.name} and ${rivalry.profile_b.name}), never "Player A/B" or "Winner/Loser"
+- Keep ripley_analysis under 75 words
+- Keep ripley_tip under 40 words
+- Be specific — mention actual prompts, answers, or rounds when relevant
+- Celebrate creativity, even for the loser
+- Reference judges by name when relevant
 
-IMPORTANT: Respond ONLY with valid JSON. No markdown, no code blocks, no extra text.`;
+Respond ONLY with valid JSON. No markdown, no code blocks, no extra text.`;
 
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -254,7 +413,7 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no code blocks, no extra t
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
+        max_tokens: 800,
         messages: [
           {
             role: 'user',
@@ -265,25 +424,54 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no code blocks, no extra t
     });
 
     if (!claudeResponse.ok) {
+      const errorText = await claudeResponse.text();
+      console.error('Claude API error:', errorText);
       throw new Error(`Claude API error: ${claudeResponse.status}`);
     }
 
     const claudeData = await claudeResponse.json();
-    const aiAnalysis = JSON.parse(claudeData.content[0].text);
+    
+    let aiAnalysis;
+    try {
+      aiAnalysis = JSON.parse(claudeData.content[0].text);
+    } catch (parseError) {
+      console.error('Failed to parse Claude response:', claudeData.content[0].text);
+      throw new Error('Failed to parse AI response');
+    }
 
     // Build final summary object
     const summary = {
       final_score: {
-        player_a_wins: playerAWins,
-        player_b_wins: playerBWins,
-        player_a_total_points: playerATotalPoints,
-        player_b_total_points: playerBTotalPoints,
+        winner_id: winnerId,
+        winner_name: winnerName,
+        loser_name: loserName,
+        winner_wins: winnerWins,
+        loser_wins: loserWins,
+        winner_total_points: winnerTotalPoints,
+        loser_total_points: loserTotalPoints,
         tiebreaker: tiebreaker
       },
-      winner_id: winnerId,
-      analysis: aiAnalysis.analysis,
-      player_profiles: aiAnalysis.player_profiles,
-      memorable_moments: aiAnalysis.memorable_moments || []
+      ai_generated: {
+        headline: aiAnalysis.headline,
+        ripley_analysis: aiAnalysis.ripley_analysis,
+        ripley_tip: aiAnalysis.ripley_tip,
+        winner_style: aiAnalysis.winner_style,
+        loser_style: aiAnalysis.loser_style
+      },
+      stats: {
+        biggest_blowout: {
+          round: biggestBlowout.round,
+          winner_name: biggestBlowout.winnerName,
+          margin: biggestBlowout.margin
+        },
+        closest_round: {
+          round: closestRound.round,
+          winner_name: closestRound.winnerName,
+          margin: closestRound.margin
+        },
+        judges_favorite: judgesFavorite,
+        unanimous_rounds: unanimousRounds
+      }
     };
 
     // Update rivalry with summary and completion status
@@ -299,7 +487,6 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no code blocks, no extra t
 
     if (updateError) {
       console.error('Failed to update rivalry:', updateError);
-      // Don't fail the request - summary was still generated
     }
 
     return new Response(
