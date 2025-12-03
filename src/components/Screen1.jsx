@@ -126,6 +126,11 @@ export default function Screen1({ onNavigate }) {
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
 
+  // Invite code state (for creating rivalries)
+  const [inviteCode, setInviteCode] = useState(null); // The generated 4-char code
+  const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
+  const [inviteError, setInviteError] = useState('');
+
   // Scroll to top when currentState changes
   useEffect(() => {
     if (currentState) {
@@ -171,13 +176,15 @@ export default function Screen1({ onNavigate }) {
         const pendingFriendName = sessionStorage.getItem('pendingRivalryFriendName');
         const pendingFriendId = sessionStorage.getItem('pendingRivalryFriendId');
         const pendingStakes = sessionStorage.getItem('pendingRivalryStakes');
+        const pendingCategory = sessionStorage.getItem('pendingRivalryCategory');
         
         if (pendingCode && pendingFriendName && pendingFriendId) {
           setPendingInvite({
             code: pendingCode,
             friendName: pendingFriendName,
             friendId: pendingFriendId,
-            stakes: pendingStakes || null
+            stakes: pendingStakes || null,
+            category: pendingCategory || 'mixed'
           });
         }
 
@@ -695,10 +702,11 @@ useEffect(() => {
   // Auto-start rivalry with pending invite (from /join link)
   const startRivalryWithPendingInvite = async (userProfile) => {
     try {
-      isCreatingRivalryRef.current = true; // Flag that we're creating a rivalry
+      isCreatingRivalryRef.current = true;
       
-      // Use stakes from pendingInvite (already fetched by JoinRivalry or from manual lookup)
+      // Use stakes and category from pendingInvite
       const rivalryStakes = pendingInvite.stakes || null;
+      const promptCategory = pendingInvite.category || 'mixed';
       
       // Select 3 judges for the entire rivalry
       const judgeObjects = await selectJudges();
@@ -716,20 +724,21 @@ useEffect(() => {
           first_show_started: false,
           stakes: rivalryStakes,
           judges: judgeKeys,
-          prompt_category: 'random'
+          prompt_category: promptCategory
         })
         .select()
         .single();
 
       if (rivalryError) throw rivalryError;
 
-      // Clear friend's pending_stakes after rivalry created
-      if (rivalryStakes) {
-        await supabase
-          .from('profiles')
-          .update({ pending_stakes: null })
-          .eq('id', pendingInvite.friendId);
-      }
+      // Mark invite code as used
+      await supabase
+        .from('rivalry_invites')
+        .update({ 
+          used_at: new Date().toISOString(),
+          accepted_by_profile_id: userProfile.id
+        })
+        .eq('code', pendingInvite.code);
 
       // Generate Ripley's intro text
       try {
@@ -742,18 +751,15 @@ useEffect(() => {
         });
 
         if (emceeResponse.data?.emcee_text) {
-          // Update rivalry with intro text
           await supabase
             .from('rivalries')
             .update({ intro_emcee_text: emceeResponse.data.emcee_text })
             .eq('id', newRivalry.id);
           
-          // Update local rivalry object
           newRivalry.intro_emcee_text = emceeResponse.data.emcee_text;
         }
       } catch (emceeErr) {
         console.error('Failed to generate intro text:', emceeErr);
-        // Continue anyway - fallback text will show
       }
 
       // Clear pending invite from session storage
@@ -761,9 +767,10 @@ useEffect(() => {
       sessionStorage.removeItem('pendingRivalryFriendName');
       sessionStorage.removeItem('pendingRivalryFriendId');
       sessionStorage.removeItem('pendingRivalryStakes');
+      sessionStorage.removeItem('pendingRivalryCategory');
       setPendingInvite(null);
 
-      // Send rivalry_started SMS to the friend (challenger) who shared their code
+      // Send rivalry_started SMS to the friend (creator who shared their code)
       try {
         await supabase.functions.invoke('send-sms', {
           body: {
@@ -776,10 +783,9 @@ useEffect(() => {
         });
       } catch (smsErr) {
         console.error('Failed to send rivalry_started SMS:', smsErr);
-        // Don't block - rivalry already created
       }
 
-      // Navigate directly to gameplay - the intro flow will show there
+      // Navigate directly to gameplay
       isCreatingRivalryRef.current = false;
       onNavigate('screen4', {
         activeProfileId: userProfile.id,
@@ -801,100 +807,120 @@ useEffect(() => {
     setIsJoining(false);
   };
 
-  // STATE B: Join Rivalry
+  // STATE B: Join Rivalry (using invite code)
   const handleJoinRivalry = async () => {
     setJoinError('');
     setIsJoining(true);
-    isCreatingRivalryRef.current = true; // Flag that we're creating a rivalry
+    isCreatingRivalryRef.current = true;
 
     try {
-      const formattedCode = formatCodeInput(friendCode);
+      const code = friendCode.toUpperCase();
 
-      // Validate format
-      if (!isValidCodeFormat(formattedCode)) {
-        setJoinError('Invalid Profile ID format');
+      // Validate format (4 chars)
+      if (code.length !== 4) {
+        setJoinError('Invalid invite code');
+        setIsJoining(false);
+        return;
+      }
+
+      // Look up invite code
+      const { data: invite, error: inviteError } = await supabase
+        .from('rivalry_invites')
+        .select(`
+          *,
+          creator:profiles!rivalry_invites_creator_profile_id_fkey(id, name)
+        `)
+        .eq('code', code)
+        .single();
+
+      if (inviteError || !invite) {
+        setJoinError('Invalid invite code. Check with your friend.');
+        setIsJoining(false);
+        return;
+      }
+
+      // Check if expired
+      if (new Date(invite.expires_at) < new Date()) {
+        setJoinError('This invite has expired. Ask your friend for a new one.');
+        setIsJoining(false);
+        return;
+      }
+
+      // Check if already used
+      if (invite.used_at) {
+        setJoinError('This invite has already been used.');
         setIsJoining(false);
         return;
       }
 
       // Check if entering own code
-      if (formattedCode === profile.code) {
-        setJoinError("You can't start a Rivalry with yourself.");
+      if (invite.creator_profile_id === profile.id) {
+        setJoinError("You can't join your own invite!");
         setIsJoining(false);
         return;
       }
 
-      // Find friend by code (include pending_stakes and name)
-const { data: friend, error: friendError } = await supabase
-  .from('profiles')
-  .select('id, name, pending_stakes')
-  .eq('code', formattedCode)
-  .single();
+      const friendId = invite.creator_profile_id;
+      const friendName = invite.creator?.name || 'Friend';
 
-if (friendError || !friend) {
-  setJoinError('Profile ID not found. Check with your friend.');
-  setIsJoining(false);
-  return;
-}
+      // Check if EITHER player is already in a rivalry
+      const { data: anyExistingRivalries } = await supabase
+        .from('rivalries')
+        .select('id, profile_a_id, profile_b_id')
+        .or(`profile_a_id.eq.${profile.id},profile_b_id.eq.${profile.id},profile_a_id.eq.${friendId},profile_b_id.eq.${friendId}`)
+        .eq('status', 'active');
 
-// NEW: Check if EITHER player is already in ANY rivalry
-const { data: anyExistingRivalries } = await supabase
-  .from('rivalries')
-  .select('id')
-  .or(`profile_a_id.eq.${profile.id},profile_b_id.eq.${profile.id},profile_a_id.eq.${friend.id},profile_b_id.eq.${friend.id}`)
-  .eq('status', 'active');
+      if (anyExistingRivalries && anyExistingRivalries.length > 0) {
+        const myRivalry = anyExistingRivalries.find(r => 
+          r.profile_a_id === profile.id || r.profile_b_id === profile.id
+        );
+        
+        if (myRivalry) {
+          setJoinError("You're already in a rivalry. Finish or cancel it first!");
+          setIsJoining(false);
+          return;
+        }
+        
+        setJoinError(`${friendName} is already in a rivalry. Try again later!`);
+        setIsJoining(false);
+        return;
+      }
 
-if (anyExistingRivalries && anyExistingRivalries.length > 0) {
-  // Check if it's YOUR rivalry
-  const myRivalry = anyExistingRivalries.find(r => 
-    r.profile_a_id === profile.id || r.profile_b_id === profile.id
-  );
-  
-  if (myRivalry) {
-    setJoinError("You're already in a rivalry. Finish or cancel it first!");
-    setIsJoining(false);
-    return;
-  }
-  
-  // It's the friend's rivalry
-  setJoinError("This person is already in a rivalry. Try again later!");
-  setIsJoining(false);
-  return;
-}
-
-      // Get stakes from friend's pending_stakes
-      const rivalryStakes = friend.pending_stakes || null;
+      // Get stakes and category from invite
+      const rivalryStakes = invite.stakes || null;
+      const promptCategory = invite.prompt_category || 'mixed';
 
       // Select 3 judges for the entire rivalry
       const judgeObjects = await selectJudges();
       const judgeKeys = judgeObjects.map(j => j.key);
 
       // Create rivalry (always put lower ID as profile_a for consistency)
-      const [profileAId, profileBId] = [profile.id, friend.id].sort();
+      const [profileAId, profileBId] = [profile.id, friendId].sort();
 
       const { data: newRivalry, error: rivalryError } = await supabase
         .from('rivalries')
         .insert({
           profile_a_id: profileAId,
           profile_b_id: profileBId,
-          mic_holder_id: profile.id, // Creator holds mic initially
+          mic_holder_id: profile.id, // Joiner holds mic initially (they go first)
           first_show_started: false,
           stakes: rivalryStakes,
           judges: judgeKeys,
-          prompt_category: selectedCategory // Use selected category
+          prompt_category: promptCategory
         })
         .select()
         .single();
 
       if (rivalryError) throw rivalryError;
 
-      // Clear friend's pending_stakes after rivalry created
-      if (rivalryStakes) {
-        await supabase
-          .from('profiles')
-          .update({ pending_stakes: null })
-          .eq('id', friend.id);
-      }
+      // Mark invite as used
+      await supabase
+        .from('rivalry_invites')
+        .update({ 
+          used_at: new Date().toISOString(),
+          accepted_by_profile_id: profile.id
+        })
+        .eq('id', invite.id);
 
       // Generate Ripley's intro text
       try {
@@ -907,25 +933,22 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         });
 
         if (emceeResponse.data?.emcee_text) {
-          // Update rivalry with intro text
           await supabase
             .from('rivalries')
             .update({ intro_emcee_text: emceeResponse.data.emcee_text })
             .eq('id', newRivalry.id);
           
-          // Update local rivalry object
           newRivalry.intro_emcee_text = emceeResponse.data.emcee_text;
         }
       } catch (emceeErr) {
         console.error('Failed to generate intro text:', emceeErr);
-        // Continue anyway - fallback text will show
       }
 
-      // Send rivalry_started SMS to the friend (challenger) who shared their code
+      // Send rivalry_started SMS to the creator
       try {
         await supabase.functions.invoke('send-sms', {
           body: {
-            userId: friend.id,
+            userId: friendId,
             notificationType: 'rivalry_started',
             contextData: {
               opponent: profile.name
@@ -934,10 +957,9 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
         });
       } catch (smsErr) {
         console.error('Failed to send rivalry_started SMS:', smsErr);
-        // Don't block - rivalry already created
       }
 
-      // Navigate directly to gameplay - the intro flow will show there
+      // Navigate to gameplay
       isCreatingRivalryRef.current = false;
       onNavigate('screen4', {
         activeProfileId: profile.id,
@@ -945,9 +967,9 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
       });
     } catch (err) {
       console.error('Error joining rivalry:', err);
-      setJoinError(err.message || 'Failed to start Rivalry');
+      setJoinError(err.message || 'Failed to start rivalry');
       setIsJoining(false);
-      isCreatingRivalryRef.current = false; // Clear the flag on error too
+      isCreatingRivalryRef.current = false;
     }
   };
 
@@ -1016,41 +1038,30 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
   }
 }
 
-  // Save stakes to profile's pending_stakes (fire and forget)
-  const savePendingStakes = () => {
-    if (!profile?.id) return;
-    supabase
-      .from('profiles')
-      .update({ pending_stakes: stakes.trim() || null })
-      .eq('id', profile.id)
-      .then(() => {})
-      .catch((err) => console.error('Failed to save pending stakes:', err));
-  };
-
-  // Lookup challenger's stakes when code is entered in join modal
-  const lookupChallengerStakes = async (code) => {
-    if (!code || code.length < 10) {
-      setChallengerStakes(null);
-      return;
-    }
-    
-    const formattedCode = formatCodeInput(code);
-    if (!isValidCodeFormat(formattedCode)) {
+  // Lookup invite stakes when code is entered in join modal
+  const lookupInviteStakes = async (code) => {
+    if (!code || code.length !== 4) {
       setChallengerStakes(null);
       return;
     }
     
     try {
-      const { data: challenger } = await supabase
-        .from('profiles')
-        .select('name, pending_stakes')
-        .eq('code', formattedCode)
+      const { data: invite } = await supabase
+        .from('rivalry_invites')
+        .select(`
+          stakes,
+          creator_profile_id,
+          expires_at,
+          used_at,
+          creator:profiles!rivalry_invites_creator_profile_id_fkey(name)
+        `)
+        .eq('code', code.toUpperCase())
         .single();
       
-      if (challenger) {
+      if (invite && !invite.used_at && new Date(invite.expires_at) > new Date()) {
         setChallengerStakes({
-          name: challenger.name,
-          stakes: challenger.pending_stakes
+          name: invite.creator?.name || 'Friend',
+          stakes: invite.stakes
         });
       } else {
         setChallengerStakes(null);
@@ -1066,11 +1077,60 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
     setStakes(STAKES_SUGGESTIONS[randomIndex]);
   };
 
-  // Copy code to clipboard
-  const handleCopyCode = async () => {
+  // Generate a unique 4-character invite code
+  const generateInviteCode = async () => {
+    setIsGeneratingInvite(true);
+    setInviteError('');
+    
     try {
-      savePendingStakes(); // Fire and forget - don't block copy
-      await navigator.clipboard.writeText(profile.code);
+      // Generate random 4-char code (uppercase + digits, excluding confusing chars)
+      const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // No 0, O, 1, I, L
+      let code = '';
+      for (let i = 0; i < 4; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      
+      // Check if code already exists (and is not expired/used)
+      const { data: existing } = await supabase
+        .from('rivalry_invites')
+        .select('id')
+        .eq('code', code)
+        .is('used_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+      
+      if (existing) {
+        // Rare collision - try again
+        return generateInviteCode();
+      }
+      
+      // Create the invite
+      const { data: invite, error } = await supabase
+        .from('rivalry_invites')
+        .insert({
+          code: code,
+          creator_profile_id: profile.id,
+          stakes: stakes.trim() || null,
+          prompt_category: selectedCategory
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      setInviteCode(code);
+    } catch (err) {
+      console.error('Failed to generate invite code:', err);
+      setInviteError('Failed to create invite. Try again.');
+    } finally {
+      setIsGeneratingInvite(false);
+    }
+  };
+
+  // Copy invite code to clipboard
+  const handleCopyInviteCode = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteCode);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
@@ -1078,15 +1138,19 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
     }
   };
 
-  // Share via SMS (opens native SMS)
-  const handleShareSMS = () => {
-    savePendingStakes(); // Fire and forget
+  // Share invite via SMS (opens native SMS)
+  const handleShareInviteSMS = () => {
     const stakesLine = stakes.trim() ? `\nPlaying for: ${stakes.trim()} 🎯\n` : '';
-    const categoryLabel = PROMPT_CATEGORIES.find(c => c.key === selectedCategory)?.label || 'Anything Goes';
     const message = stakes.trim() 
-      ? `Hey! I challenge you to One-Upper - we answer weird prompts and AI judges decide who one-upped the other.\n${stakesLine}\nJoin me: https://oneupper.app/join/${profile.code}\n\nLet the rivalry begin! 🎤`
-      : `I challenge you to One-Upper! 🎤\n\nJoin: https://oneupper.app/join/${profile.code}\n\nLet's see who's got the better one-liners.`;
+      ? `Hey! I challenge you to One-Upper - we answer weird prompts and AI judges decide who one-upped the other.\n${stakesLine}\nJoin with code: ${inviteCode}\nOr tap: https://oneupper.app/join/${inviteCode}\n\nLet the rivalry begin! 🎤`
+      : `I challenge you to One-Upper! 🎤\n\nJoin with code: ${inviteCode}\nOr tap: https://oneupper.app/join/${inviteCode}\n\nLet's see who's got the better one-liners.`;
     window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
+  };
+
+  // Reset invite code (to create a new one)
+  const resetInviteCode = () => {
+    setInviteCode(null);
+    setInviteError('');
   };
 
   if (loading) {
@@ -1549,23 +1613,52 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                       </div>
                     </div>
                     
-                    {/* Share buttons */}
-                    <div className="space-y-2">
-                      <label className="text-sm text-slate-400">Share your ID to get started:</label>
-                      <div className="flex gap-3">
-                        <button
-                          onClick={handleCopyCode}
-                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors border border-slate-600"
-                        >
-                          {copied ? '✓ Copied!' : 'Copy my ID'}
-                        </button>
-                        <button
-                          onClick={handleShareSMS}
-                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors border border-slate-600"
-                        >
-                          Share via Text
-                        </button>
-                      </div>
+                    {/* Invite Code Section */}
+                    <div className="space-y-3">
+                      {!inviteCode ? (
+                        <>
+                          <button
+                            onClick={generateInviteCode}
+                            disabled={isGeneratingInvite}
+                            className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white py-3 px-4 rounded-lg font-semibold transition-colors"
+                          >
+                            {isGeneratingInvite ? 'Creating...' : 'Create Invite Code'}
+                          </button>
+                          {inviteError && (
+                            <p className="text-red-400 text-sm text-center">{inviteError}</p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-center">
+                            <p className="text-sm text-slate-400 mb-2">Share this code with your rival:</p>
+                            <div className="text-4xl font-mono font-bold text-orange-500 tracking-widest mb-1">
+                              {inviteCode}
+                            </div>
+                            <p className="text-xs text-slate-500">Expires in 24 hours</p>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={handleCopyInviteCode}
+                              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors border border-slate-600"
+                            >
+                              {copied ? '✓ Copied!' : 'Copy Code'}
+                            </button>
+                            <button
+                              onClick={handleShareInviteSMS}
+                              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-3 px-4 rounded-lg font-medium transition-colors border border-slate-600"
+                            >
+                              Share via Text
+                            </button>
+                          </div>
+                          <button
+                            onClick={resetInviteCode}
+                            className="w-full text-slate-500 hover:text-slate-300 text-sm py-2 transition-colors"
+                          >
+                            Create new code
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1576,7 +1669,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                 onClick={() => setShowJoinModal(true)}
                 className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-4 px-6 rounded-xl font-medium transition-colors border border-slate-600"
               >
-                Join a Friend's Rivalry
+                Have an Invite Code?
               </button>
             </div>
           )}
@@ -1602,17 +1695,21 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
                   </button>
                 </div>
 
-                <p className="text-slate-300">Enter friend's Profile ID:</p>
+                <p className="text-slate-300">Enter invite code:</p>
 
                 <input
                   type="text"
                   value={friendCode}
                   onChange={(e) => {
-                    setFriendCode(e.target.value);
-                    lookupChallengerStakes(e.target.value);
+                    // Only allow alphanumeric, max 4 chars
+                    const cleaned = e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 4);
+                    setFriendCode(cleaned);
+                    // Look up invite stakes
+                    lookupInviteStakes(cleaned);
                   }}
-                  placeholder="HAPPY-TIGER-1234"
-                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg uppercase"
+                  placeholder="ABCD"
+                  className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-2xl uppercase text-center tracking-widest font-mono"
+                  maxLength={4}
                   autoFocus
                 />
 
@@ -1632,7 +1729,7 @@ if (anyExistingRivalries && anyExistingRivalries.length > 0) {
 
                 <button
                   onClick={handleJoinRivalry}
-                  disabled={!friendCode.trim() || isJoining}
+                  disabled={friendCode.length !== 4 || isJoining}
                   className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
                 >
                   {isJoining ? 'Starting...' : 'Start Rivalry'}

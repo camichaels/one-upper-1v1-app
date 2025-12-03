@@ -15,16 +15,33 @@ export default function JoinRivalry() {
 
   async function checkUserStatus() {
     try {
-      // First, look up the friend's profile by code (include pending_stakes)
-      const { data: friendProfile, error: friendError } = await supabase
-        .from('profiles')
-        .select('name, id, pending_stakes')
+      // Look up the invite code
+      const { data: invite, error: inviteError } = await supabase
+        .from('rivalry_invites')
+        .select(`
+          *,
+          creator:profiles!rivalry_invites_creator_profile_id_fkey(id, name)
+        `)
         .eq('code', code.toUpperCase())
         .single();
 
-      if (friendError || !friendProfile) {
+      if (inviteError || !invite) {
         setStatus('error');
         setErrorMessage('Invalid invite code. Check with your friend!');
+        return;
+      }
+
+      // Check if expired
+      if (new Date(invite.expires_at) < new Date()) {
+        setStatus('error');
+        setErrorMessage('This invite has expired. Ask your friend for a new one.');
+        return;
+      }
+
+      // Check if already used
+      if (invite.used_at) {
+        setStatus('error');
+        setErrorMessage('This invite has already been used.');
         return;
       }
 
@@ -34,21 +51,24 @@ export default function JoinRivalry() {
       if (!activeId) {
         // No profile - need to create one first
         setStatus('needs_profile');
-        // Store the code, friend's name, id, and stakes for later
+        // Store the invite code and friend info for later
         sessionStorage.setItem('pendingRivalryCode', code.toUpperCase());
-        sessionStorage.setItem('pendingRivalryFriendName', friendProfile.name);
-        sessionStorage.setItem('pendingRivalryFriendId', friendProfile.id);
-        if (friendProfile.pending_stakes) {
-          sessionStorage.setItem('pendingRivalryStakes', friendProfile.pending_stakes);
+        sessionStorage.setItem('pendingRivalryFriendName', invite.creator?.name || 'Friend');
+        sessionStorage.setItem('pendingRivalryFriendId', invite.creator_profile_id);
+        if (invite.stakes) {
+          sessionStorage.setItem('pendingRivalryStakes', invite.stakes);
+        }
+        if (invite.prompt_category) {
+          sessionStorage.setItem('pendingRivalryCategory', invite.prompt_category);
         }
         navigate('/play');
         return;
       }
 
-      // Check if trying to join your own code
-      if (activeId === friendProfile.id) {
+      // Check if trying to join your own invite
+      if (activeId === invite.creator_profile_id) {
         setStatus('error');
-        setErrorMessage("You can't start a rivalry with yourself!");
+        setErrorMessage("You can't join your own invite!");
         return;
       }
 
@@ -78,27 +98,30 @@ export default function JoinRivalry() {
         return;
       }
 
-      // Check if friend is already in a rivalry
-      const { data: friendRivalry } = await supabase
+      // Check if invite creator is already in a rivalry
+      const { data: creatorRivalry } = await supabase
         .from('rivalries')
         .select('id')
-        .or(`profile_a_id.eq.${friendProfile.id},profile_b_id.eq.${friendProfile.id}`)
+        .or(`profile_a_id.eq.${invite.creator_profile_id},profile_b_id.eq.${invite.creator_profile_id}`)
         .eq('status', 'active')
         .maybeSingle();
 
-      if (friendRivalry) {
+      if (creatorRivalry) {
         setStatus('error');
-        setErrorMessage(`${friendProfile.name} is already in a rivalry. Try again later!`);
+        setErrorMessage(`${invite.creator?.name || 'Your friend'} is already in a rivalry. Try again later!`);
         return;
       }
 
       // User has profile and not in rivalry - redirect to /play with prefilled code
       setStatus('has_profile');
       sessionStorage.setItem('pendingRivalryCode', code.toUpperCase());
-      sessionStorage.setItem('pendingRivalryFriendName', friendProfile.name);
-      sessionStorage.setItem('pendingRivalryFriendId', friendProfile.id);
-      if (friendProfile.pending_stakes) {
-        sessionStorage.setItem('pendingRivalryStakes', friendProfile.pending_stakes);
+      sessionStorage.setItem('pendingRivalryFriendName', invite.creator?.name || 'Friend');
+      sessionStorage.setItem('pendingRivalryFriendId', invite.creator_profile_id);
+      if (invite.stakes) {
+        sessionStorage.setItem('pendingRivalryStakes', invite.stakes);
+      }
+      if (invite.prompt_category) {
+        sessionStorage.setItem('pendingRivalryCategory', invite.prompt_category);
       }
       navigate('/play');
       

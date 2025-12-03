@@ -452,7 +452,8 @@ Format:
               contextData: {
                 show_num: show.show_number,
                 prompt: show.prompt,
-                opponent: opponentName
+                opponent: opponentName,
+                show_id: show.id
               }
             })
           }
