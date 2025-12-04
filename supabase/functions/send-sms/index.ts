@@ -45,17 +45,25 @@ const SMS_TEMPLATES = {
     'One-Upper: {opponent} accepted your challenge! Game on: https://oneupper.app/play?p={profile_id}',
     'One-Upper: {opponent} is ready to battle! First show awaits: https://oneupper.app/play?p={profile_id}',
     'One-Upper: It\'s on! {opponent} joined your rivalry: https://oneupper.app/play?p={profile_id}',
+  ],
+  rematch_challenge: [
+    'One-Upper: {challenger_name} wants a rematch! 🎤 Accept: https://oneupper.app/join/{invite_code}',
+    'One-Upper: {challenger_name} is back for more! Rematch? https://oneupper.app/join/{invite_code}',
+    'One-Upper: {challenger_name} challenged you again! 🔥 https://oneupper.app/join/{invite_code}',
   ]
 };
 
 interface RequestBody {
   userId: string;
-  notificationType: 'your_turn' | 'verdict_ready' | 'nudge' | 'rivalry_cancelled' | 'welcome' | 'rivalry_started';
+  notificationType: 'your_turn' | 'verdict_ready' | 'nudge' | 'rivalry_cancelled' | 'welcome' | 'rivalry_started' | 'rematch_challenge';
   contextData: {
     opponent?: string;
     show_num?: string | number;
     prompt?: string;
     show_id?: string;
+    challenger_name?: string;
+    invite_code?: string;
+    stakes?: string;
   };
 }
 
@@ -143,6 +151,23 @@ serve(async (req) => {
     }
     if (contextData.show_id) {
       message = message.replace('{show_id}', contextData.show_id);
+    }
+    if (contextData.challenger_name) {
+      message = message.replace('{challenger_name}', contextData.challenger_name);
+    }
+    if (contextData.invite_code) {
+      message = message.replace('{invite_code}', contextData.invite_code);
+    }
+    // For rematch with stakes, insert stakes info before the URL
+    if (contextData.stakes && notificationType === 'rematch_challenge') {
+      // Handle different template patterns
+      if (message.includes(' Accept:')) {
+        message = message.replace(' Accept:', ` Playing for: ${contextData.stakes} -`);
+      } else if (message.includes(' Rematch?')) {
+        message = message.replace(' Rematch?', ` Playing for: ${contextData.stakes} - Rematch?`);
+      } else if (message.includes('! 🔥')) {
+        message = message.replace('! 🔥', `! 🔥 Playing for: ${contextData.stakes} -`);
+      }
     }
     // Always replace profile_id with the recipient's user ID
     message = message.replace('{profile_id}', userId);

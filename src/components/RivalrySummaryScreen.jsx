@@ -5,6 +5,7 @@ import Header from './Header';
 import GoldenMic from '../assets/microphone.svg';
 import ShareCard from './ShareCard';
 import { shareAsImage } from '../utils/shareUtils';
+import RematchModal from './RematchModal';
 
 // Helper function to normalize old summary format to new format
 function normalizeSummary(summary, rivalry) {
@@ -154,6 +155,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [currentStatIndex, setCurrentStatIndex] = useState(0);
   const [showStyleModal, setShowStyleModal] = useState(null); // 'winner' | 'loser' | null
   const [animationTriggered, setAnimationTriggered] = useState(false);
+  const [showRematchModal, setShowRematchModal] = useState(false);
 
   // Determine if we came from history browsing or just completed a rivalry
   const isFromHistory = context === 'from_history';
@@ -770,12 +772,20 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               ← Back to History
             </button>
           ) : (
-            <button
-              onClick={handleChallengeNewFriend}
-              className="flex-[2] px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
-            >
-              New Rivalry
-            </button>
+            <>
+              <button
+                onClick={() => setShowRematchModal(true)}
+                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
+              >
+                Rematch
+              </button>
+              <button
+                onClick={handleChallengeNewFriend}
+                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 text-slate-200 rounded-xl hover:bg-slate-600 transition-all font-semibold"
+              >
+                New Rivalry
+              </button>
+            </>
           )}
         </div>
         
@@ -828,6 +838,19 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </div>
         </div>
       )}
+
+      {/* Rematch Modal */}
+      <RematchModal
+        isOpen={showRematchModal}
+        onClose={(wasSent) => {
+          setShowRematchModal(false);
+          if (wasSent) {
+            onNavigate('screen1');
+          }
+        }}
+        myProfile={myProfile}
+        opponent={opponentProfile}
+      />
     </div>
   );
 }

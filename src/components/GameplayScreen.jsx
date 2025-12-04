@@ -704,6 +704,23 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     }
   }
 
+  function getNudgeLink() {
+    return `https://oneupper.app/play?p=${opponentProfile.id}`;
+  }
+
+  function handleCopyNudgeLink() {
+    navigator.clipboard.writeText(getNudgeLink());
+    setShowNudgeModal(false);
+    alert('Link copied! ⚡');
+  }
+
+  function handleShareNudgeViaText() {
+    const message = `Hey! Your turn in One-Upper 🎤 ${getNudgeLink()}`;
+    const smsUrl = `sms:?&body=${encodeURIComponent(message)}`;
+    window.location.href = smsUrl;
+    setShowNudgeModal(false);
+  }
+
   async function handleCancelRivalry() {
     try {
       const { error } = await supabase
@@ -1134,23 +1151,55 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
               <h3 className="text-lg font-bold text-slate-100 mb-2">
                 Send a Nudge?
               </h3>
-              <p className="text-slate-300 text-sm mb-6">
-                {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
-              </p>
-              <div className="space-y-2">
-                <button
-                  onClick={sendNudge}
-                  className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
-                >
-                  Send Nudge
-                </button>
-                <button
-                  onClick={() => setShowNudgeModal(false)}
-                  className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
-                >
-                  Cancel
-                </button>
-              </div>
+              {opponentProfile?.sms_consent ? (
+                <>
+                  <p className="text-slate-300 text-sm mb-6">
+                    {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
+                  </p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={sendNudge}
+                      className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
+                    >
+                      Send Nudge
+                    </button>
+                    <button
+                      onClick={() => setShowNudgeModal(false)}
+                      className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-slate-300 text-sm mb-6">
+                    {opponentProfile?.name} has game messaging off, so you'll have to send it yourself.
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleCopyNudgeLink}
+                        className="flex-1 py-3 bg-slate-700 text-slate-200 font-medium rounded hover:bg-slate-600"
+                      >
+                        Copy Link
+                      </button>
+                      <button
+                        onClick={handleShareNudgeViaText}
+                        className="flex-1 py-3 bg-slate-700 text-slate-200 font-medium rounded hover:bg-slate-600"
+                      >
+                        Share via Text
+                      </button>
+                    </div>
+                    <button
+                      onClick={() => setShowNudgeModal(false)}
+                      className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -1548,23 +1597,55 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
             <h3 className="text-lg font-bold text-slate-100 mb-2">
               Send a Nudge?
             </h3>
-            <p className="text-slate-300 text-sm mb-6">
-              {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
-            </p>
-            <div className="space-y-2">
-              <button
-                onClick={sendNudge}
-                className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
-              >
-                Send Nudge
-              </button>
-              <button
-                onClick={() => setShowNudgeModal(false)}
-                className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
-              >
-                Cancel
-              </button>
-            </div>
+            {opponentProfile?.sms_consent ? (
+              <>
+                <p className="text-slate-300 text-sm mb-6">
+                  {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
+                </p>
+                <div className="space-y-2">
+                  <button
+                    onClick={sendNudge}
+                    className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
+                  >
+                    Send Nudge
+                  </button>
+                  <button
+                    onClick={() => setShowNudgeModal(false)}
+                    className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-slate-300 text-sm mb-6">
+                  {opponentProfile?.name} has game messaging off, so you'll have to send it yourself.
+                </p>
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCopyNudgeLink}
+                      className="flex-1 py-3 bg-slate-700 text-slate-200 font-medium rounded hover:bg-slate-600"
+                    >
+                      Copy Link
+                    </button>
+                    <button
+                      onClick={handleShareNudgeViaText}
+                      className="flex-1 py-3 bg-slate-700 text-slate-200 font-medium rounded hover:bg-slate-600"
+                    >
+                      Share via Text
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowNudgeModal(false)}
+                    className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
