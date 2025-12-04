@@ -2,17 +2,24 @@ import { supabase } from '../lib/supabase';
 
 /**
  * Get a random prompt from the database
+ * Filters by category if provided (uses array contains for categories column)
  * Excludes recently used prompts if IDs provided
  * @param {number[]} usedPromptIds - Array of recently used prompt IDs
+ * @param {string|null} category - Category to filter by (null or 'mixed' = all categories)
  * @returns {Promise<Object>} Random prompt object
  */
-export async function getRandomPrompt(usedPromptIds = []) {
+export async function getRandomPrompt(usedPromptIds = [], category = null) {
   try {
     // Build query for active prompts
     let query = supabase
       .from('prompts')
       .select('*')
       .eq('is_active', true);
+    
+    // Filter by category if provided (and not 'mixed' which means all)
+    if (category && category !== 'mixed') {
+      query = query.contains('categories', [category]);
+    }
     
     // Exclude recently used prompts if any
     if (usedPromptIds.length > 0) {
@@ -23,19 +30,38 @@ export async function getRandomPrompt(usedPromptIds = []) {
     
     if (error) throw error;
     
-    // If no prompts available (all used), get any active prompt
+    // If no prompts available (all used or none in category), fallback
     if (!data || data.length === 0) {
-      const { data: allPrompts, error: allError } = await supabase
+      // Try without exclusions first
+      let fallbackQuery = supabase
         .from('prompts')
         .select('*')
         .eq('is_active', true);
       
-      if (allError) throw allError;
-      if (!allPrompts || allPrompts.length === 0) {
-        throw new Error('No active prompts found');
+      if (category && category !== 'mixed') {
+        fallbackQuery = fallbackQuery.contains('categories', [category]);
       }
       
-      return allPrompts[Math.floor(Math.random() * allPrompts.length)];
+      const { data: fallbackPrompts, error: fallbackError } = await fallbackQuery;
+      
+      if (fallbackError) throw fallbackError;
+      
+      // If still no prompts (category has none), get any active prompt
+      if (!fallbackPrompts || fallbackPrompts.length === 0) {
+        const { data: allPrompts, error: allError } = await supabase
+          .from('prompts')
+          .select('*')
+          .eq('is_active', true);
+        
+        if (allError) throw allError;
+        if (!allPrompts || allPrompts.length === 0) {
+          throw new Error('No active prompts found');
+        }
+        
+        return allPrompts[Math.floor(Math.random() * allPrompts.length)];
+      }
+      
+      return fallbackPrompts[Math.floor(Math.random() * fallbackPrompts.length)];
     }
     
     // Return random prompt from available
@@ -46,7 +72,7 @@ export async function getRandomPrompt(usedPromptIds = []) {
     return {
       id: null,
       text: 'Tell me something interesting.',
-      category: 'general'
+      categories: ['mixed']
     };
   }
 }

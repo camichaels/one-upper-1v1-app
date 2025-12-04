@@ -49,15 +49,15 @@ export default function Screen2({ onNavigate, editProfileId }) {
     }
   }, [editProfileId, profiles]);
 
-  async function loadProfiles() {
+  async function loadProfiles(phoneOverride = null) {
     try {
       const activeId = localStorage.getItem('activeProfileId');
       setActiveProfileId(activeId);
 
-      // First, try to get phone number from the ACTIVE profile (not recentProfiles)
-      let phoneNumber = null;
+      // First, try to get phone number from override, or from the ACTIVE profile
+      let phoneNumber = phoneOverride;
 
-      if (activeId) {
+      if (!phoneNumber && activeId) {
         const { data: activeProfile } = await supabase
           .from('profiles')
           .select('phone')
@@ -66,8 +66,16 @@ export default function Screen2({ onNavigate, editProfileId }) {
         
         if (activeProfile?.phone) {
           phoneNumber = activeProfile.phone;
-          setCurrentPhone(phoneNumber);
         }
+      }
+      
+      // Also check currentPhone state as fallback
+      if (!phoneNumber && currentPhone) {
+        phoneNumber = currentPhone;
+      }
+      
+      if (phoneNumber) {
+        setCurrentPhone(phoneNumber);
       }
 
       // If we have a phone number, load ALL profiles for that phone
@@ -285,6 +293,9 @@ export default function Screen2({ onNavigate, editProfileId }) {
 
   async function handleDeleteProfile(profileId) {
     try {
+      // Save phone number BEFORE any deletions (for reloading other profiles)
+      const savedPhone = currentPhone;
+      
       // First, update any rivalries this profile is in to cancelled
       await supabase
         .from('rivalries')
@@ -320,7 +331,8 @@ export default function Screen2({ onNavigate, editProfileId }) {
       if (profiles.length === 1) {
         window.location.href = '/';
       } else {
-        await loadProfiles();
+        // Pass the saved phone to reload other profiles
+        await loadProfiles(savedPhone);
       }
     } catch (err) {
       console.error('Error deleting profile:', err);
@@ -434,10 +446,15 @@ export default function Screen2({ onNavigate, editProfileId }) {
       const updated = [profileInfo, ...recentProfiles];
       localStorage.setItem('recentProfiles', JSON.stringify(updated.slice(0, 10)));
 
+      // Set the new profile as active
+      localStorage.setItem('activeProfileId', newProfile.id);
+
       setShowCreateForm(false);
       setCreateFormData({ name: '', avatar: AVATARS[0], phone: '', bio: '', sms_consent: false });
       setIsCreating(false);
-      await loadProfiles();
+      
+      // Navigate to Screen1 which will handle onboarding check
+      onNavigate && onNavigate('screen1');
     } catch (err) {
       console.error('Error creating profile:', err);
       setCreateError('Failed to create profile');

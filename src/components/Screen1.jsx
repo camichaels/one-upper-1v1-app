@@ -7,6 +7,7 @@ import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
 import AboutModal from './AboutModal';
+import OnboardingFlow from './OnboardingFlow';
 
 
 // Avatar options
@@ -47,11 +48,12 @@ const STAKES_SUGGESTIONS = [
 
 // Prompt categories
 const PROMPT_CATEGORIES = [
-  { key: 'random', label: 'Surprise Me', emoji: '🔀' },
+  { key: 'mixed', label: 'Surprise Me', emoji: '🔀' },
   { key: 'pop_culture', label: 'Pop Culture', emoji: '🌟' },
   { key: 'deep_think', label: 'Deep Think', emoji: '🤔' },
   { key: 'edgy', label: 'More Edgy', emoji: '🌶️' },
   { key: 'absurd', label: 'Totally Absurd', emoji: '😂' },
+  { key: 'everyday', label: 'Everyday', emoji: '☕' },
 ];
 
 // Helper: Save profile to localStorage history
@@ -121,7 +123,7 @@ export default function Screen1({ onNavigate }) {
 
   // New state for collapsible Start section
   const [showStartExpanded, setShowStartExpanded] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('random');
+  const [selectedCategory, setSelectedCategory] = useState('mixed');
 
   // Pending invite state (from /join link)
   const [pendingInvite, setPendingInvite] = useState(null); // { code, friendName, friendId }
@@ -130,6 +132,9 @@ export default function Screen1({ onNavigate }) {
   const [inviteCode, setInviteCode] = useState(null); // The generated 4-char code
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [inviteError, setInviteError] = useState('');
+
+  // Onboarding state
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Scroll to top when currentState changes
   useEffect(() => {
@@ -240,6 +245,24 @@ export default function Screen1({ onNavigate }) {
         }
 
         setProfile(profileData);
+
+        // Check if this profile needs onboarding (hasn't completed it yet)
+        if (!profileData.onboarding_completed && profileData.phone) {
+          // Check if any OTHER profile with same phone has completed onboarding
+          const { data: completedProfiles } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('phone', profileData.phone)
+            .eq('onboarding_completed', true)
+            .limit(1);
+          
+          if (!completedProfiles || completedProfiles.length === 0) {
+            // No profiles on this phone have completed onboarding - show it
+            setShowOnboarding(true);
+            setLoading(false);
+            return;
+          }
+        }
 
       // Check for active rivalry
 const { data: rivalryData, error: rivalryError } = await supabase
@@ -566,12 +589,33 @@ useEffect(() => {
       // Update state
       setProfile(newProfile);
       
-      // Check if there's a pending invite - if so, auto-start rivalry
+      // Check if there's a pending invite - if so, skip onboarding and auto-start rivalry
       if (pendingInvite) {
         await startRivalryWithPendingInvite(newProfile);
       } else {
-        setCurrentState('B');
-        setShowForm(false);
+        // Check if this phone number has already completed onboarding
+        let shouldShowOnboarding = true;
+        
+        if (normalizedPhone) {
+          const { data: existingProfiles } = await supabase
+            .from('profiles')
+            .select('onboarding_completed')
+            .eq('phone', normalizedPhone)
+            .eq('onboarding_completed', true)
+            .limit(1);
+          
+          if (existingProfiles && existingProfiles.length > 0) {
+            shouldShowOnboarding = false;
+          }
+        }
+        
+        if (shouldShowOnboarding) {
+          setShowOnboarding(true);
+          setShowForm(false);
+        } else {
+          setCurrentState('B');
+          setShowForm(false);
+        }
       }
       
       setIsSubmitting(false);
@@ -1153,6 +1197,19 @@ useEffect(() => {
     setInviteError('');
   };
 
+  // Show onboarding flow if triggered
+  if (showOnboarding && profile) {
+    return (
+      <OnboardingFlow
+        profile={profile}
+        onComplete={() => {
+          setShowOnboarding(false);
+          setCurrentState('B');
+        }}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
@@ -1240,19 +1297,19 @@ useEffect(() => {
               
               {/* Avatar Picker */}
               <div>
-                <label className="text-sm text-slate-400 mb-2 block">
-                  Pick your avatar
+                <label className="block text-sm font-semibold text-slate-200 mb-2">
+                  Avatar:
                 </label>
-                <div className="flex gap-2 flex-wrap">
+                <div className="grid grid-cols-4 gap-3">
                   {AVATARS.map((av) => (
                     <button
                       key={av}
                       type="button"
                       onClick={() => setFormData({ ...formData, avatar: av })}
-                      className={`text-3xl p-2 rounded-lg transition-all ${
+                      className={`text-4xl p-4 rounded-lg transition-all bg-slate-700/50 hover:bg-slate-600/50 ${
                         formData.avatar === av
-                          ? 'bg-orange-500'
-                          : 'bg-slate-700 hover:bg-slate-600'
+                          ? 'ring-2 ring-orange-500 bg-slate-600/50'
+                          : ''
                       }`}
                     >
                       {av}
@@ -1278,27 +1335,59 @@ useEffect(() => {
               
               {/* Phone Input */}
               <div>
-                <label className="text-sm text-slate-400 mb-1 block">
-                  Phone number (optional, for notifications)
+                <label className="block text-sm font-semibold text-slate-200 mb-2">
+                  Phone:
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  placeholder="(555) 123-4567"
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="415-555-1234"
+                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
+                  required
                 />
-                {formData.phone && (
-                  <label className="flex items-center gap-2 mt-2 text-sm text-slate-400">
-                    <input
-                      type="checkbox"
-                      checked={formData.sms_consent}
-                      onChange={(e) => setFormData({ ...formData, sms_consent: e.target.checked })}
-                      className="rounded border-slate-600"
-                    />
-                    I agree to receive SMS notifications
-                  </label>
-                )}
+                <p className="text-xs text-slate-500 mt-1">US phone number (10 digits)</p>
+              </div>
+
+              {/* Bio Input */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-200 mb-2">
+                  Bio <span className="text-slate-500 font-normal">(optional):</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.bio}
+                  onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                  placeholder="Pun enthusiast"
+                  maxLength={50}
+                  className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
+                />
+                <p className="text-xs text-slate-500 mt-1">Max 50 characters</p>
+              </div>
+
+              {/* SMS Consent */}
+              <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.sms_consent}
+                    onChange={(e) => setFormData({ ...formData, sms_consent: e.target.checked })}
+                    className="mt-1 w-4 h-4 text-orange-500 bg-slate-700 border-slate-500 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-200">
+                      Send me text notifications about my games
+                    </span>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Get notified when it's your turn and results are ready (~3-6 msgs per rivalry). Msg & data rates may apply. Reply STOP to opt out anytime.
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      <a href="/terms" className="text-orange-500 hover:text-orange-400 underline">Terms</a>
+                      {' | '}
+                      <a href="/privacy" className="text-orange-500 hover:text-orange-400 underline">Privacy</a>
+                    </p>
+                  </div>
+                </label>
               </div>
               
               {formError && (

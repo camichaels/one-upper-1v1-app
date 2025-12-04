@@ -33,6 +33,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   const [showNudgeModal, setShowNudgeModal] = useState(false);
   const [showIntroFlow, setShowIntroFlow] = useState(false);
   const [rivalryJudges, setRivalryJudges] = useState([]);
+  const [rivalryCancelled, setRivalryCancelled] = useState(false);
   const prevShowIdRef = useRef(null);
 
   // Reset verdictStep when moving to a new show
@@ -63,8 +64,8 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         table: 'rivalries',
         filter: `id=eq.${rivalryId}`
       }, (payload) => {
-        alert('😢 Rivalry Ended\n\nThis Rivalry has been cancelled.\n\nYour history has been saved.');
-        onNavigate('screen1');
+        // Set state to show cancellation modal
+        setRivalryCancelled(true);
       })
       .subscribe();
 
@@ -288,7 +289,8 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         return;
       }
       
-      const prompt = await getRandomPrompt();
+      const usedPromptIds = await getUsedPromptIds();
+      const prompt = await getRandomPrompt(usedPromptIds, loadedRivalry.prompt_category);
       const judgeKeys = loadedRivalry.judges;
       
       // Safety check - judges must exist
@@ -362,8 +364,41 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     setWordCount(words.length);
   }
 
+  // Get prompt IDs already used in this rivalry
+  async function getUsedPromptIds() {
+    try {
+      const { data: shows } = await supabase
+        .from('shows')
+        .select('prompt_id')
+        .eq('rivalry_id', rivalryId)
+        .not('prompt_id', 'is', null);
+      
+      return shows ? shows.map(s => s.prompt_id).filter(Boolean) : [];
+    } catch (err) {
+      console.error('Error fetching used prompts:', err);
+      return [];
+    }
+  }
+
   async function submitAnswer() {
     if (!myAnswer.trim() || wordCount > 30) return;
+
+    // Check if rivalry was cancelled
+    if (rivalryCancelled) {
+      return;
+    }
+
+    // Verify rivalry still exists before submitting
+    const { data: rivalryCheck, error: rivalryError } = await supabase
+      .from('rivalries')
+      .select('id, status')
+      .eq('id', rivalryId)
+      .single();
+
+    if (rivalryError || !rivalryCheck) {
+      setRivalryCancelled(true);
+      return;
+    }
 
     const isProfileA = activeProfileId === currentShow.profile_a_id;
     const updateData = isProfileA
@@ -573,7 +608,8 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         }
       }
 
-      const prompt = await getRandomPrompt();
+      const usedPromptIds = await getUsedPromptIds();
+      const prompt = await getRandomPrompt(usedPromptIds, rivalry.prompt_category);
       // Use judges from rivalry (selected once at rivalry creation)
       const judgeKeys = rivalry.judges;
 
@@ -717,6 +753,30 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     (name) => `You've done your part. Time to see what you're up against.`,
   ];
 
+  // Rivalry cancelled - show modal immediately
+  if (rivalryCancelled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <Header />
+        <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full text-center">
+          <div className="text-5xl mb-4">😢</div>
+          <h3 className="text-xl font-bold text-slate-100 mb-2">
+            Rivalry Ended
+          </h3>
+          <p className="text-slate-300 text-sm mb-6">
+            This rivalry has been cancelled by your opponent. Your history has been saved.
+          </p>
+          <button
+            onClick={() => onNavigate('screen1')}
+            className="w-full py-3 bg-orange-500 text-white font-semibold rounded-lg hover:bg-orange-400"
+          >
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -786,7 +846,8 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
                   
                   const nextShowNumber = allShows && allShows.length > 0 ? allShows[0].show_number + 1 : 1;
                   
-                  const prompt = await getRandomPrompt();
+                  const usedPromptIds = await getUsedPromptIds();
+                  const prompt = await getRandomPrompt(usedPromptIds, rivalry.prompt_category);
                   // Use judges from rivalry (selected once at rivalry creation)
                   const judgeKeys = rivalry.judges;
                   

@@ -62,11 +62,12 @@ const MATCHUP_COMMENTS = {
 
 // Category display names
 const CATEGORY_DISPLAY = {
-  random: "🔀 Surprise Me",
+  mixed: "🔀 Surprise Me",
   pop_culture: "🌟 Pop Culture",
   deep_think: "🤔 Deep Think",
   edgy: "🌶️ More Edgy",
-  absurd: "😂 Totally Absurd"
+  absurd: "😂 Totally Absurd",
+  everyday: "☕ Everyday"
 };
 
 // Helper to pick random item from array
@@ -161,7 +162,7 @@ export default function RivalryIntroFlow({
 
   // Screen 2: Matchup
   if (currentScreen === 2) {
-    const categoryDisplay = CATEGORY_DISPLAY[rivalry.prompt_category] || CATEGORY_DISPLAY.random;
+    const categoryDisplay = CATEGORY_DISPLAY[rivalry.prompt_category] || CATEGORY_DISPLAY.mixed;
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
