@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
+import HeaderWithBack from './HeaderWithBack';
 import HowToPlayModal from './HowToPlayModal';
 import AboutModal from './AboutModal';
 import OnboardingFlow from './OnboardingFlow';
@@ -1223,7 +1224,7 @@ useEffect(() => {
   if (currentState === 'A') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />
+        <HeaderWithBack backTo="/go" />
         <div className="max-w-md mx-auto">
           
           {/* Show personalized message if coming from /join link */}
@@ -1507,7 +1508,7 @@ useEffect(() => {
     return (
       <>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />
+        <HeaderWithBack backTo="/go" />
         <div className="max-w-md mx-auto space-y-6">
           
           {/* Greeting Row - Centered text with menu on right */}
@@ -1633,7 +1634,7 @@ useEffect(() => {
                   onClick={() => setShowStartExpanded(!showStartExpanded)}
                   className="w-full bg-orange-500 hover:bg-orange-400 text-white py-4 px-6 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
                 >
-                  <span>Start a Rivalry</span>
+                  <span>🎤 Start a Rivalry</span>
                   {showStartExpanded ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -1648,16 +1649,16 @@ useEffect(() => {
                 {/* Expanded Start Content */}
                 {showStartExpanded && (
                   <div className="bg-slate-800/50 rounded-xl p-4 space-y-4">
-                    {/* Category Pills */}
-                    <div className="space-y-2">
-                      <label className="text-sm text-slate-400">Category:</label>
-                      <div className="flex flex-wrap gap-2">
+                    {/* Category Grid */}
+                    <div className="space-y-3">
+                      <label className="text-sm text-slate-400 font-medium">Pick a category:</label>
+                      <div className="grid grid-cols-2 gap-2">
                         {PROMPT_CATEGORIES.map((cat) => (
                           <button
                             key={cat.key}
                             type="button"
                             onClick={() => setSelectedCategory(cat.key)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                            className={`px-4 py-3 rounded-lg text-sm font-medium transition-all ${
                               selectedCategory === cat.key
                                 ? 'bg-orange-500 text-white'
                                 : 'bg-slate-700 text-slate-300 hover:bg-slate-600'

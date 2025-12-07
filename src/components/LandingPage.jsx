@@ -18,7 +18,7 @@ export default function LandingPage() {
   useEffect(() => {
     const activeProfileId = localStorage.getItem('activeProfileId');
     if (activeProfileId) {
-      navigate('/play');
+      navigate('/go');
     }
   }, [navigate]);
 
@@ -39,7 +39,7 @@ export default function LandingPage() {
           
           {/* Primary CTA */}
           <Link 
-            to="/play"
+            to="/go"
             className="block w-full px-6 py-4 bg-orange-500 text-white text-lg font-bold rounded-lg hover:bg-orange-400 transition-all text-center"
           >
             Play Now
@@ -213,7 +213,7 @@ export default function LandingPage() {
         <div className="border-t-2 border-slate-600 pt-8 mb-12">
           <h2 className="text-2xl font-bold text-orange-500 text-center mb-6">READY TO PLAY?</h2>
           <Link 
-            to="/play"
+            to="/go"
             className="block w-full px-6 py-4 bg-orange-500 text-white text-lg font-bold rounded-lg hover:bg-orange-400 transition-all text-center"
           >
             Play Now

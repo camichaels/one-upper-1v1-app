@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { getRandomPrompt } from '../utils/prompts';
+import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
@@ -610,8 +610,19 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
 
       const usedPromptIds = await getUsedPromptIds();
       const prompt = await getRandomPrompt(usedPromptIds, rivalry.prompt_category);
+      
       // Use judges from rivalry (selected once at rivalry creation)
-      const judgeKeys = rivalry.judges;
+      // Fall back to selecting new judges if rivalry doesn't have them (legacy rivalries)
+      let judgeKeys = rivalry.judges;
+      if (!judgeKeys || judgeKeys.length === 0) {
+        const judgeObjects = await selectJudges();
+        judgeKeys = judgeObjects.map(j => j.key);
+        // Optionally save to rivalry for consistency
+        await supabase
+          .from('rivalries')
+          .update({ judges: judgeKeys })
+          .eq('id', rivalryId);
+      }
 
       const { data: newShow, error } = await supabase
         .from('shows')

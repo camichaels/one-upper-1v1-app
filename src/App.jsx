@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import { useState } from 'react';
 import LandingPage from './components/LandingPage';
+import GameModeChoice from './components/GameModeChoice';
 import Screen1 from './components/Screen1';
 import Screen2 from './components/Screen2';
 import GameplayScreen from './components/GameplayScreen';
@@ -17,6 +18,11 @@ import JudgesPage from './components/JudgesPage';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import useOnlineStatus from './hooks/useOnlineStatus';
+
+// Showdown components
+import ShowdownEntry from './components/showdown/ShowdownEntry';
+import ShowdownJoin from './components/showdown/ShowdownJoin';
+import ShowdownGame from './components/showdown/ShowdownGame';
 
 
 function App() {
@@ -35,6 +41,9 @@ function App() {
         {/* Landing Page */}
         <Route path="/" element={<LandingPage />} />
         
+        {/* Game Mode Choice - Hub between Rivalry and Showdown */}
+        <Route path="/go" element={<GameModeChoice />} />
+        
         {/* Deep Link for joining rivalry */}
         <Route path="/join/:code" element={<JoinRivalry />} />
         
@@ -48,6 +57,11 @@ function App() {
         {/* Phone Verification */}
         <Route path="/verify" element={<VerifyPhone />} />
         <Route path="/auth/:token" element={<AuthCallback />} />
+        
+        {/* Showdown Routes */}
+        <Route path="/showdown" element={<ShowdownEntry />} />
+        <Route path="/showdown/:code/join" element={<ShowdownJoin />} />
+        <Route path="/showdown/:code" element={<ShowdownGame />} />
         
         {/* Game Routes */}
         <Route 
