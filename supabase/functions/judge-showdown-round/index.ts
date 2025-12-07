@@ -21,6 +21,34 @@ const BONUS_CATEGORIES = [
   'Most Unexpected'
 ]
 
+// Replace letter references (A, B, C) with player names in banter text
+function replaceLettersWithNames(text: string, letterToName: Record<string, string>): string {
+  let result = text
+  
+  // Sort letters by length descending to avoid partial replacements (not needed for single letters, but safe)
+  const letters = Object.keys(letterToName).sort((a, b) => b.length - a.length)
+  
+  for (const letter of letters) {
+    const name = letterToName[letter]
+    
+    // Match the letter when it's:
+    // - At word boundary followed by 's (possessive): "A's" -> "Craig's"
+    // - At word boundary followed by space, punctuation, or end: "A " -> "Craig "
+    // - Standing alone
+    // But NOT in the middle of words like "AMAZING" or "BAD"
+    
+    // Pattern: letter at word boundary, followed by 's, space, punctuation, or end of string
+    const pattern = new RegExp(
+      `\\b${letter}(?='s|\\s|[.,!?;:]|$)`,
+      'g'
+    )
+    
+    result = result.replace(pattern, name)
+  }
+  
+  return result
+}
+
 serve(async (req) => {
   // CORS headers
   const corsHeaders = {
@@ -59,7 +87,7 @@ serve(async (req) => {
       SUPABASE_SERVICE_ROLE_KEY!
     )
 
-    // Fetch round with answers
+    // Fetch round with showdown info
     const { data: round, error: roundError } = await supabase
       .from('showdown_rounds')
       .select(`
@@ -79,11 +107,17 @@ serve(async (req) => {
       )
     }
 
-    // Fetch answers for this round
+    // Fetch answers for this round WITH player names
     console.log('Fetching answers for round_id:', roundId)
     const { data: answers, error: answersError } = await supabase
       .from('showdown_answers')
-      .select('*')
+      .select(`
+        *,
+        player:showdown_players!player_id(
+          id,
+          guest_name
+        )
+      `)
       .eq('round_id', roundId)
 
     console.log('Answers query result:', { answers, answersError, count: answers?.length })
@@ -110,11 +144,16 @@ serve(async (req) => {
     // Use judges directly (they're already full objects)
     const sortedJudges = judges
 
-    // Create answer mapping (A, B, C, etc.)
+    // Create answer mapping (A, B, C, etc.) and letter-to-name mapping
     const answerLabels = 'ABCDEFGHIJ'.split('')
     const answerMap: Record<string, any> = {}
+    const letterToName: Record<string, string> = {}
+    
     answers.forEach((answer, idx) => {
-      answerMap[answerLabels[idx]] = answer
+      const letter = answerLabels[idx]
+      answerMap[letter] = answer
+      // Build letter -> player name mapping for later replacement
+      letterToName[letter] = answer.player?.guest_name || `Player ${letter}`
     })
 
     // Get bonus category for this round
@@ -212,6 +251,16 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       )
     }
 
+    // Replace letter references with player names in banter comments
+    const banterWithNames: Record<string, string> = {}
+    for (const [judgeKey, comment] of Object.entries(judgeResponse.comments || {})) {
+      banterWithNames[judgeKey] = replaceLettersWithNames(comment as string, letterToName)
+    }
+
+    // Also replace in bonus winner reason
+    let bonusReasonWithNames = judgeResponse.bonusWinner?.reason || ''
+    bonusReasonWithNames = replaceLettersWithNames(bonusReasonWithNames, letterToName)
+
     // Convert letter rankings to player IDs with placements
     const rankings = judgeResponse.rankings.map((letter: string, idx: number) => {
       const answer = answerMap[letter]
@@ -219,7 +268,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
         playerId: answer?.player_id,
         answerId: answer?.id,
         placement: idx + 1,
-        answer: answer?.answer_text
+        answer: answer?.answer_text,
+        playerName: answer?.player?.guest_name || `Player ${letter}`
       }
     }).filter((r: any) => r.playerId) // Filter out any invalid mappings
 
@@ -231,13 +281,14 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       answerId: bonusWinnerAnswer.id,
       category: bonusCategory,
       categoryDisplay: bonusCategory,
-      reason: judgeResponse.bonusWinner?.reason
+      reason: bonusReasonWithNames,
+      playerName: bonusWinnerAnswer.player?.guest_name || `Player ${bonusWinnerLetter}`
     } : null
 
     // Build verdict object
     const verdict = {
       rankings,
-      banter: judgeResponse.comments || {},
+      banter: banterWithNames,
       bonusWinner,
       judgeWhisperers: [] // Will be calculated separately based on player votes
     }

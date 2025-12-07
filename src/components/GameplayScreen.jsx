@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
-import { RIVALRY_LENGTH } from '../config';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
 import AllRoundsModal from './AllRoundsModal';
@@ -563,8 +562,10 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     try {
       const nextShowNumber = currentShow.show_number + 1;
 
-      if (currentShow.show_number === RIVALRY_LENGTH) {
-        console.log(`Show ${RIVALRY_LENGTH} complete - navigating to summary`);
+      // Use rivalry.match_length from database (not config constant) to support varying rivalry lengths
+      const matchLength = rivalry?.match_length || 5;
+      if (currentShow.show_number === matchLength) {
+        console.log(`Show ${matchLength} complete - navigating to summary`);
         onNavigate('summary', {
           activeProfileId,
           rivalryId
@@ -1071,7 +1072,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
           {/* Minimal header: Round + Menu */}
           <div className="flex items-center justify-between mb-6">
             <div className="w-8"></div>
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
@@ -1272,7 +1273,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
           {/* Minimal header: Round + Menu */}
           <div className="flex items-center justify-between mb-8">
             <div className="w-8"></div>
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
@@ -1491,7 +1492,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
           {/* Round + Menu */}
           <div className="flex items-center justify-between mb-3">
             <div className="w-8"></div>
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
           

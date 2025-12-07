@@ -4,7 +4,6 @@ import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
 import AllRoundsModal from './AllRoundsModal';
 import GoldenMic from '../assets/microphone.svg';
-import { RIVALRY_LENGTH } from '../config';
 
 // Ripley intro lines for Step 1 (random selection)
 const ripleyIntros = [
@@ -194,8 +193,9 @@ export default function VerdictFlow({
     const oppWinsNow = oppWinsBefore + (isWinner ? 0 : 1);
     const wasLosingNowWinning = myWinsBefore < oppWinsBefore && myWinsNow > oppWinsNow;
     
-    // Final round
-    if (currentShow.show_number === RIVALRY_LENGTH) {
+    // Final round - use rivalry.match_length from database
+    const matchLength = rivalry?.match_length || 5;
+    if (currentShow.show_number === matchLength) {
       return getRandomLine(ripleyVerdictLines.final_round);
     }
     
@@ -392,7 +392,7 @@ export default function VerdictFlow({
           {/* Header row */}
           <div className="flex items-center justify-between mb-4">
             <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
@@ -475,7 +475,7 @@ export default function VerdictFlow({
           {/* Header row with Ripley intro instead of plain text */}
           <div className="flex items-center justify-between mb-4">
             <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
@@ -548,7 +548,7 @@ export default function VerdictFlow({
           {/* Header row */}
           <div className="flex items-center justify-between mb-6">
             <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
@@ -653,7 +653,7 @@ export default function VerdictFlow({
           {/* Header row */}
           <div className="flex items-center justify-between mb-4">
             <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {RIVALRY_LENGTH}</h2>
+            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
@@ -775,7 +775,8 @@ export default function VerdictFlow({
           {/* Next button - no arrow */}
           <button
             onClick={() => {
-              if (currentShow.show_number === RIVALRY_LENGTH) {
+              const matchLength = rivalry?.match_length || 5;
+              if (currentShow.show_number === matchLength) {
                 onNavigateToSummary();
               } else {
                 onNextRound();
@@ -783,7 +784,7 @@ export default function VerdictFlow({
             }}
             className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
           >
-            {currentShow.show_number === RIVALRY_LENGTH 
+            {currentShow.show_number === (rivalry?.match_length || 5)
               ? 'See Rivalry Summary' 
               : `On to Round ${currentShow.show_number + 1}`}
           </button>

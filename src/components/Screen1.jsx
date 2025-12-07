@@ -331,12 +331,11 @@ setRivalry(rivalry); // ← YES, keep this but use 'rivalry' variable
 const pendingVerdictShowId = sessionStorage.getItem('pendingVerdictShowId');
 if (pendingVerdictShowId) {
   sessionStorage.removeItem('pendingVerdictShowId');
-  // Navigate directly to verdict screen
-  onNavigate('screen6summary', {
-    showId: pendingVerdictShowId,
-    rivalryId: rivalry.id,
+  // Navigate to gameplay - VerdictFlow will show the completed round
+  // and properly handle "next round" vs "see summary" based on actual round count
+  onNavigate('screen4', { 
     activeProfileId: profileData.id,
-    context: 'from_sms'
+    rivalryId: rivalry.id
   });
   return;
 }

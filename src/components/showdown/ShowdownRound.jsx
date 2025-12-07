@@ -14,6 +14,7 @@ import {
   endShowdown,
   leaveShowdown,
   judgeRound,
+  calculateGuessResults,
   TOTAL_ROUNDS
 } from '../../services/showdown';
 
@@ -108,7 +109,11 @@ export default function ShowdownRound({ showdown, currentPlayer, onShowdownUpdat
       // First update status to revealing
       await updateRoundStatus(round.id, 'revealing');
       
-      // Trigger AI judging in background
+      // IMPORTANT: Calculate guess results BEFORE judging
+      // This sets best_guesser_id so the Edge Function can award the +1 point
+      await calculateGuessResults(round.id);
+      
+      // Now trigger AI judging (it will read the best_guesser_id we just set)
       judgeRound(round.id).catch(err => {
         console.error('AI judging failed:', err);
         // Continue anyway - UI will show placeholder rankings
