@@ -239,8 +239,8 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         .from('rivalries')
         .select(`
           *,
-          profile_a:profiles!rivalries_profile_a_id_fkey(id, name, avatar, code),
-          profile_b:profiles!rivalries_profile_b_id_fkey(id, name, avatar, code)
+          profile_a:profiles!rivalries_profile_a_id_fkey(id, name, avatar, code, phone, sms_consent),
+          profile_b:profiles!rivalries_profile_b_id_fkey(id, name, avatar, code, phone, sms_consent)
         `)
         .eq('id', rivalryId)
         .single();
