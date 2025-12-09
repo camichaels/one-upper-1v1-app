@@ -65,13 +65,13 @@ export default function ShowdownPrompt({ round, showdown, currentPlayer, onSubmi
 
   return (
     <div className="max-w-md mx-auto mt-4">
-      {/* Round indicator - bigger */}
-      <div className="text-center mb-4">
-        <p className="text-2xl font-bold text-slate-100">Round {round.round_number} of {TOTAL_ROUNDS}</p>
+      {/* Round indicator - smaller, orange */}
+      <div className="text-center mb-3">
+        <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
       </div>
 
-      {/* Prompt - no quotes */}
-      <p className="text-xl text-slate-100 font-medium text-center leading-relaxed mb-6 px-2">
+      {/* Prompt - bold, hero treatment */}
+      <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
         {round.prompt_text}
       </p>
 
@@ -81,19 +81,21 @@ export default function ShowdownPrompt({ round, showdown, currentPlayer, onSubmi
           ref={textareaRef}
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Write your answer..."
+          placeholder="Go on, one-up everyone..."
           className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors resize-none text-lg"
           rows={4}
           disabled={isSubmitting}
         />
         
-        {/* Word count */}
+        {/* Word count + hint on same line */}
         <div className="flex justify-between items-center mt-2">
           <p className={`text-sm ${isOverLimit ? 'text-red-400' : 'text-slate-500'}`}>
             {wordCount}/{maxWords} words
           </p>
-          {isOverLimit && (
+          {isOverLimit ? (
             <p className="text-red-400 text-sm">Too many words!</p>
+          ) : (
+            <p className="text-slate-500 text-sm">Be bold. Be weird. Be unexpected.</p>
           )}
         </div>
       </div>
@@ -116,13 +118,8 @@ export default function ShowdownPrompt({ round, showdown, currentPlayer, onSubmi
         disabled={!canSubmit}
         className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
       >
-        {isSubmitting ? 'Submitting...' : 'Submit Answer'}
+        {isSubmitting ? 'Locking In...' : 'Lock It In'}
       </button>
-
-      {/* Hint */}
-      <p className="text-slate-500 text-sm text-center mt-4">
-        Be bold. Be weird. Be memorable.
-      </p>
     </div>
   );
 }

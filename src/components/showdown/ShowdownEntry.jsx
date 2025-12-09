@@ -4,6 +4,60 @@ import HeaderWithBack from '../HeaderWithBack';
 import { createShowdown, joinShowdown, getShowdownByCode, PROMPT_CATEGORIES, AVATARS } from '../../services/showdown';
 import { supabase } from '../../lib/supabase';
 
+// Judge quotes - same pool as GameModeChoice
+const JUDGE_QUOTES = [
+  { text: "Bore me and I'll know.", judge: "Judge Savage", emoji: "🔥" },
+  { text: "Safe answers finish last.", judge: "Judge Savage", emoji: "🔥" },
+  { text: "Make me feel something. That's all I ask.", judge: "Judge Riley", emoji: "💙" },
+  { text: "Heart wins here. Bring yours.", judge: "Judge Riley", emoji: "💙" },
+  { text: "Impress me. Intellectually.", judge: "Judge Snoot", emoji: "🎓" },
+  { text: "I award points for elegance. Plan accordingly.", judge: "Judge Snoot", emoji: "🎓" },
+  { text: "Do you have what it takes? We'll find out.", judge: "Judge Coach", emoji: "💪" },
+  { text: "Leave it all on the field.", judge: "Judge Coach", emoji: "💪" },
+  { text: "My scoring logic? Wouldn't you like to know.", judge: "Judge Wildcard", emoji: "🎲" },
+  { text: "I might love it. I might not. Even I don't know yet.", judge: "Judge Wildcard", emoji: "🎲" },
+  { text: "Main character energy only, please.", judge: "Judge Diva", emoji: "🎬" },
+  { text: "Give me drama or give me nothing.", judge: "Judge Diva", emoji: "🎬" },
+  { text: "HUMOR.EXE loading... prepare for evaluation.", judge: "Judge GLiTCH", emoji: "🤖" },
+  { text: "Your response will be processed. Resistance is suboptimal.", judge: "Judge GLiTCH", emoji: "🤖" },
+  { text: "Explain 'funny' again? Slowly this time.", judge: "Judge Zorp", emoji: "👽" },
+  { text: "Earth humor remains... confusing. But I am ready.", judge: "Judge Zorp", emoji: "👽" },
+  { text: "Bars. Flow. Victory. Let's go.", judge: "Judge Hype", emoji: "🎤" },
+  { text: "Spit your best. I'll judge the rest.", judge: "Judge Hype", emoji: "🎤" },
+  { text: "Back in my day, we were actually funny.", judge: "Judge Gramps", emoji: "👴" },
+  { text: "Show me something timeless, kid.", judge: "Judge Gramps", emoji: "👴" },
+  { text: "Can this joke scale? Let's find out.", judge: "Judge Mogul", emoji: "💸" },
+  { text: "Disrupt my expectations or pivot out.", judge: "Judge Mogul", emoji: "💸" },
+  { text: "Your answer is a mirror. What will it reflect?", judge: "Judge Guru", emoji: "🧘" },
+  { text: "The real one-upper was inside you all along. Maybe.", judge: "Judge Guru", emoji: "🧘" },
+  { text: "Too wholesome and I'll pretend to hate it.", judge: "Judge Edge", emoji: "🔪" },
+  { text: "Make it weird. I can take it.", judge: "Judge Edge", emoji: "🔪" },
+  { text: "I've studied 10,000 jokes. Surprise me.", judge: "Judge Scholar", emoji: "📚" },
+  { text: "Structurally, this should be interesting.", judge: "Judge Scholar", emoji: "📚" },
+  { text: "Comedy is dead. Prove me wrong.", judge: "Judge Artiste", emoji: "🎨" },
+  { text: "I don't expect you to understand my scoring.", judge: "Judge Artiste", emoji: "🎨" },
+  { text: "No pain, no gain. Same goes for jokes.", judge: "Judge Tank", emoji: "🏋️" },
+  { text: "Hit me with your PR. Personal Response.", judge: "Judge Tank", emoji: "🏋️" },
+  { text: "Clutch or kick. Your call.", judge: "Judge Gamer", emoji: "🎮" },
+  { text: "Time to lock in. No throwing.", judge: "Judge Gamer", emoji: "🎮" },
+  { text: "I detect notes of... potential.", judge: "Judge Sommelier", emoji: "🍷" },
+  { text: "Let's see if this answer has legs.", judge: "Judge Sommelier", emoji: "🍷" },
+  { text: "Rules? I don't remember agreeing to rules.", judge: "Judge Chaos", emoji: "🎪" },
+  { text: "Scoring is a construct. But I'll do it anyway.", judge: "Judge Chaos", emoji: "🎪" },
+  { text: "This better be seasoned properly.", judge: "Judge Chef", emoji: "👨‍🍳" },
+  { text: "Raw talent only. No microwaved answers.", judge: "Judge Chef", emoji: "👨‍🍳" },
+  { text: "I've become the judge. There is no me anymore.", judge: "Judge Method", emoji: "🎭" },
+  { text: "Show me truth. I'll know if you're faking.", judge: "Judge Method", emoji: "🎭" },
+  { text: "Make some noise or get off the stage.", judge: "Judge Rockstar", emoji: "🎸" },
+  { text: "This ain't soundcheck. Bring the arena energy.", judge: "Judge Rockstar", emoji: "🎸" },
+  { text: "Hypothesis: you're funny. Let's test it.", judge: "Judge Scientist", emoji: "🔬" },
+  { text: "Your humor will be measured. Precisely.", judge: "Judge Scientist", emoji: "🔬" },
+  { text: "Everyone's a winner! But also, someone has to lose.", judge: "Judge Wholesome", emoji: "🌈" },
+  { text: "I believe in you! Now don't let me down.", judge: "Judge Wholesome", emoji: "🌈" },
+  { text: "I've witnessed a million joke deaths. Don't join them.", judge: "Judge Reaper", emoji: "💀" },
+  { text: "Make me laugh, or join my list.", judge: "Judge Reaper", emoji: "💀" },
+];
+
 export default function ShowdownEntry() {
   const navigate = useNavigate();
   
@@ -26,6 +80,7 @@ export default function ShowdownEntry() {
   // UI state
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState('');
+  const [judgeQuote, setJudgeQuote] = useState(null);
 
   // Load existing profile and session data
   useEffect(() => {
@@ -55,6 +110,9 @@ export default function ShowdownEntry() {
     if (savedName) setName(savedName);
     if (savedAvatar) setAvatar(savedAvatar);
     if (savedBrag) setBrag(savedBrag);
+
+    // Pick random judge quote
+    setJudgeQuote(JUDGE_QUOTES[Math.floor(Math.random() * JUDGE_QUOTES.length)]);
   }, []);
 
   async function handleCreate() {
@@ -122,20 +180,20 @@ export default function ShowdownEntry() {
       const showdown = await getShowdownByCode(cleanCode);
       
       if (!showdown) {
-        setJoinError('Showdown not found. Check the code and try again.');
+        setJoinError("Can't find that one. Double-check the code?");
         setIsJoining(false);
         return;
       }
 
       if (showdown.status !== 'lobby') {
-        setJoinError('This showdown has already started.');
+        setJoinError('Too late! This one already started.');
         setIsJoining(false);
         return;
       }
 
       const playerCount = showdown.players?.length || 0;
       if (playerCount >= 5) {
-        setJoinError('This showdown is full (5 players max).');
+        setJoinError('Full house! This one has 5 players already.');
         setIsJoining(false);
         return;
       }
@@ -144,7 +202,7 @@ export default function ShowdownEntry() {
       navigate(`/showdown/${cleanCode}/join`);
     } catch (err) {
       console.error('Failed to check showdown:', err);
-      setJoinError('Could not find that showdown. Check the code.');
+      setJoinError("Can't find that one. Double-check the code?");
       setIsJoining(false);
     }
   }
@@ -156,16 +214,16 @@ export default function ShowdownEntry() {
       <div className="max-w-md mx-auto">
         {/* Title */}
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-orange-500">It's a One-Up Show-Down!</h1>
+          <h1 className="text-2xl font-bold text-orange-500">Round up the competition.</h1>
         </div>
 
         <div className="space-y-4">
           {/* Start a Showdown Button */}
           <button
             onClick={() => setShowStartExpanded(!showStartExpanded)}
-            className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg flex items-center justify-center gap-2"
+            className="w-full bg-orange-500 hover:bg-orange-400 hover:scale-[1.02] text-white font-bold py-4 px-6 rounded-xl transition-all duration-300 text-lg flex items-center justify-center gap-2"
           >
-            Start a Showdown
+            Host a Showdown
             <span className={`transition-transform ${showStartExpanded ? 'rotate-180' : ''}`}>
               ▾
             </span>
@@ -177,7 +235,7 @@ export default function ShowdownEntry() {
               {/* Name */}
               <div>
                 <label className="block text-slate-300 text-sm font-medium mb-2">
-                  Your name:
+                  What do they call you?
                 </label>
                 <input
                   type="text"
@@ -193,7 +251,7 @@ export default function ShowdownEntry() {
               {/* Avatar */}
               <div>
                 <label className="block text-slate-300 text-sm font-medium mb-2">
-                  Avatar:
+                  Pick your fighter:
                 </label>
                 <div className="grid grid-cols-4 gap-3">
                   {AVATARS.map((a) => (
@@ -217,7 +275,7 @@ export default function ShowdownEntry() {
               {/* Entry Brag */}
               <div>
                 <label className="block text-slate-300 text-sm font-medium mb-2">
-                  Share something un-one-uppable about yourself:
+                  Brag a little:
                 </label>
                 <textarea
                   value={brag}
@@ -235,7 +293,7 @@ export default function ShowdownEntry() {
               {/* Category Grid */}
               <div>
                 <label className="block text-slate-300 text-sm font-medium mb-3">
-                  Pick a category:
+                  Set the vibe:
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {PROMPT_CATEGORIES.map((cat) => (
@@ -266,18 +324,32 @@ export default function ShowdownEntry() {
                 disabled={isCreating || !name.trim() || !brag.trim()}
                 className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
               >
-                {isCreating ? 'Creating...' : 'Create Showdown Code'}
+                {isCreating ? 'Creating...' : 'Get Your Code'}
               </button>
             </div>
           )}
 
-          {/* Have a Code Button */}
+          {/* Join Button */}
           <button
             onClick={() => setShowJoinModal(true)}
-            className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-4 px-6 rounded-xl font-medium transition-colors border border-slate-600"
+            className="w-full bg-slate-700 hover:bg-slate-600 hover:scale-[1.02] text-slate-100 py-4 px-6 rounded-xl font-medium transition-all duration-300 border border-slate-600 hover:border-orange-500/50"
           >
-            Have a Code?
+            Join with Code
           </button>
+        </div>
+
+        {/* Footer - Judge Quote */}
+        <div className="mt-10 text-center">
+          {judgeQuote && (
+            <>
+              <p className="text-slate-400 italic text-sm">
+                {judgeQuote.text}
+              </p>
+              <p className="text-slate-500 text-xs mt-1">
+                {judgeQuote.emoji} {judgeQuote.judge}
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -302,7 +374,7 @@ export default function ShowdownEntry() {
             </div>
             
             <label className="block text-slate-300 text-sm font-medium">
-              Enter showdown code:
+              Enter the code:
             </label>
             
             <input
@@ -328,7 +400,7 @@ export default function ShowdownEntry() {
               disabled={joinCode.length !== 4 || isJoining}
               className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
             >
-              {isJoining ? 'Checking...' : 'Next'}
+              {isJoining ? 'Checking...' : 'Join'}
             </button>
           </div>
         </div>

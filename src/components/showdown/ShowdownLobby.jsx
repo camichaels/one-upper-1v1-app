@@ -86,33 +86,33 @@ export default function ShowdownLobby({ showdown, currentPlayer, onShowdownUpdat
       <div className="max-w-md mx-auto">
         {/* Title */}
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-orange-500 mb-2">Showdown Lobby</h1>
+          <h1 className="text-2xl font-bold text-orange-500 mb-2">Gathering the Lineup</h1>
         </div>
 
         {/* Instructions for host */}
         <div className="bg-slate-800/50 rounded-lg p-4 mb-6">
           <p className="text-slate-300 text-sm font-medium mb-3">
-            Tell your group:
+            Spread the word:
           </p>
-          <ol className="space-y-2 text-slate-400 text-sm">
+          <ol className="space-y-2 text-sm">
             <li className="flex gap-2">
-              <span className="text-orange-500 font-bold">1.</span>
-              <span>Go to <span className="text-slate-200 font-mono">oneupper.app/showdown</span></span>
+              <span className="text-slate-500">1.</span>
+              <span className="text-slate-300">Go to <span className="text-orange-400 font-mono">oneupper.app/showdown</span></span>
             </li>
             <li className="flex gap-2">
-              <span className="text-orange-500 font-bold">2.</span>
-              <span>Tap "Have a Code?"</span>
+              <span className="text-slate-500">2.</span>
+              <span className="text-slate-300">Tap "Join with Code"</span>
             </li>
             <li className="flex gap-2 items-baseline">
-              <span className="text-orange-500 font-bold">3.</span>
-              <span>Enter code: <span className="text-orange-400 font-mono font-bold tracking-wider">{code}</span></span>
+              <span className="text-slate-500">3.</span>
+              <span className="text-slate-300">Enter: <span className="text-orange-400 font-mono font-bold tracking-wider">{code}</span></span>
             </li>
           </ol>
         </div>
 
         {/* Players header */}
         <p className="text-slate-400 text-sm mb-3">
-          Players
+          The Contenders
         </p>
 
         {/* Player list */}
@@ -136,7 +136,7 @@ export default function ShowdownLobby({ showdown, currentPlayer, onShowdownUpdat
                       )}
                     </div>
                     <p className="text-slate-400 text-sm mt-1 italic">
-                      "{player.entry_brag}"
+                      {player.entry_brag}
                     </p>
                   </div>
                 </div>
@@ -144,13 +144,11 @@ export default function ShowdownLobby({ showdown, currentPlayer, onShowdownUpdat
             );
           })}
 
-          {/* Waiting placeholder */}
+          {/* Waiting placeholder - no box, just text */}
           {playerCount < 3 && (
-            <div className="bg-slate-800/30 rounded-lg p-4 text-center">
-              <p className="text-slate-500">
-                ⏳ Waiting for more players...
-              </p>
-            </div>
+            <p className="text-slate-500 text-center py-2">
+              ⏳ Waiting on the slow ones... (need at least 3)
+            </p>
           )}
         </div>
 
@@ -167,16 +165,11 @@ export default function ShowdownLobby({ showdown, currentPlayer, onShowdownUpdat
               disabled={!canStart || isStarting}
               className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
             >
-              {isStarting ? 'Starting...' : 'Start Showdown'}
+              {isStarting ? 'Starting...' : 'Start the Show'}
             </button>
-            {!canStart && (
-              <p className="text-slate-500 text-sm text-center mt-2">
-                Need at least 3 players to start
-              </p>
-            )}
             {canStart && (
-              <p className="text-slate-500 text-sm text-center mt-2">
-                Make sure everyone's ready
+              <p className="text-slate-500 text-sm text-center mt-2 italic">
+                May the boldest win.
               </p>
             )}
           </div>

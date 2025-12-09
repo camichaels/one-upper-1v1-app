@@ -2,18 +2,35 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateShowdownRecap, TOTAL_ROUNDS, getShowdownRounds } from '../../services/showdown';
 
+// Ripley loading quips
+const LOADING_QUIPS = [
+  "Let me find the best moments...",
+  "This showdown had some doozies...",
+  "Reviewing the chaos...",
+  "So much to unpack here...",
+  "The judges are still talking about this one...",
+  "Compiling the greatest hits...",
+  "This is gonna be good...",
+];
+
 export default function ShowdownHighlights({ showdown, currentPlayer }) {
   const [currentCard, setCurrentCard] = useState(0);
   const [recap, setRecap] = useState(showdown.recap || null);
   const [isLoading, setIsLoading] = useState(!showdown.recap);
   const [showFullResults, setShowFullResults] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [rounds, setRounds] = useState([]);
+  const [loadingQuip] = useState(() => 
+    LOADING_QUIPS[Math.floor(Math.random() * LOADING_QUIPS.length)]
+  );
   const navigate = useNavigate();
 
   const players = showdown.players || [];
   const sortedPlayers = [...players].sort((a, b) => 
     (b.total_score || 0) - (a.total_score || 0)
   );
+  const champion = sortedPlayers[0];
 
   // Build player map for lookups
   const playerMap = {};
@@ -51,6 +68,14 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
     loadData();
   }, [showdown.id]);
 
+  // Check if recap arrived via real-time update
+  useEffect(() => {
+    if (showdown.recap && !recap) {
+      setRecap(showdown.recap);
+      setIsLoading(false);
+    }
+  }, [showdown.recap]);
+
   // Get player display info
   function getPlayerDisplay(player) {
     if (!player) return { name: 'Unknown', avatar: '❓' };
@@ -66,7 +91,7 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
 
     const cards = [];
 
-    // Card 1: Narrative
+    // Card 1: The Story (Ripley)
     if (recap.narrative) {
       cards.push({
         type: 'narrative',
@@ -84,16 +109,18 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
       });
     }
 
-    // Card 3: Superlatives
-    if (recap.superlatives?.length > 0) {
+    // Card 3: For the Runner-Uppers (non-winners only)
+    // Support both old format (superlatives) and new format (runnerUpperAwards)
+    const awards = recap.runnerUpperAwards || recap.superlatives;
+    if (awards?.length > 0) {
       cards.push({
-        type: 'superlatives',
-        title: 'Superlatives',
-        data: recap.superlatives
+        type: 'runnerUppers',
+        title: 'For the Runner-Uppers',
+        data: awards
       });
     }
 
-    // Card 4: Brag Checks
+    // Card 4: Brag Check (all players)
     if (recap.bragChecks?.length > 0) {
       cards.push({
         type: 'bragChecks',
@@ -102,20 +129,11 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
       });
     }
 
-    // Card 5: Robbed Moment (if exists)
-    if (recap.robbedMoment) {
-      cards.push({
-        type: 'robbed',
-        title: 'Robbed',
-        data: recap.robbedMoment
-      });
-    }
-
-    // Card 6: Deep Thought
+    // Card 5: Final Thoughts (Ripley)
     if (recap.deepThought) {
       cards.push({
         type: 'deep',
-        title: 'Deep Thoughts',
+        title: 'Final Thoughts',
         content: recap.deepThought
       });
     }
@@ -126,16 +144,13 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
   const cards = getHighlightCards();
   const totalCards = cards.length;
 
+  // Circular navigation
   function nextCard() {
-    if (currentCard < totalCards - 1) {
-      setCurrentCard(currentCard + 1);
-    }
+    setCurrentCard((currentCard + 1) % totalCards);
   }
 
   function prevCard() {
-    if (currentCard > 0) {
-      setCurrentCard(currentCard - 1);
-    }
+    setCurrentCard((currentCard - 1 + totalCards) % totalCards);
   }
 
   function handleNewShowdown() {
@@ -148,113 +163,26 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
     navigate('/');
   }
 
-  function handleShare() {
-    // TODO: Implement share functionality
-    // For now, could copy a summary to clipboard
-    const champion = sortedPlayers[0];
-    const text = `🏆 ${getPlayerDisplay(champion).name} won our One-Upper Showdown with ${champion.total_score} points! Play at oneupper.app`;
-    navigator.clipboard?.writeText(text);
-    alert('Copied to clipboard!');
+  function getShareText() {
+    const sharePrompt = recap?.sharePrompt || "What's your best one-upper moment?";
+    return `I just played One-Upper with friends! 🏆
+
+How would you answer: "${sharePrompt}"
+
+Think you can one-up us?
+https://oneupper.app`;
   }
 
-  // Render a highlight card
-  function renderCard(card) {
-    switch (card.type) {
-      case 'narrative':
-        return (
-          <div className="text-center px-2">
-            <p className="text-slate-200 text-lg leading-relaxed">
-              {card.content}
-            </p>
-          </div>
-        );
+  function handleCopyShare() {
+    navigator.clipboard?.writeText(getShareText());
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
-      case 'quote':
-        return (
-          <div className="text-center px-2">
-            <p className="text-slate-400 text-sm mb-2">
-              Round {card.data.round}: "{card.data.prompt}"
-            </p>
-            <div className="bg-slate-700/50 rounded-xl p-4 mb-3">
-              <p className="text-xl text-slate-100 italic">
-                "{card.data.answer}"
-              </p>
-              <p className="text-orange-400 mt-2">
-                — {card.data.playerAvatar} {card.data.player}
-              </p>
-            </div>
-            <p className="text-slate-300 text-sm">
-              {card.data.reaction}
-            </p>
-          </div>
-        );
-
-      case 'superlatives':
-        return (
-          <div className="space-y-3 px-2 max-h-64 overflow-y-auto">
-            {card.data.map((sup, i) => (
-              <div key={i} className="flex items-start gap-3 bg-slate-700/30 rounded-lg p-3">
-                <span className="text-2xl">{sup.playerAvatar}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-slate-100">
-                    {sup.emoji} {sup.title}
-                  </p>
-                  <p className="text-slate-400 text-sm">{sup.player}</p>
-                  <p className="text-slate-300 text-sm mt-1">{sup.explanation}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'bragChecks':
-        return (
-          <div className="space-y-3 px-2 max-h-64 overflow-y-auto">
-            {card.data.map((brag, i) => (
-              <div key={i} className="bg-slate-700/30 rounded-lg p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{brag.playerAvatar}</span>
-                  <span className="font-semibold text-slate-100">{brag.player}</span>
-                </div>
-                <p className="text-slate-400 text-sm italic mb-1">
-                  Walked in: "{brag.entryBrag}"
-                </p>
-                <p className="text-slate-200 text-sm">
-                  {brag.realityCheck}
-                </p>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'robbed':
-        return (
-          <div className="text-center px-2">
-            <p className="text-slate-400 text-sm mb-2">Round {card.data.round}</p>
-            <div className="bg-slate-700/50 rounded-xl p-4 mb-3">
-              <p className="text-lg text-slate-100 italic">
-                "{card.data.answer}"
-              </p>
-              <p className="text-orange-400 mt-2">— {card.data.player}</p>
-            </div>
-            <p className="text-slate-300">
-              {card.data.commentary}
-            </p>
-          </div>
-        );
-
-      case 'deep':
-        return (
-          <div className="text-center px-2">
-            <p className="text-slate-200 text-lg leading-relaxed italic">
-              {card.content}
-            </p>
-          </div>
-        );
-
-      default:
-        return null;
-    }
+  function handleTextShare() {
+    const text = encodeURIComponent(getShareText());
+    window.open(`sms:?&body=${text}`, '_blank');
+    setShowShareModal(false);
   }
 
   // Render full results dropdown
@@ -293,7 +221,7 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
                       <span className="w-6 text-center flex-shrink-0">{medal}</span>
                       <span className="flex-shrink-0">{player?.avatar}</span>
                       <span className="text-slate-300 flex-1 break-words">
-                        {answer.answer_text || '[no answer]'}
+                        {answer.answer_text || '[crickets]'}
                       </span>
                     </div>
                   );
@@ -335,75 +263,41 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
     );
   }
 
-  return (
-    <div className="max-w-md mx-auto mt-4 flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
-      {/* Title */}
-      <h1 className="text-xl font-bold text-slate-100 text-center mb-4">
-        The Highlights
-      </h1>
+  // Full-screen loading state
+  if (isLoading) {
+    return (
+      <div className="max-w-md mx-auto mt-4">
+        {/* Title */}
+        <h1 className="text-xl font-bold text-orange-400 text-center mb-8">
+          Highlights
+        </h1>
 
-      {/* Card area - main content */}
-      <div className="flex-grow flex flex-col">
-        {/* Swipeable card */}
-        <div className="bg-slate-800/60 rounded-xl p-4 mb-4 min-h-48 flex flex-col">
-          {isLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-3xl mb-2 animate-pulse">🎬</div>
-                <p className="text-slate-400">Generating highlights...</p>
-              </div>
+        {/* Loading content */}
+        <div className="text-center mb-8">
+          {/* Animated clapperboard */}
+          <div className="text-6xl mb-6 animate-pulse">🎬</div>
+          
+          <p className="text-xl text-slate-200 font-medium mb-6">
+            Generating highlights...
+          </p>
+
+          {/* Ripley quip */}
+          <div className="bg-slate-800/80 rounded-xl p-4 mx-4">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xl">🎙️</span>
+              <span className="text-orange-400 font-semibold text-sm">Ripley</span>
             </div>
-          ) : cards.length > 0 ? (
-            <>
-              {/* Card title */}
-              <h2 className="text-orange-400 font-semibold text-sm mb-3 text-center">
-                {cards[currentCard]?.title}
-              </h2>
-              
-              {/* Card content with arrows */}
-              <div className="flex-1 flex items-center">
-                {/* Left arrow */}
-                <button
-                  onClick={prevCard}
-                  className={`p-2 ${currentCard > 0 ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700'}`}
-                  disabled={currentCard === 0}
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                
-                {/* Card content */}
-                <div className="flex-1 py-2">
-                  {renderCard(cards[currentCard])}
-                </div>
-                
-                {/* Right arrow */}
-                <button
-                  onClick={nextCard}
-                  className={`p-2 ${currentCard < totalCards - 1 ? 'text-slate-400 hover:text-slate-200' : 'text-slate-700'}`}
-                  disabled={currentCard >= totalCards - 1}
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center">
-              <p className="text-slate-500">No highlights available</p>
-            </div>
-          )}
+            <p className="text-slate-300 text-sm text-left">{loadingQuip}</p>
+          </div>
         </div>
 
-        {/* Full Results dropdown */}
-        <div className="mb-4">
+        {/* Round by Round dropdown - available even while loading */}
+        <div className="mb-6">
           <button
             onClick={() => setShowFullResults(!showFullResults)}
             className="w-full flex items-center justify-between bg-slate-800/40 rounded-xl p-3 text-slate-300 hover:bg-slate-800/60 transition-colors"
           >
-            <span className="font-medium">Full Results</span>
+            <span className="font-medium">Round by Round</span>
             <svg 
               className={`w-5 h-5 transition-transform ${showFullResults ? 'rotate-180' : ''}`} 
               fill="none" 
@@ -420,23 +314,276 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
             </div>
           )}
         </div>
+
+        {/* Action buttons */}
+        <div className="space-y-3">
+          <button
+            onClick={handleNewShowdown}
+            className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+          >
+            Start New Showdown
+          </button>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowShareModal(true)}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
+            >
+              Share Results
+            </button>
+            <button
+              onClick={handleDone}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Render a highlight card
+  function renderCard(card) {
+    switch (card.type) {
+      case 'narrative':
+        return (
+          <div className="text-left">
+            {/* Ripley attribution */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">🎙️</span>
+              <span className="text-orange-400 font-semibold">Ripley</span>
+            </div>
+            <p className="text-slate-200 text-base leading-relaxed">
+              {card.content}
+            </p>
+          </div>
+        );
+
+      case 'quote':
+        return (
+          <div className="text-left">
+            <p className="text-slate-400 text-sm mb-3">
+              Round {card.data.round}: "{card.data.prompt}"
+            </p>
+            <div className="bg-slate-700/50 rounded-xl p-4 mb-3">
+              <p className="text-lg text-slate-100 italic leading-relaxed">
+                "{card.data.answer}"
+              </p>
+              <p className="text-orange-400 mt-3 font-medium">
+                — {card.data.playerAvatar} {card.data.player}
+              </p>
+            </div>
+            <p className="text-slate-400 text-sm">
+              {card.data.reaction}
+            </p>
+          </div>
+        );
+
+      case 'runnerUppers':
+        return (
+          <div className="space-y-4 text-left">
+            {card.data.map((award, i) => (
+              <div key={i}>
+                <p className="text-orange-400 font-semibold">
+                  {award.emoji} {award.title}
+                </p>
+                <p className="text-slate-200 text-sm">{award.player}</p>
+                <p className="text-slate-400 text-sm mt-1">{award.explanation}</p>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'bragChecks':
+        return (
+          <div className="space-y-4 text-left">
+            {card.data.map((brag, i) => (
+              <div key={i}>
+                <p className="text-slate-200 font-medium">
+                  {brag.playerAvatar} {brag.player}
+                </p>
+                <p className="text-slate-500 text-sm italic">
+                  Walked in: "{brag.entryBrag}"
+                </p>
+                <p className="text-slate-300 text-sm">
+                  {brag.realityCheck}
+                </p>
+              </div>
+            ))}
+          </div>
+        );
+
+      case 'deep':
+        return (
+          <div className="text-left">
+            {/* Ripley attribution */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-2xl">🎙️</span>
+              <span className="text-orange-400 font-semibold">Ripley</span>
+            </div>
+            <p className="text-slate-200 text-base leading-relaxed italic">
+              {card.content}
+            </p>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  }
+
+  // Share Modal
+  function renderShareModal() {
+    if (!showShareModal) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+        <div className="bg-slate-800 rounded-2xl p-6 max-w-sm w-full">
+          <h3 className="text-lg font-bold text-slate-100 mb-4">Share Results</h3>
+          
+          {/* Preview */}
+          <div className="bg-slate-700/50 rounded-xl p-4 mb-4 text-sm text-slate-300 whitespace-pre-line">
+            {getShareText()}
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <button
+              onClick={handleCopyShare}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              {copied ? (
+                <>
+                  <span>✓</span>
+                  <span>Copied!</span>
+                </>
+              ) : (
+                <>
+                  <span>📋</span>
+                  <span>Copy to Clipboard</span>
+                </>
+              )}
+            </button>
+            
+            <button
+              onClick={handleTextShare}
+              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              <span>💬</span>
+              <span>Share via Text</span>
+            </button>
+            
+            <button
+              onClick={() => setShowShareModal(false)}
+              className="w-full text-slate-400 hover:text-slate-300 font-medium py-2 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-md mx-auto mt-4">
+      {/* Share Modal */}
+      {renderShareModal()}
+
+      {/* Title */}
+      <h1 className="text-xl font-bold text-orange-400 text-center mb-4">
+        Highlights
+      </h1>
+
+      {/* Card area - takes up most of the screen */}
+      <div className="bg-slate-800/60 rounded-xl p-4 mb-4" style={{ minHeight: '320px' }}>
+        {cards.length > 0 ? (
+          <>
+            {/* Card title */}
+            <h2 className="text-orange-400 font-semibold text-sm mb-4 text-center">
+              {cards[currentCard]?.title}
+            </h2>
+            
+            {/* Card content with centered arrows */}
+            <div className="flex items-center gap-2">
+              {/* Left arrow */}
+              <button
+                onClick={prevCard}
+                className="p-1 flex-shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              
+              {/* Card content */}
+              <div className="flex-1 min-h-[240px] flex flex-col justify-center">
+                {renderCard(cards[currentCard])}
+              </div>
+              
+              {/* Right arrow */}
+              <button
+                onClick={nextCard}
+                className="p-1 flex-shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Card counter */}
+            <p className="text-center text-slate-500 text-xs mt-3">
+              {currentCard + 1} of {totalCards}
+            </p>
+          </>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <p className="text-slate-500">No highlights available</p>
+          </div>
+        )}
       </div>
 
-      {/* Action buttons - always at bottom */}
-      <div className="mt-auto space-y-3">
+      {/* Round by Round dropdown */}
+      <div className="mb-4">
+        <button
+          onClick={() => setShowFullResults(!showFullResults)}
+          className="w-full flex items-center justify-between bg-slate-800/40 rounded-xl p-3 text-slate-300 hover:bg-slate-800/60 transition-colors"
+        >
+          <span className="font-medium">Round by Round</span>
+          <svg 
+            className={`w-5 h-5 transition-transform ${showFullResults ? 'rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {showFullResults && (
+          <div className="bg-slate-800/40 rounded-b-xl px-4 pb-4 -mt-2 pt-2">
+            {renderFullResults()}
+          </div>
+        )}
+      </div>
+
+      {/* Action buttons */}
+      <div className="space-y-3">
         <button
           onClick={handleNewShowdown}
           className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
         >
-          New Showdown
+          Start New Showdown
         </button>
         
         <div className="flex gap-3">
           <button
-            onClick={handleShare}
+            onClick={() => setShowShareModal(true)}
             className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
           >
-            Share
+            Share Results
           </button>
           <button
             onClick={handleDone}

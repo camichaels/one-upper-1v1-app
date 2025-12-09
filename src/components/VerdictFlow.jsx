@@ -90,6 +90,7 @@ export default function VerdictFlow({
   onNextRound,
   onNavigateToSummary,
   onNavigate,
+  onCancelRivalry,
   initialStep = 1,
   onStepChange,
 }) {
@@ -454,9 +455,7 @@ export default function VerdictFlow({
         {showCancelModal && (
           <CancelModal 
             opponentName={opponentProfile.name}
-            onConfirm={() => {
-              // Handle cancel - would need to pass this function
-            }}
+            onConfirm={onCancelRivalry}
             onClose={() => setShowCancelModal(false)}
           />
         )}
@@ -479,29 +478,29 @@ export default function VerdictFlow({
             <MenuButton />
           </div>
 
-          {/* Ripley banter intro */}
-          <div className="mb-6">
+          {/* Prompt */}
+          <div className="mb-4 text-center">
+            <p className="text-lg font-semibold text-slate-300">{currentShow.prompt}</p>
+          </div>
+
+          {/* Ripley intro to banter */}
+          <div className="mb-4">
             <RipleyBubble text={ripleyBanterIntro} />
           </div>
 
-          {/* Banter bubbles - no borders */}
+          {/* Judge banter - each judge gets their own bubble */}
           <div className="space-y-3 mb-8">
-            {banter.map((line, i) => {
-              const judge = judgeProfiles.find(j => j.key === line.judge);
-              const isEven = i % 2 === 0;
-              
+            {banter.map((item, i) => {
+              const judge = judgeProfiles.find(j => j.key === item.judge);
               return (
-                <div 
-                  key={i} 
-                  className={`flex ${isEven ? 'justify-start' : 'justify-end'}`}
-                >
-                  <div className="max-w-[85%]">
-                    <div className="bg-slate-800/70 rounded-xl p-3">
+                <div key={i} className="bg-slate-800/50 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">{judge?.emoji || '❓'}</span>
+                    <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">{judge?.emoji || '❓'}</span>
-                        <span className="text-sm font-bold text-slate-400">{judge?.name || line.judge}</span>
+                        <span className="text-sm font-bold text-slate-300">{judge?.name || item.judge}</span>
                       </div>
-                      <p className="text-slate-200 text-sm">{line.text}</p>
+                      <p className="text-slate-200 text-sm leading-relaxed">{item.comment}</p>
                     </div>
                   </div>
                 </div>
@@ -509,12 +508,12 @@ export default function VerdictFlow({
             })}
           </div>
 
-          {/* Next button - no arrow, cleaner ellipsis */}
+          {/* Next button */}
           <button
             onClick={() => setStep(3)}
             className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
           >
-            And the winner is…
+            See who won
           </button>
         </div>
 
@@ -532,32 +531,43 @@ export default function VerdictFlow({
             }}
           />
         )}
+        {showCancelModal && (
+          <CancelModal 
+            opponentName={opponentProfile.name}
+            onConfirm={onCancelRivalry}
+            onClose={() => setShowCancelModal(false)}
+          />
+        )}
       </div>
     );
   }
 
-  // STEP 3: The Reveal
+  // STEP 3: The Winner
   if (step === 3) {
-    // AI headline - for now use verdict, later we'll add custom headline
-    const headline = currentShow.judge_data?.headline || currentShow.verdict || '';
+    const headline = currentShow.judge_data?.headline;
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
         <div className="max-w-md mx-auto">
           {/* Header row */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-4">
             <div className="w-8" />
             <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
             <MenuButton />
           </div>
 
-          {/* Winner announcement */}
+          {/* Prompt */}
+          <div className="mb-6 text-center">
+            <p className="text-lg font-semibold text-slate-300">{currentShow.prompt}</p>
+          </div>
+
+          {/* Winner announcement - centered */}
           <div className="text-center mb-6">
-            {/* Golden mic for winner (even on tiebreaker - they still won!) */}
+            {/* Golden Mic for winner */}
             {iAmWinner && (
-              <div className="flex justify-center mb-2">
-                <img src={GoldenMic} alt="mic" className="w-12 h-12" />
+              <div className="mb-3">
+                <img src={GoldenMic} alt="mic" className="w-12 h-12 mx-auto" />
               </div>
             )}
             
@@ -633,6 +643,13 @@ export default function VerdictFlow({
               setShowAllRounds(false);
               onNavigate('screen6', { showId });
             }}
+          />
+        )}
+        {showCancelModal && (
+          <CancelModal 
+            opponentName={opponentProfile.name}
+            onConfirm={onCancelRivalry}
+            onClose={() => setShowCancelModal(false)}
           />
         )}
       </div>
@@ -802,6 +819,13 @@ export default function VerdictFlow({
               setShowAllRounds(false);
               onNavigate('screen6', { showId });
             }}
+          />
+        )}
+        {showCancelModal && (
+          <CancelModal 
+            opponentName={opponentProfile.name}
+            onConfirm={onCancelRivalry}
+            onClose={() => setShowCancelModal(false)}
           />
         )}
       </div>

@@ -1,7 +1,41 @@
 import { useState, useEffect } from 'react';
+import { generateShowdownRecap } from '../../services/showdown';
+
+// Ripley quips for winners
+const WINNER_QUIPS = [
+  "Absolutely dominant!",
+  "The One-Upper has been crowned!",
+  "That's how it's done!",
+  "You understood the assignment.",
+  "Take a bow!",
+  "The judges have spoken!",
+  "Remember this moment.",
+  "Champion energy right there.",
+  "You came to play!",
+  "Bow down, everyone.",
+];
+
+// Ripley quips for non-winners
+const NON_WINNER_QUIPS = [
+  "Tough crowd tonight!",
+  "You'll get 'em next time.",
+  "Hey, someone had to lose.",
+  "The judges are harsh. We know.",
+  "Shake it off.",
+  "There's always next showdown.",
+  "Not your night. It happens.",
+  "The real win was the chaos we caused.",
+  "Can't win 'em all.",
+  "You made it weird. That counts.",
+];
 
 export default function ShowdownChampion({ showdown, currentPlayer, isHost, onContinue }) {
-  const [showConfetti, setShowConfetti] = useState(true);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [trophySettled, setTrophySettled] = useState(false);
+  const [ripleyQuip] = useState(() => {
+    // Will be set properly once we know if player is winner
+    return '';
+  });
   
   const players = showdown.players || [];
   
@@ -14,6 +48,16 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
   const winners = sortedPlayers.filter(p => (p.total_score || 0) === topScore);
   const isMultipleWinners = winners.length > 1;
   const iAmWinner = winners.some(w => w.id === currentPlayer?.id);
+  
+  // Get my placement
+  const myPlayer = players.find(p => p.id === currentPlayer?.id);
+  const myPlacement = myPlayer ? getPlacement(myPlayer) : 999;
+
+  // Pick a random Ripley quip based on winner status
+  const [selectedQuip] = useState(() => {
+    const pool = iAmWinner ? WINNER_QUIPS : NON_WINNER_QUIPS;
+    return pool[Math.floor(Math.random() * pool.length)];
+  });
 
   // Get player display info
   function getPlayerDisplay(player) {
@@ -29,23 +73,65 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
     return sortedPlayers.filter(p => (p.total_score || 0) > score).length + 1;
   }
 
-  // Get medal emoji for placement
-  function getMedal(placement) {
-    if (placement === 1) return '🥇';
-    if (placement === 2) return '🥈';
-    if (placement === 3) return '🥉';
-    return `${placement}.`;
-  }
+  // Winner's name for non-winners to see
+  const winnerName = winners.length === 1 
+    ? getPlayerDisplay(winners[0]).name 
+    : winners.map(w => getPlayerDisplay(w).name).join(' & ');
 
-  // Stop confetti after a few seconds
+  // Pre-fetch recap in background so it's ready when user advances
   useEffect(() => {
-    const timer = setTimeout(() => setShowConfetti(false), 5000);
-    return () => clearTimeout(timer);
-  }, []);
+    if (!showdown.recap) {
+      // Start generating recap in background
+      generateShowdownRecap(showdown.id).catch(err => {
+        console.log('Background recap generation started:', err?.message || 'in progress');
+      });
+    }
+  }, [showdown.id, showdown.recap]);
+
+  // Start confetti for winner, trigger trophy settle animation
+  useEffect(() => {
+    if (iAmWinner) {
+      setShowConfetti(true);
+      // Trophy settles after 2 seconds
+      const settleTimer = setTimeout(() => setTrophySettled(true), 2000);
+      // Confetti stops after 5 seconds
+      const confettiTimer = setTimeout(() => setShowConfetti(false), 5000);
+      return () => {
+        clearTimeout(settleTimer);
+        clearTimeout(confettiTimer);
+      };
+    } else {
+      // Non-winners see settled state immediately
+      setTrophySettled(true);
+    }
+  }, [iAmWinner]);
+
+  // Render placement indicator based on position
+  function renderPlacementIndicator(placement, isLarge = false) {
+    if (placement === 1) {
+      return (
+        <div className={`${isLarge ? 'text-7xl' : 'text-4xl'} ${isLarge && !trophySettled && iAmWinner ? 'animate-bounce' : ''}`}>
+          🏆
+        </div>
+      );
+    }
+    if (placement === 2) {
+      return <div className={isLarge ? 'text-6xl' : 'text-3xl'}>🥈</div>;
+    }
+    if (placement === 3) {
+      return <div className={isLarge ? 'text-6xl' : 'text-3xl'}>🥉</div>;
+    }
+    // 4th and 5th get muted boxes
+    return (
+      <div className={`${isLarge ? 'w-16 h-16 text-3xl' : 'w-10 h-10 text-xl'} bg-slate-700/50 rounded-lg flex items-center justify-center text-slate-400 font-bold`}>
+        {placement}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-md mx-auto mt-4 flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
-      {/* Confetti */}
+      {/* Confetti - winner only */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
           {[...Array(80)].map((_, i) => (
@@ -73,91 +159,94 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
         </div>
       )}
 
-      {/* Top 3/4: Winner Spotlight */}
+      {/* Main content area */}
       <div className="flex-grow flex flex-col justify-center text-center pb-4">
-        {/* Trophy */}
-        <div className="text-7xl mb-2 animate-bounce">🏆</div>
+        
+        {/* Placement indicator */}
+        <div className="flex justify-center mb-3">
+          {renderPlacementIndicator(myPlacement, true)}
+        </div>
 
-        {/* Winner announcement */}
-        {isMultipleWinners ? (
-          <>
-            <h1 className="text-2xl font-bold text-yellow-400 mb-2">
-              It's a Tie!
-            </h1>
-            
-            {/* Multiple winners - horizontal */}
-            <div className="flex justify-center gap-4 mb-4">
-              {winners.map(winner => {
-                const { name, avatar } = getPlayerDisplay(winner);
-                const isMe = winner.id === currentPlayer?.id;
-                return (
-                  <div key={winner.id} className="text-center">
-                    <span className="text-4xl block mb-1">{avatar}</span>
-                    <span className={`font-bold ${isMe ? 'text-orange-400' : 'text-yellow-400'}`}>
-                      {name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="text-slate-400 text-sm">{topScore} points each</p>
-          </>
+        {/* Title - different for winner vs others */}
+        {iAmWinner ? (
+          <h1 className="text-3xl font-bold text-yellow-400 mb-2">
+            You Won!
+          </h1>
         ) : (
-          <>
-            <h1 className="text-2xl font-bold text-yellow-400 mb-1">
-              {iAmWinner ? 'You Won!' : 'Champion'}
-            </h1>
-            
-            {/* Single winner */}
-            {winners[0] && (
-              <>
-                <div className="text-5xl mb-2">
-                  {getPlayerDisplay(winners[0]).avatar}
-                </div>
-                <h2 className={`text-2xl font-bold ${iAmWinner ? 'text-orange-400' : 'text-yellow-400'}`}>
-                  {getPlayerDisplay(winners[0]).name}
-                </h2>
-                <p className="text-slate-400">
-                  {topScore} points
-                </p>
-              </>
-            )}
-          </>
+          <h1 className="text-2xl font-bold text-slate-100 mb-2">
+            {isMultipleWinners ? `${winnerName} Tie!` : `${winnerName} Wins!`}
+          </h1>
         )}
-      </div>
 
-      {/* Bottom 1/4: Compact Standings + Button */}
-      <div className="mt-auto">
-        {/* Compact standings - horizontal row */}
-        <div className="bg-slate-800/60 rounded-xl p-3 mb-4">
-          <div className="flex justify-around items-center">
+        {/* Show my info for non-winners */}
+        {!iAmWinner && myPlayer && (
+          <div className="mt-2 mb-4">
+            <div className="text-3xl mb-1">{getPlayerDisplay(myPlayer).avatar}</div>
+            <p className="text-orange-400 font-medium">{getPlayerDisplay(myPlayer).name}</p>
+            <p className="text-slate-400 text-sm">{myPlayer.total_score || 0} points</p>
+          </div>
+        )}
+
+        {/* Winner shows their avatar and score */}
+        {iAmWinner && myPlayer && (
+          <div className="mb-4">
+            <div className="text-4xl mb-1">{getPlayerDisplay(myPlayer).avatar}</div>
+            <p className="text-orange-400 font-medium text-lg">{getPlayerDisplay(myPlayer).name}</p>
+            <p className="text-slate-400">{myPlayer.total_score || 0} points</p>
+          </div>
+        )}
+
+        {/* Full Leaderboard */}
+        <div className="bg-slate-800/50 rounded-xl p-4 mb-4 mx-2">
+          <div className="space-y-2">
             {sortedPlayers.map((player) => {
               const { name, avatar } = getPlayerDisplay(player);
               const isMe = player.id === currentPlayer?.id;
               const placement = getPlacement(player);
               const score = player.total_score || 0;
+              const isWinner = placement === 1;
               
               return (
-                <div key={player.id} className="text-center px-1">
-                  <div className="text-sm mb-1">{getMedal(placement)}</div>
-                  <div className="text-xl">{avatar}</div>
-                  <div className={`text-xs font-medium truncate max-w-16 ${isMe ? 'text-orange-400' : 'text-slate-300'}`}>
-                    {name.split(' ')[0]}
+                <div 
+                  key={player.id} 
+                  className={`flex items-center justify-between p-2 rounded-lg ${isMe ? 'bg-slate-700/50' : ''}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 flex justify-center">
+                      {renderPlacementIndicator(placement, false)}
+                    </div>
+                    <span className="text-xl">{avatar}</span>
+                    <span className={`font-medium ${isMe ? 'text-orange-400' : isWinner ? 'text-yellow-400' : 'text-slate-200'}`}>
+                      {name}
+                    </span>
                   </div>
-                  <div className="text-xs text-slate-500">{score}</div>
+                  <span className={`font-bold ${isWinner ? 'text-yellow-400' : 'text-slate-400'}`}>
+                    {score} pts
+                  </span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Continue button */}
+        {/* Ripley quip */}
+        <div className="bg-slate-800/80 rounded-xl p-4 mx-2 mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🎙️</span>
+            <span className="text-orange-400 font-semibold text-sm">Ripley</span>
+          </div>
+          <p className="text-slate-300 text-sm">{selectedQuip}</p>
+        </div>
+      </div>
+
+      {/* Continue button */}
+      <div className="mt-auto">
         {isHost ? (
           <button
             onClick={onContinue}
             className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
           >
-            See Highlights →
+            Let's Go Deeper
           </button>
         ) : (
           <button

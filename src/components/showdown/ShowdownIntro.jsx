@@ -10,20 +10,24 @@ const WELCOME_LINES = [
   "Alright, let's do this.",
   "The stage is set.",
   "Time to see what you've got.",
-  "Let's find out who's the real one-upper.",
+  "Let's find out who's the real One-Upper.",
   "Everyone's here. Let's make it weird.",
   "The judges are ready. Are you?",
   "This is gonna be good.",
-  "May the best one-upper win.",
+  "May the best One-Upper win.",
   "No pressure. Just your reputation on the line.",
 ];
 
 // Ripley intro lines
 const RIPLEY_INTROS = [
-  "I'm your host. I call the rounds and try not to play favorites.",
-  "I'm Ripley, your emcee. I'm here for the drama.",
-  "I keep things moving and the judges honest. Mostly.",
-  "I run the show. The judges do the hard part."
+  "I'm your host. I call the rounds. I try not to play favorites 😉",
+  "I'm Ripley, your emcee. I live for the drama 💅",
+  "I keep things moving and the judges honest. Mostly 🤞",
+  "I run the show. The judges run their mouths 😏",
+  "I'm Ripley. I don't judge. That's their job 👀",
+  "I keep the peace. The judges keep score 🎯",
+  "I'm just here to watch you sweat 🍿",
+  "I ask the questions. They decide if you're funny 🤷"
 ];
 
 // Judge intro lines
@@ -31,7 +35,12 @@ const JUDGE_INTRO_LINES = [
   "Three judges. Three egos. Play to the room.",
   "Your fate's in their hands. Learn their quirks.",
   "Each one has a weakness. Find it.",
-  "Impress them and you win. Simple as that."
+  "Impress them and you win. Simple as that.",
+  "They can smell fear. And poor punctuation.",
+  "Whatever you write, they'll say try harder.",
+  "They're judging you. Try not to think about it.",
+  "No pressure. Just supercomputers rating your brain.",
+  "They've seen it all. Surprise them."
 ];
 
 // Category display names
@@ -126,14 +135,14 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
         />
         
         <div className="max-w-md mx-auto mt-4">
-          {/* Ripley speech bubble with all intro content */}
+          {/* Ripley speech bubble */}
           <div className="bg-slate-800/80 rounded-2xl p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
               <span className="text-2xl">🎙️</span>
               <span className="text-orange-400 font-semibold">Ripley</span>
             </div>
             
-            <p className="text-xl text-slate-100 font-medium mb-3">
+            <p className="text-slate-100 mb-3">
               {welcomeLine}
             </p>
             
@@ -141,27 +150,15 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
               {ripleyIntro}
             </p>
 
-            <p className="text-slate-200 mb-4">
-              {playerCount} players. 5 rounds. One winner.
+            <p className="text-slate-300">
+              Everyone answers the same prompt. You guess who wrote what, 
+              pick who you think judges will love, then the judges have their say.
             </p>
-
-            <div className="border-t border-slate-700 pt-4 mt-4">
-              <p className="text-slate-300 text-sm leading-relaxed mb-3">
-                Everyone answers the same prompt. You'll guess who wrote what, 
-                vote for the One-Upper, then the judges rank everyone.
-              </p>
-              <p className="text-slate-400 text-sm">
-                Be bold. Be weird. Be memorable.
-              </p>
-              <p className="text-slate-400 text-sm">
-                You have 60 seconds per prompt.
-              </p>
-            </div>
           </div>
 
           {/* Category info */}
           <div className="bg-slate-800/50 rounded-xl p-4 mb-8">
-            <span className="text-slate-400 text-sm">Types of questions: </span>
+            <span className="text-slate-400 text-sm">Prompt vibe: </span>
             <span className="text-slate-200">{categoryDisplay}</span>
           </div>
 
@@ -172,7 +169,7 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
                 onClick={handleContinue}
                 className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
               >
-                Meet Your Judges →
+                Meet Your Judges
               </button>
             ) : (
               <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
@@ -198,7 +195,7 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
       
       <div className="max-w-md mx-auto mt-4">
         {/* Judges title */}
-        <p className="text-slate-400 text-sm mb-3">Your showdown judges:</p>
+        <p className="text-slate-400 text-sm mb-3">Today's judges:</p>
 
         {/* Judge cards - tap to open modal */}
         <div className="space-y-3 mb-6">
@@ -238,7 +235,7 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
               disabled={isAdvancing}
               className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
             >
-              {isAdvancing ? 'Starting...' : "Let's Go!"}
+              {isAdvancing ? 'Starting...' : "Let's Go"}
             </button>
           ) : (
             <div className="bg-slate-800 border border-slate-700 rounded-xl p-4 text-center">
@@ -285,7 +282,7 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
               onClick={() => setSelectedJudge(null)}
               className="w-full py-3 bg-orange-500 hover:bg-orange-400 text-white font-semibold rounded-lg transition-colors"
             >
-              Close
+              Got It!
             </button>
           </div>
         </div>

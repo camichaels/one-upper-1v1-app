@@ -76,9 +76,10 @@ export default function ShowdownLeaderboard({ round, showdown, currentPlayer, is
 
   return (
     <div className="max-w-md mx-auto mt-4">
+      {/* Title - orange like other round indicators */}
       <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-slate-100">
-          Standings after Round {currentRound}
+        <h2 className="text-xl font-bold text-orange-400">
+          After Round {currentRound}
         </h2>
       </div>
 
@@ -159,8 +160,8 @@ export default function ShowdownLeaderboard({ round, showdown, currentPlayer, is
           {isStartingNext 
             ? 'Loading...' 
             : isLastRound 
-              ? 'See Final Results →' 
-              : `Start Round ${currentRound + 1} →`
+              ? 'See Final Results' 
+              : `On to Round ${currentRound + 1}`
           }
         </button>
       ) : (

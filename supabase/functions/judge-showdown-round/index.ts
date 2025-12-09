@@ -12,37 +12,66 @@ interface JudgeShowdownRequest {
   roundId: string
 }
 
-// Bonus categories by round
-const BONUS_CATEGORIES = [
-  'Most Creative',
-  'Funniest', 
-  'Most Outlandish',
-  'Best Storytelling',
-  'Most Unexpected'
+// Bonus categories - Type 1: AI picks the specific reference
+const DYNAMIC_BONUS_CATEGORIES = [
+  { prompt: "Which answer sounds most like a famous celebrity's tweet? Name the celebrity.", prefix: "Most" },
+  { prompt: "Which answer has the strongest famous TV chef energy? Name the chef.", prefix: "Most" },
+  { prompt: "Which answer sounds like a famous comedian's bit? Name the comedian.", prefix: "Most" },
+  { prompt: "Which answer could be a famous movie character's backstory? Name the character.", prefix: "Best backstory for" },
 ]
+
+// Bonus categories - Type 2: Fixed category, AI just picks winner
+const FIXED_BONUS_CATEGORIES = [
+  "Could be an Onion headline",
+  "Sounds like a Florida Man story",
+  "Best TMZ breaking news",
+  "Most clickbait article title",
+  "Best podcast episode title",
+  "Best topic for a graduate thesis",
+  "Most likely to be a TED Talk",
+  "Best LinkedIn humblebrag",
+  "Most corporate jargon energy",
+  "Best plot for a Lifetime movie",
+  "Best reality TV confession",
+  "Most soap opera cliffhanger",
+  "Best true crime documentary title",
+  "Most dramatic movie trailer voiceover",
+  "Most likely to get you arrested",
+  "Strongest 'hold my beer' energy",
+  "Most 'what could go wrong' vibes",
+  "Best way to get banned from a place",
+  "Most likely to void a warranty",
+  "Best reason to call a lawyer",
+  "Biggest 'trust me bro' moment",
+  "Most 'main character' energy",
+  "Best shower thought",
+  "Most 'said with full confidence'",
+  "Best 'no context needed'",
+  "Most 'I woke up and chose chaos'",
+]
+
+// Pick a random bonus category
+function getRandomBonusCategory(): { prompt: string; isDynamic: boolean; prefix?: string } {
+  const allCategories = [
+    ...DYNAMIC_BONUS_CATEGORIES.map(c => ({ ...c, isDynamic: true })),
+    ...FIXED_BONUS_CATEGORIES.map(c => ({ prompt: c, isDynamic: false })),
+  ]
+  const selected = allCategories[Math.floor(Math.random() * allCategories.length)]
+  return selected
+}
 
 // Replace letter references (A, B, C) with player names in banter text
 function replaceLettersWithNames(text: string, letterToName: Record<string, string>): string {
   let result = text
   
-  // Sort letters by length descending to avoid partial replacements (not needed for single letters, but safe)
   const letters = Object.keys(letterToName).sort((a, b) => b.length - a.length)
   
   for (const letter of letters) {
     const name = letterToName[letter]
-    
-    // Match the letter when it's:
-    // - At word boundary followed by 's (possessive): "A's" -> "Craig's"
-    // - At word boundary followed by space, punctuation, or end: "A " -> "Craig "
-    // - Standing alone
-    // But NOT in the middle of words like "AMAZING" or "BAD"
-    
-    // Pattern: letter at word boundary, followed by 's, space, punctuation, or end of string
     const pattern = new RegExp(
       `\\b${letter}(?='s|\\s|[.,!?;:]|$)`,
       'g'
     )
-    
     result = result.replace(pattern, name)
   }
   
@@ -152,12 +181,11 @@ serve(async (req) => {
     answers.forEach((answer, idx) => {
       const letter = answerLabels[idx]
       answerMap[letter] = answer
-      // Build letter -> player name mapping for later replacement
       letterToName[letter] = answer.player?.guest_name || `Player ${letter}`
     })
 
-    // Get bonus category for this round
-    const bonusCategory = BONUS_CATEGORIES[(round.round_number - 1) % BONUS_CATEGORIES.length]
+    // Get random bonus category for this round
+    const bonusCategory = getRandomBonusCategory()
 
     // Build the prompt
     const answersText = answers.map((answer, idx) => 
@@ -165,16 +193,35 @@ serve(async (req) => {
     ).join('\n')
 
     const judgesText = sortedJudges.map(judge => 
-      `${judge.name} (${judge.emoji}): ${judge.description}\nExample one-liners: ${judge.examples || 'None provided'}`
-    ).join('\n\n')
+      `${judge.name} (${judge.emoji}, key: "${judge.key}"): ${judge.description}`
+    ).join('\n')
+
+    // Build bonus instruction based on type
+    const bonusInstruction = bonusCategory.isDynamic
+      ? `BONUS CATEGORY (AI picks specific reference): ${bonusCategory.prompt}
+Return the category as "${bonusCategory.prefix} [Name You Pick]" format.`
+      : `BONUS CATEGORY (fixed): "${bonusCategory.prompt}"
+Return the category exactly as written.`
+
+    // Build dynamic example for banter based on actual judges
+    const banterExample = sortedJudges.slice(0, 3).flatMap((judge, idx) => {
+      if (idx === 0) {
+        return [
+          { judgeKey: judge.key, judgeName: judge.name, emoji: judge.emoji, comment: "First reaction to the answers..." },
+          { judgeKey: sortedJudges[1]?.key || judge.key, judgeName: sortedJudges[1]?.name || judge.name, emoji: sortedJudges[1]?.emoji || judge.emoji, comment: "Response or different take..." },
+        ]
+      }
+      return []
+    })
+    // Add a couple more to show the back-and-forth pattern
+    banterExample.push(
+      { judgeKey: sortedJudges[0].key, judgeName: sortedJudges[0].name, emoji: sortedJudges[0].emoji, comment: "Another comment..." },
+      { judgeKey: sortedJudges[2]?.key || sortedJudges[0].key, judgeName: sortedJudges[2]?.name || sortedJudges[0].name, emoji: sortedJudges[2]?.emoji || sortedJudges[0].emoji, comment: "Final anticipatory comment..." }
+    )
+
+    const banterExampleJson = JSON.stringify(banterExample, null, 2)
 
     const prompt = `You are the judging panel for "One-Upper," a comedy competition where players try to one-up each other with outlandish answers.
-
-RULES:
-- Rank ALL answers from best to worst
-- Reward boldness, creativity, humor - truth doesn't matter
-- Each judge provides a short comment (1-2 sentences in their voice)
-- Pick a bonus category winner
 
 PROMPT: "${round.prompt_text}"
 
@@ -184,7 +231,19 @@ ${answersText}
 JUDGES:
 ${judgesText}
 
-BONUS CATEGORY: ${bonusCategory}
+YOUR TASKS:
+
+1. RANK all answers from best to worst (reward boldness, creativity, humor - truth doesn't matter)
+
+2. BANTER: Write 4-5 short back-and-forth comments between the judges discussing the answers. Rules:
+   - Judges should react to MULTIPLE answers, not just the winner
+   - They can agree, disagree, riff off each other
+   - Build tension/suspense but DO NOT reveal who wins
+   - Reference answers by their letter (A, B, C)
+   - Keep each comment to 1-2 sentences MAX in their character voice
+   - End with something anticipatory like "Let's see how it shakes out" or "This is gonna be close"
+
+3. BONUS WINNER: ${bonusInstruction}
 
 SCORING PHILOSOPHY:
 - Outlandish beats safe
@@ -197,14 +256,11 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
 
 {
   "rankings": ["${answerLabels.slice(0, answers.length).join('", "')}"],
-  "comments": {
-    "${sortedJudges[0]?.key}": "Short punchy comment in character voice",
-    "${sortedJudges[1]?.key}": "Short punchy comment in character voice",
-    "${sortedJudges[2]?.key}": "Short punchy comment in character voice"
-  },
+  "banterMessages": ${banterExampleJson},
   "bonusWinner": {
     "answer": "A",
-    "reason": "Brief reason for bonus win"
+    "category": "The display category name",
+    "reason": "Brief witty reason (1 sentence)"
   }
 }`
 
@@ -218,7 +274,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 1500,
         messages: [
           { role: 'user', content: prompt }
         ]
@@ -251,13 +307,29 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       )
     }
 
-    // Replace letter references with player names in banter comments
-    const banterWithNames: Record<string, string> = {}
-    for (const [judgeKey, comment] of Object.entries(judgeResponse.comments || {})) {
-      banterWithNames[judgeKey] = replaceLettersWithNames(comment as string, letterToName)
+    // Process banter messages - replace letter references with player names
+    // Use emoji from our judge data, not from AI response (AI might return broken emojis)
+    const judgesByKey = Object.fromEntries(sortedJudges.map(j => [j.key, j]))
+    
+    const banterMessages = (judgeResponse.banterMessages || []).slice(0, 5).map((msg: any) => {
+      const judge = judgesByKey[msg.judgeKey]
+      return {
+        judgeKey: msg.judgeKey,
+        judgeName: judge?.name || msg.judgeName,
+        emoji: judge?.emoji || msg.emoji,
+        comment: replaceLettersWithNames(msg.comment, letterToName)
+      }
+    })
+
+    // Also create the old banter format for backwards compatibility
+    const banterByJudge: Record<string, string> = {}
+    for (const msg of banterMessages) {
+      if (!banterByJudge[msg.judgeKey]) {
+        banterByJudge[msg.judgeKey] = msg.comment
+      }
     }
 
-    // Also replace in bonus winner reason
+    // Process bonus winner
     let bonusReasonWithNames = judgeResponse.bonusWinner?.reason || ''
     bonusReasonWithNames = replaceLettersWithNames(bonusReasonWithNames, letterToName)
 
@@ -271,7 +343,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
         answer: answer?.answer_text,
         playerName: answer?.player?.guest_name || `Player ${letter}`
       }
-    }).filter((r: any) => r.playerId) // Filter out any invalid mappings
+    }).filter((r: any) => r.playerId)
 
     // Convert bonus winner letter to player ID
     const bonusWinnerLetter = judgeResponse.bonusWinner?.answer
@@ -279,8 +351,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
     const bonusWinner = bonusWinnerAnswer ? {
       playerId: bonusWinnerAnswer.player_id,
       answerId: bonusWinnerAnswer.id,
-      category: bonusCategory,
-      categoryDisplay: bonusCategory,
+      category: judgeResponse.bonusWinner?.category || bonusCategory.prompt,
+      categoryDisplay: judgeResponse.bonusWinner?.category || bonusCategory.prompt,
       reason: bonusReasonWithNames,
       playerName: bonusWinnerAnswer.player?.guest_name || `Player ${bonusWinnerLetter}`
     } : null
@@ -288,9 +360,10 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
     // Build verdict object
     const verdict = {
       rankings,
-      banter: banterWithNames,
+      banter: banterByJudge,
+      banterMessages,
       bonusWinner,
-      judgeWhisperers: [] // Will be calculated separately based on player votes
+      judgeWhisperers: []
     }
 
     // Calculate Judge Whisperer bonus (players who voted for the winning answer)
@@ -303,15 +376,13 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
         .eq('voted_answer_id', winningAnswerId)
 
       if (votes && votes.length > 0) {
-        // Exclude the winner themselves from Judge Whisperer
-        const winnerId = rankings[0]?.playerId
-        verdict.judgeWhisperers = votes
-          .map(v => v.voter_id)
-          .filter(id => id !== winnerId)
+        // Include everyone who predicted correctly - even the winner!
+        // If you believed in yourself and were right, you deserve the bonus
+        verdict.judgeWhisperers = votes.map(v => v.voter_id)
       }
     }
 
-    // Update round with verdict (don't change status - host controls flow)
+    // Update round with verdict
     const { error: updateError } = await supabase
       .from('showdown_rounds')
       .update({
@@ -328,22 +399,19 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
     }
 
     // Calculate and update player scores
-    const placementPoints = [5, 3, 2, 1, 0] // 1st=5, 2nd=3, 3rd=2, 4th=1, 5th=0
+    const placementPoints = [5, 3, 2, 1, 0]
     
     for (const ranking of rankings) {
       let pointsEarned = placementPoints[ranking.placement - 1] || 0
       
-      // Add bonus point if they won the bonus category
       if (bonusWinner && bonusWinner.playerId === ranking.playerId) {
         pointsEarned += 1
       }
       
-      // Add bonus point if they're a Judge Whisperer
       if (verdict.judgeWhisperers.includes(ranking.playerId)) {
         pointsEarned += 1
       }
 
-      // Update player's total score
       const { error: scoreError } = await supabase.rpc('increment_showdown_score', {
         player_id: ranking.playerId,
         points: pointsEarned
@@ -351,11 +419,10 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
 
       if (scoreError) {
         console.error('Error updating player score:', scoreError)
-        // Continue with other players even if one fails
       }
     }
 
-    // Also award Best Guesser +1 point if there is one
+    // Award Best Guesser +1 point
     if (round.best_guesser_id) {
       await supabase.rpc('increment_showdown_score', {
         player_id: round.best_guesser_id,

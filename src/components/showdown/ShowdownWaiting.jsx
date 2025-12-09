@@ -1,6 +1,38 @@
 import { useState, useEffect } from 'react';
 import { getCurrentRound, getGuessSubmissions } from '../../services/showdown';
 
+// Randomized "answer submitted" lines
+const ANSWER_SUBMITTED_LINES = [
+  "Locked In!",
+  "You're In!",
+  "Bold Move.",
+  "Nailed It.",
+];
+
+// Randomized "guesses submitted" lines
+const GUESSES_SUBMITTED_LINES = [
+  "Picks Locked In!",
+  "Guesses In!",
+  "You've Made Your Calls.",
+];
+
+// Ripley anticipation lines
+const RIPLEY_ANTICIPATION_LINES = [
+  "I can cut the tension with a chainsaw.",
+  "Someone's about to be embarrassed.",
+  "This is my favorite part.",
+  "Place your bets.",
+  "I've seen the answers. No spoilers.",
+  "This should be interesting.",
+  "Oh, this is gonna be good.",
+  "I already have a favorite.",
+  "Somebody went bold. Somebody didn't.",
+];
+
+function getRandomLine(lines) {
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
 export default function ShowdownWaiting({ 
   round: initialRound, 
   showdown, 
@@ -14,6 +46,11 @@ export default function ShowdownWaiting({
   const [round, setRound] = useState(initialRound);
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [guessSubmitters, setGuessSubmitters] = useState([]);
+  
+  // Randomize lines once on mount
+  const [answerSubmittedLine] = useState(() => getRandomLine(ANSWER_SUBMITTED_LINES));
+  const [guessesSubmittedLine] = useState(() => getRandomLine(GUESSES_SUBMITTED_LINES));
+  const [ripleyLine] = useState(() => getRandomLine(RIPLEY_ANTICIPATION_LINES));
 
   // Poll for answer updates during answering phase
   useEffect(() => {
@@ -125,16 +162,19 @@ export default function ShowdownWaiting({
   // Dynamic header text
   const getHeaderText = () => {
     if (everyoneIn) return "Everyone's in!";
-    if (timeExpired) return "Time's up!";
+    if (timeExpired) return "That's a wrap!";
     return "Waiting for others...";
   };
 
+  // Show Ripley + button when ready
+  const showReadyState = everyoneIn || timeExpired;
+
   return (
     <div className="max-w-md mx-auto mt-4">
-      {/* Success message - no icon */}
+      {/* Success message */}
       <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-slate-100">
-          {phase === 'answering' ? 'Answer Submitted!' : 'Picks Locked In!'}
+        <h2 className="text-xl font-bold text-orange-400">
+          {phase === 'answering' ? answerSubmittedLine : guessesSubmittedLine}
         </h2>
         <p className="text-slate-400 mt-1">{getHeaderText()}</p>
       </div>
@@ -177,6 +217,17 @@ export default function ShowdownWaiting({
         </div>
       </div>
 
+      {/* Ripley anticipation line - always show */}
+      <div className="bg-slate-800/80 rounded-2xl p-4 mb-6">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-lg">🎙️</span>
+          <span className="text-orange-400 font-semibold text-sm">Ripley</span>
+        </div>
+        <p className="text-slate-300 text-sm">
+          {ripleyLine}
+        </p>
+      </div>
+
       {/* Timer - only show if time remaining */}
       {timeRemaining > 0 && (
         <div className={`text-center mb-6 ${isLowTime ? 'animate-pulse' : ''}`}>
@@ -192,26 +243,26 @@ export default function ShowdownWaiting({
       )}
 
       {/* Host controls */}
-      {isHost && phase === 'answering' && (everyoneIn || timeExpired) && (
+      {isHost && phase === 'answering' && showReadyState && (
         <button
           onClick={onStartGuessing}
           className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
         >
-          Start Guessing Phase →
+          Who Said What?
         </button>
       )}
 
-      {isHost && phase === 'guessing' && (everyoneIn || timeExpired) && (
+      {isHost && phase === 'guessing' && showReadyState && (
         <button
           onClick={onStartReveal}
           className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
         >
-          Reveal Results →
+          Who Wrote What?
         </button>
       )}
 
       {/* Non-host: show disabled button instead of text */}
-      {!isHost && (everyoneIn || timeExpired) && (
+      {!isHost && showReadyState && (
         <button
           disabled
           className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"

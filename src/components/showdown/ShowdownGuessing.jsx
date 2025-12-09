@@ -117,22 +117,18 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
 
   return (
     <div className="max-w-md mx-auto mt-4">
-      {/* Header */}
-      <div className="text-center mb-2">
-        <p className="text-2xl font-bold text-slate-100">Round {round.round_number} of {TOTAL_ROUNDS}</p>
+      {/* Header - smaller, orange */}
+      <div className="text-center mb-3">
+        <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
       </div>
       
-      {/* Prompt reminder - same style as prompt screen */}
-      <p className="text-xl text-slate-100 font-medium text-center leading-relaxed mb-4 px-2">
+      {/* Prompt - bold */}
+      <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-4 px-2">
         {round.prompt_text}
       </p>
 
-      <div className="text-center mb-4">
-        <h2 className="text-lg font-semibold text-slate-400">Who wrote what?</h2>
-      </div>
-
       {/* Timer */}
-      <div className={`text-center mb-4 ${isLowTime ? 'animate-pulse' : ''}`}>
+      <div className={`text-center mb-6 ${isLowTime ? 'animate-pulse' : ''}`}>
         <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${
           isLowTime ? 'bg-red-500/20 text-red-400' : 'bg-slate-700/50 text-slate-300'
         }`}>
@@ -143,9 +139,11 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
         </div>
       </div>
 
-      {/* Answers to guess */}
-      <div className="space-y-3 mb-6">
-        {shuffledAnswers.map((answer) => {
+      {/* Who wrote what section */}
+      <p className="text-slate-100 font-semibold mb-3">Who wrote what?</p>
+      
+      <div className="bg-slate-800/50 rounded-xl overflow-hidden mb-6">
+        {shuffledAnswers.map((answer, index) => {
           const isMyAnswer = answer.player_id === currentPlayer?.id;
           const availablePlayers = getAvailablePlayers(answer.id);
           const selectedPlayerId = guesses[answer.id];
@@ -154,9 +152,9 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
           return (
             <div 
               key={answer.id}
-              className={`bg-slate-800/50 rounded-xl p-4 ${isMyAnswer ? 'border border-orange-500/30' : ''}`}
+              className="p-4"
             >
-              {/* Answer text - no quotes */}
+              {/* Answer text */}
               <p className="text-slate-100 mb-3 leading-relaxed">
                 {answer.answer_text || '[no answer]'}
               </p>
@@ -164,15 +162,14 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
               {isMyAnswer ? (
                 <div className="flex items-center gap-2 text-orange-400 text-sm">
                   <span>★</span>
-                  <span>You wrote this</span>
+                  <span>Yours</span>
                 </div>
               ) : (
                 <div>
-                  <label className="text-slate-400 text-sm block mb-2">Written by:</label>
                   <select
                     value={selectedPlayerId || ''}
                     onChange={(e) => handleGuessChange(answer.id, e.target.value || null)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-orange-500"
+                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-orange-500 text-sm"
                   >
                     <option value="">Select a player...</option>
                     {/* Show currently selected player first if assigned */}
@@ -200,46 +197,40 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
         })}
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-slate-700 my-6"></div>
+      {/* Pick the winner section */}
+      <p className="text-slate-100 font-semibold mb-3">Pick the judges' favorite</p>
+      
+      <div className="bg-slate-800/50 rounded-xl overflow-hidden mb-6">
+        {shuffledAnswers.map((answer, index) => {
+          const isSelected = vote === answer.id;
 
-      {/* Vote section */}
-      <div className="mb-6">
-        <h3 className="text-lg font-bold text-slate-100 mb-3">Which answer wins this round?</h3>
-        <p className="text-slate-400 text-sm mb-4">Pick the one you think the judges will love</p>
-        
-        <div className="space-y-2">
-          {shuffledAnswers.map((answer) => {
-            const isSelected = vote === answer.id;
-
-            return (
-              <button
-                key={answer.id}
-                onClick={() => setVote(answer.id)}
-                className={`w-full text-left p-3 rounded-lg transition-colors ${
-                  isSelected 
-                    ? 'bg-orange-500/20 border border-orange-500' 
-                    : 'bg-slate-700/50 border border-transparent hover:bg-slate-700'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 ${
-                    isSelected ? 'border-orange-500 bg-orange-500' : 'border-slate-500'
-                  }`}>
-                    {isSelected && (
-                      <div className="w-full h-full flex items-center justify-center text-white text-xs">✓</div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-slate-200 text-sm leading-relaxed">
-                      {answer.answer_text?.slice(0, 60) || '[no answer]'}{answer.answer_text?.length > 60 ? '...' : ''}
-                    </p>
-                  </div>
+          return (
+            <button
+              key={answer.id}
+              onClick={() => setVote(answer.id)}
+              className={`w-full text-left p-4 transition-colors ${
+                isSelected 
+                  ? 'bg-orange-500/20' 
+                  : 'hover:bg-slate-700/50'
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 ${
+                  isSelected ? 'border-orange-500 bg-orange-500' : 'border-slate-500'
+                }`}>
+                  {isSelected && (
+                    <div className="w-full h-full flex items-center justify-center text-white text-xs">✓</div>
+                  )}
                 </div>
-              </button>
-            );
-          })}
-        </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-200 text-sm leading-relaxed">
+                    {answer.answer_text?.slice(0, 60) || '[no answer]'}{answer.answer_text?.length > 60 ? '...' : ''}
+                  </p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Submit button */}
@@ -248,14 +239,8 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
         disabled={!canSubmit}
         className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
       >
-        {isSubmitting ? 'Locking In...' : 'Lock In My Picks'}
+        {isSubmitting ? 'Locking In...' : 'Lock It In'}
       </button>
-
-      {!canSubmit && !isSubmitting && (
-        <p className="text-slate-500 text-sm text-center mt-3">
-          {!allGuessesComplete ? 'Assign all answers to continue' : 'Pick your vote to continue'}
-        </p>
-      )}
     </div>
   );
 }

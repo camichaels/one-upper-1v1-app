@@ -32,7 +32,7 @@ serve(async (req) => {
 
     console.log('Fetching showdown:', showdownId)
 
-    // Fetch showdown with players (specify FK to avoid ambiguity)
+    // Fetch showdown with players
     const { data: showdown, error: showdownError } = await supabase
       .from('showdowns')
       .select(`
@@ -48,6 +48,15 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ error: 'Showdown not found', details: showdownError }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // IMPORTANT: Check if recap already exists - return it immediately to avoid duplicate AI calls
+    if (showdown.recap) {
+      console.log('Recap already exists, returning cached version')
+      return new Response(
+        JSON.stringify({ success: true, recap: showdown.recap, cached: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -149,8 +158,13 @@ serve(async (req) => {
       }
     })
 
+    // Pick a random prompt for the share message
+    const randomRound = rounds[Math.floor(Math.random() * rounds.length)]
+    const sharePrompt = randomRound?.prompt_text || "What's your best one-upper moment?"
+
     // Build the AI prompt
-    const prompt = `You're a witty comedy writer recapping a party game called "One-Upper" where players tried to out-do each other with outlandish answers to prompts. Your job is to create highlight cards that will make players laugh, screenshot, and want to play again.
+    const nonWinners = playerSummaries.filter(p => p.finalPlace !== 1)
+    const prompt = `You're Ripley, the witty host recapping a party game called "One-Upper" where players tried to out-do each other with outlandish answers to prompts.
 
 THE SHOWDOWN DATA:
 
@@ -167,36 +181,41 @@ ${r.answers.map((a: any) => `  ${a.placement}. ${a.player}: "${a.answer}"`).join
 `).join('\n')}
 
 CHAMPION: ${championName}
+RUNNER-UPPERS (non-winners): ${nonWinners.map(p => p.name).join(', ')}
 
 YOUR TASK - Generate these highlight cards:
 
-1. NARRATIVE (2-3 sentences): Tell the story of this showdown with dramatic tension. Reference specific moments. Make it feel like sports commentary meets comedy roast.
+1. NARRATIVE (2-3 sentences): Tell the story of this showdown. Reference specific moments. Sports commentary meets comedy roast. This is YOU (Ripley) speaking.
 
-2. QUOTE OF THE NIGHT: Pick the single funniest/most memorable answer. Include:
-   - Which round and prompt
-   - The answer (verbatim)
-   - Who said it
-   - A pithy 1-sentence reaction (channel your inner Ryan Reynolds)
+2. QUOTE OF THE NIGHT: Pick THE single funniest answer from ANY player. Include:
+   - round (number)
+   - prompt (the question)
+   - answer (verbatim)
+   - player (who said it)
+   - playerAvatar (their emoji)
+   - reaction (1 pithy sentence)
 
-3. BRAG CHECK (one per player): Compare their entry brag to their actual performance. Be playfully brutal. Format:
-   - Entry brag they walked in with
-   - Reality check roast (1-2 sentences)
+3. RUNNER-UPPER AWARDS: Give awards ONLY to non-winners (${nonWinners.map(p => p.name).join(', ')}). DO NOT include ${championName}. Each non-winner gets a fun award:
+   - player (name)
+   - emoji (a fun icon for this award, like 🎯 or 👻 or 🎪)
+   - title (creative award name like "The Shoe Chaos Architect")
+   - explanation (1 sentence why they earned it)
+   Even players who didn't answer much should get something - be creative!
 
-4. ROBBED MOMENT (if applicable): Was there a great answer that deserved better? A controversial judge call? If nothing stands out, skip this.
+4. BRAG CHECK: Include ALL players. Compare their entry brag to their performance. Each gets:
+   - player (name)
+   - playerAvatar (their emoji)
+   - entryBrag (what they said walking in)
+   - realityCheck (1 SHORT sentence - punchy, not mean)
 
-5. SUPERLATIVES (one per player): Give each player a fun title. Format:
-   - Emoji + Title (like "🦊 The Assassin")
-   - One-liner explanation
-   Make these memorable and specific to how they actually played.
+5. DEEP THOUGHT (2-3 sentences): A slightly profound observation about what these answers revealed, then undercut it. This is YOU (Ripley) closing the show.
 
-6. DEEP THOUGHT: One slightly profound or absurdist observation about what the answers revealed about the players or humanity. Then undercut it with the final score.
-
-TONE: Funny, specific, pop-culture aware, occasionally profound, never mean-spirited. Think Jackbox meets late-night monologue meets therapy session.
+TONE: Funny, specific, never mean-spirited. You're celebrating chaos, not mocking players.
 
 CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
 
 {
-  "narrative": "string",
+  "narrative": "string (Ripley speaking)",
   "quoteOfTheNight": {
     "round": 1,
     "prompt": "string",
@@ -205,6 +224,14 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
     "playerAvatar": "string",
     "reaction": "string"
   },
+  "runnerUpperAwards": [
+    {
+      "player": "string",
+      "emoji": "string",
+      "title": "string",
+      "explanation": "string"
+    }
+  ],
   "bragChecks": [
     {
       "player": "string",
@@ -213,22 +240,8 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
       "realityCheck": "string"
     }
   ],
-  "robbedMoment": {
-    "player": "string",
-    "round": 1,
-    "answer": "string",
-    "commentary": "string"
-  } | null,
-  "superlatives": [
-    {
-      "player": "string",
-      "playerAvatar": "string",
-      "emoji": "string",
-      "title": "string",
-      "explanation": "string"
-    }
-  ],
-  "deepThought": "string"
+  "deepThought": "string (Ripley's closing)",
+  "sharePrompt": "${sharePrompt}"
 }`
 
     // Call Claude API
@@ -272,6 +285,9 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Add the share prompt to the recap (in case AI didn't include it)
+    recap.sharePrompt = recap.sharePrompt || sharePrompt
 
     // Store recap in showdown
     const { error: updateError } = await supabase

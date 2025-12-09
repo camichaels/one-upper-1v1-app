@@ -104,21 +104,17 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
 
     return (
       <div className="max-w-md mx-auto mt-4">
-        {/* Round indicator */}
-        <div className="text-center mb-2">
-          <p className="text-2xl font-bold text-slate-100">Round {round.round_number} of {TOTAL_ROUNDS}</p>
+        {/* Round indicator - smaller, orange */}
+        <div className="text-center mb-3">
+          <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
         </div>
         
-        {/* Prompt - same as previous screens */}
-        <p className="text-xl text-slate-100 font-medium text-center leading-relaxed mb-4 px-2">
+        {/* Prompt - bold */}
+        <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
           {round.prompt_text}
         </p>
 
-        <div className="text-center mb-4">
-          <h2 className="text-lg text-slate-400">Who wrote what?</h2>
-        </div>
-
-        {/* Answers with authors and guess results */}
+        {/* Answers with authors and guess results - separate boxes */}
         <div className="space-y-3 mb-6">
           {answers.map((answer) => {
             const author = getPlayerDisplay(answer.player_id);
@@ -130,31 +126,34 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
                 key={answer.id}
                 className="bg-slate-800/50 rounded-xl p-4"
               >
-                {/* Author */}
+                {/* Answer text */}
+                <p className="text-slate-100 leading-relaxed mb-3">
+                  {answer.answer_text || '[no answer]'}
+                </p>
+                
+                {/* Written by */}
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">{author.avatar}</span>
-                  <span className={`font-semibold ${isMe ? 'text-orange-400' : 'text-slate-100'}`}>
+                  <span className="text-slate-500 text-sm">Written by:</span>
+                  <span className="text-xl">{author.avatar}</span>
+                  <span className={`font-semibold ${isMe ? 'text-orange-400' : 'text-orange-400'}`}>
                     {author.name} {isMe && '(You)'}
                   </span>
                 </div>
-                
-                {/* Answer text - no quotes */}
-                <p className="text-slate-300 leading-relaxed mb-2">
-                  {answer.answer_text || '[no answer]'}
-                </p>
 
-                {/* Who guessed correctly/incorrectly */}
+                {/* Predicted by */}
                 {guessers.length > 0 && (
-                  <div className="text-sm">
-                    <span className="text-slate-500">Guessed by: </span>
-                    {guessers.map((g, i) => (
-                      <span key={g.guesserId}>
-                        {i > 0 && <span className="text-slate-600"> · </span>}
-                        <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>
-                          {g.isCorrect ? '✓' : '✗'} {g.name}
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-slate-500">Predicted by:</span>
+                    <div>
+                      {guessers.map((g, i) => (
+                        <span key={g.guesserId}>
+                          {i > 0 && <span className="text-slate-600"> · </span>}
+                          <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>
+                            {g.isCorrect ? '✓' : '✗'} {g.name}
+                          </span>
                         </span>
-                      </span>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -165,12 +164,11 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
         {/* Best Guesser */}
         {bestGuesser && (
           <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-            <p className="text-slate-400 text-sm mb-1">Best Who Said What +1 point</p>
-            <p className="text-slate-100">
-              <span className="text-xl mr-2">{bestGuesser.avatar}</span>
-              <span className="font-semibold">{bestGuesser.name}</span>
+            <p className="text-orange-400 font-semibold">
+              {bestGuesser.name} guessed best!
             </p>
-            <p className="text-slate-500 text-xs mt-1">Fastest player with the most correct guesses</p>
+            <p className="text-slate-300 text-sm mt-1">Bonus +1 point</p>
+            <p className="text-slate-500 text-xs mt-1">Fastest with the most correct predictions</p>
           </div>
         )}
 
@@ -180,7 +178,7 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
             onClick={handleContinue}
             className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
           >
-            See What the Judges Think →
+            Hear From the Judges
           </button>
         ) : (
           <button
@@ -194,61 +192,121 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     );
   }
 
-  // Phase 2: Judge Banter - Ripley format
+  // Phase 2: Judge Banter - conversation flow like Rivalry
   if (revealPhase === 'banter') {
     const judges = showdown.judges || [];
     const banter = verdict.banter || {};
+    
+    // Check if banter is an array (conversation) or object (one comment per judge)
+    const banterMessages = Array.isArray(verdict.banterMessages) 
+      ? verdict.banterMessages 
+      : judges.map(judge => ({
+          judgeKey: judge.key,
+          judgeName: judge.name,
+          emoji: judge.emoji,
+          comment: banter[judge.key] || ""
+        })).filter(msg => msg.comment); // Filter out empty comments
+
+    // Show deliberating animation if no banter yet
+    if (banterMessages.length === 0) {
+      return (
+        <div className="max-w-md mx-auto mt-4">
+          {/* Round indicator */}
+          <div className="text-center mb-3">
+            <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
+          </div>
+          
+          {/* Prompt */}
+          <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-8 px-2">
+            {round.prompt_text}
+          </p>
+
+          {/* Deliberating message */}
+          <div className="text-center space-y-8">
+            <div className="text-xl text-slate-200 font-medium">Judges are deliberating...</div>
+            
+            {/* Orbiting judges */}
+            <div className="relative w-48 h-48 mx-auto">
+              <div className="judges-orbit w-full h-full relative">
+                {judges.map((judge, i) => {
+                  const angle = (i * (360 / judges.length) - 90) * (Math.PI / 180);
+                  const radius = 70;
+                  const x = Math.cos(angle) * radius;
+                  const y = Math.sin(angle) * radius;
+                  
+                  return (
+                    <div
+                      key={judge.key}
+                      className="absolute left-1/2 top-1/2"
+                      style={{
+                        transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
+                      }}
+                    >
+                      <div className="judge-item-inner flex flex-col items-center">
+                        <span className="text-4xl">{judge.emoji}</span>
+                        <span className="text-xs text-slate-400 mt-1">{judge.name}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <p className="text-slate-400 text-sm">This won't take long...</p>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="max-w-md mx-auto mt-4">
-        <div className="text-center mb-2">
-          <p className="text-2xl font-bold text-slate-100">Round {round.round_number} of {TOTAL_ROUNDS}</p>
+        {/* Round indicator - smaller, orange */}
+        <div className="text-center mb-3">
+          <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
         </div>
         
-        {/* Prompt */}
-        <p className="text-xl text-slate-100 font-medium text-center leading-relaxed mb-4 px-2">
+        {/* Prompt - bold */}
+        <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
           {round.prompt_text}
         </p>
 
-        {/* Ripley intro - same format as elsewhere */}
-        <div className="bg-slate-800/80 rounded-xl p-4 mb-4">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">🎙️</span>
-            <div>
-              <span className="text-orange-400 font-semibold">Ripley</span>
-              <p className="text-slate-200 mt-1">
-                The judges have thoughts. They always do.
-              </p>
-            </div>
+        {/* Ripley intro */}
+        <div className="bg-slate-800/80 rounded-2xl p-4 mb-4">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🎙️</span>
+            <span className="text-orange-400 font-semibold text-sm">Ripley</span>
           </div>
+          <p className="text-slate-300 text-sm mb-2">
+            Judges, what are you thinking?
+          </p>
+          <p className="text-slate-300 text-sm">
+            Players, feel free to read these aloud. We won't judge. They will.
+          </p>
         </div>
 
-        {/* Judge comments */}
+        {/* Judge banter - alternating conversation flow */}
         <div className="space-y-3 mb-6">
-          {judges.length > 0 ? (
-            judges.map((judge, index) => {
-              const judgeComment = banter[judge.key] || "Still deliberating...";
-              
-              return (
-                <div key={judge.key || index} className="bg-slate-800/50 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">{judge.emoji}</span>
-                    <div>
-                      <span className="text-slate-100 font-semibold">{judge.name}</span>
-                      <p className="text-slate-300 text-sm mt-1">
-                        {judgeComment}
-                      </p>
-                    </div>
+          {banterMessages.map((msg, index) => {
+            // Alternate left/right positioning
+            const isLeft = index % 2 === 0;
+            
+            return (
+              <div 
+                key={index} 
+                className={`flex ${isLeft ? 'justify-start' : 'justify-end'}`}
+              >
+                <div className={`bg-slate-800/50 rounded-xl p-4 max-w-[85%]`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">{msg.emoji}</span>
+                    <span className="text-slate-100 font-semibold text-sm">{msg.judgeName}</span>
                   </div>
+                  <p className="text-slate-300 text-sm">
+                    {msg.comment}
+                  </p>
                 </div>
-              );
-            })
-          ) : (
-            <div className="bg-slate-800/50 rounded-xl p-4 text-center">
-              <p className="text-slate-400">Judges are deliberating...</p>
-              <p className="text-slate-500 text-sm mt-2">(AI judging coming soon)</p>
-            </div>
-          )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Continue button */}
@@ -257,7 +315,7 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
             onClick={handleContinue}
             className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
           >
-            See Results →
+            And the winner is...
           </button>
         ) : (
           <button
@@ -320,14 +378,18 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
           </div>
         )}
 
-        <div className="text-center mb-2">
-          <p className="text-2xl font-bold text-slate-100">Round {round.round_number} of {TOTAL_ROUNDS}</p>
+        {/* Round indicator - smaller, orange */}
+        <div className="text-center mb-3">
+          <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
         </div>
         
-        {/* Prompt */}
-        <p className="text-xl text-slate-100 font-medium text-center leading-relaxed mb-6 px-2">
+        {/* Prompt - bold */}
+        <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
           {round.prompt_text}
         </p>
+
+        {/* Section header */}
+        <p className="text-slate-400 text-sm mb-3">Judges say...</p>
 
         {/* Rankings - show all players with their answers */}
         <div className="space-y-2 mb-6">
@@ -360,51 +422,41 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
                     +{points} pts
                   </span>
                 </div>
-                {ranking.answer && (
-                  <p className="text-slate-300 text-sm mt-2 ml-11">
-                    {ranking.answer.slice(0, 100)}{ranking.answer.length > 100 ? '...' : ''}
-                  </p>
-                )}
+                <p className="text-slate-300 text-sm mt-2 ml-11">
+                  {ranking.answer || '[crickets]'}
+                </p>
               </div>
             );
           })}
         </div>
 
-        {/* Judges Pick - Most X (judge award first) */}
-        {bonusWinner && (
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-            <p className="text-slate-400 text-sm mb-1">Judges Pick for {bonusWinner.categoryDisplay} +1 point</p>
-            <p className="text-slate-100">
-              <span className="text-xl mr-2">{getPlayerDisplay(bonusWinner.playerId).avatar}</span>
-              <span className="font-semibold">{getPlayerDisplay(bonusWinner.playerId).name}</span>
-            </p>
-          </div>
-        )}
+        {/* Bonus Awards */}
+        {(bonusWinner || round.best_guesser_id || judgeWhisperers.length > 0) && (
+          <>
+            <p className="text-slate-400 text-sm mb-3">Bonus points (+1 each)</p>
+            <div className="bg-slate-800/50 rounded-xl p-4 mb-6 space-y-2">
+              {/* Judges Pick */}
+              {bonusWinner && (
+                <p className="text-slate-300 text-sm">
+                  {bonusWinner.categoryDisplay}: <span className="text-orange-400 font-medium">{getPlayerDisplay(bonusWinner.playerId).name}</span>
+                </p>
+              )}
 
-        {/* Best Who Said What (guessing bonus second) */}
-        {round.best_guesser_id && (
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-            <p className="text-slate-400 text-sm mb-1">Best Who Said What +1 point</p>
-            <p className="text-slate-100">
-              <span className="text-xl mr-2">{getPlayerDisplay(round.best_guesser_id).avatar}</span>
-              <span className="font-semibold">{getPlayerDisplay(round.best_guesser_id).name}</span>
-            </p>
-            <p className="text-slate-500 text-xs mt-1">Fastest player with the most correct guesses</p>
-          </div>
-        )}
+              {/* Best Guesser */}
+              {round.best_guesser_id && (
+                <p className="text-slate-300 text-sm">
+                  Best Guesser: <span className="text-orange-400 font-medium">{getPlayerDisplay(round.best_guesser_id).name}</span>
+                </p>
+              )}
 
-        {/* Most Like The Judges (voting bonus third) */}
-        {judgeWhisperers.length > 0 && (
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-            <p className="text-slate-400 text-sm mb-1">Most Like The Judges +1 point{judgeWhisperers.length > 1 ? ' each' : ''}</p>
-            <p className="text-slate-100">
-              {judgeWhisperers.map(id => {
-                const player = getPlayerDisplay(id);
-                return `${player.avatar} ${player.name}`;
-              }).join(', ')}
-            </p>
-            <p className="text-slate-500 text-xs mt-1">They picked the winning answer!</p>
-          </div>
+              {/* Judge Whisperers */}
+              {judgeWhisperers.length > 0 && (
+                <p className="text-slate-300 text-sm">
+                  Predicted the Winner: <span className="text-orange-400 font-medium">{judgeWhisperers.map(id => getPlayerDisplay(id).name).join(', ')}</span>
+                </p>
+              )}
+            </div>
+          </>
         )}
 
         {/* No AI results notice */}
@@ -420,7 +472,7 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
             onClick={handleContinue}
             className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
           >
-            {isLastRound ? 'See Who Won! 🏆' : 'See Standings →'}
+            {isLastRound ? 'See Who Won' : "Who's Winning?"}
           </button>
         ) : (
           <button

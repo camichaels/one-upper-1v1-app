@@ -57,7 +57,7 @@ export default function ShowdownCreate() {
       return;
     }
     if (!brag.trim()) {
-      setError('Please share your un-one-uppable brag');
+      setError('Please share a brag');
       return;
     }
     if (brag.length > 100) {
@@ -116,7 +116,7 @@ export default function ShowdownCreate() {
           {/* Category Selection */}
           <div>
             <label className="block text-slate-300 text-sm font-medium mb-3">
-              Pick a category:
+              Set the vibe:
             </label>
             <div className="grid grid-cols-2 gap-2">
               {PROMPT_CATEGORIES.map((cat) => (
@@ -141,7 +141,7 @@ export default function ShowdownCreate() {
           {/* Name */}
           <div>
             <label className="block text-slate-300 text-sm font-medium mb-2">
-              Your name:
+              What do they call you?
             </label>
             <input
               type="text"
@@ -160,7 +160,7 @@ export default function ShowdownCreate() {
           {/* Avatar */}
           <div>
             <label className="block text-slate-300 text-sm font-medium mb-2">
-              Avatar:
+              Pick your fighter:
             </label>
             <div className="grid grid-cols-4 gap-3">
               {AVATARS.map((a) => (
@@ -187,7 +187,7 @@ export default function ShowdownCreate() {
           {/* Entry Brag */}
           <div>
             <label className="block text-slate-300 text-sm font-medium mb-2">
-              Share something un-one-uppable about yourself:
+              Brag a little:
             </label>
             <textarea
               value={brag}
@@ -216,7 +216,7 @@ export default function ShowdownCreate() {
             disabled={isCreating || !name.trim() || !brag.trim()}
             className="w-full bg-orange-500 hover:bg-orange-400 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
           >
-            {isCreating ? 'Creating...' : 'Create Showdown'}
+            {isCreating ? 'Creating...' : 'Get Your Code'}
           </button>
         </div>
       </div>
