@@ -836,10 +836,10 @@ export default function VerdictFlow({
             rivalry={rivalry}
             activeProfileId={activeProfileId}
             onClose={() => setShowAllRounds(false)}
-            onSelectRound={(showId) => {
-              setShowAllRounds(false);
-              onNavigate('screen6', { showId });
-            }}
+onSelectRound={(showId) => {
+  setShowAllRounds(false);
+  onNavigate('screen6', { showId, activeProfileId });
+}}
           />
         )}
         {showCancelModal && (

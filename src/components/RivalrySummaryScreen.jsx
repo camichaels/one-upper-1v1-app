@@ -83,11 +83,10 @@ function normalizeSummary(summary, rivalry) {
   };
 }
 
-// Helper to extract first 2-3 words from a longer style description
+// Helper to clean up style text (no truncation - show full title)
 function truncateStyle(styleText) {
   if (!styleText) return "Creative player";
-  const words = styleText.split(' ').slice(0, 3).join(' ');
-  return words.length > 25 ? words.substring(0, 25) + '...' : words;
+  return styleText;
 }
 
 // Stats configuration for carousel - format functions receive (stat, allShows, rivalry)
@@ -570,16 +569,18 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
 
         {/* Golden Mic + Headline + Score */}
         <div className="text-center space-y-3">
-          {/* Golden Mic */}
-          <img 
-            src={GoldenMic} 
-            alt="Golden Mic" 
-            className={`w-16 h-16 mx-auto ${iWon ? 'drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]' : 'opacity-50 grayscale'}`}
-          />
+          {/* Golden Mic - only show for winner */}
+          {iWon && (
+            <img 
+              src={GoldenMic} 
+              alt="Golden Mic" 
+              className="w-16 h-16 mx-auto drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]"
+            />
+          )}
           
-          {/* AI-Generated Headline */}
+          {/* AI-Generated Headline - no quotes */}
           <h1 className="text-2xl font-bold text-slate-100 px-4">
-            "{summary.ai_generated?.headline || 'A Rivalry for the Ages'}"
+            {summary.ai_generated?.headline || 'A Rivalry for the Ages'}
           </h1>
 
           {/* Score: Winner: X • Loser: Y */}
@@ -670,7 +671,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </div>
         )}
 
-        {/* Player Style Cards */}
+        {/* Player Style Cards - no quotes */}
         <div className="grid grid-cols-2 gap-3">
           {/* My Style */}
           <button
@@ -681,7 +682,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               <span className="text-2xl">{myProfile.avatar}</span>
               <span className="font-semibold text-slate-100 text-sm">{myProfile.name}</span>
             </div>
-            <p className="text-orange-400 text-sm font-medium">"{myStyle.short}"</p>
+            <p className="text-orange-400 text-sm font-medium">{myStyle.short}</p>
           </button>
 
           {/* Opponent Style */}
@@ -693,15 +694,15 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               <span className="text-2xl">{opponentProfile.avatar}</span>
               <span className="font-semibold text-slate-100 text-sm">{opponentProfile.name}</span>
             </div>
-            <p className="text-orange-400 text-sm font-medium">"{opponentStyle.short}"</p>
+            <p className="text-orange-400 text-sm font-medium">{opponentStyle.short}</p>
           </button>
         </div>
 
-        {/* Ripley's Tip */}
+        {/* Ripley's Take */}
         <div className="bg-slate-800/50 rounded-xl p-5">
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xl">🎙️</span>
-            <span className="text-orange-400 font-semibold">Ripley's Tip</span>
+            <span className="text-orange-400 font-semibold">Ripley's Take</span>
           </div>
           <p className="text-slate-200 leading-relaxed">
             {summary.ai_generated?.ripley_tip || "Keep practicing and come back stronger next time."}
@@ -715,14 +716,14 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         >
           {showHistory ? (
             <>
-              Hide Past Rounds
+              Hide the Rounds
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
               </svg>
             </>
           ) : (
             <>
-              See Past Rounds
+              Relive the Rounds
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -740,7 +741,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0 mr-3">
-                    <p className="font-semibold text-slate-100">Round {show.show_number} of {RIVALRY_LENGTH}</p>
+                    <p className="font-semibold text-slate-100">Round {show.show_number}</p>
                     <p className="text-sm text-slate-400 line-clamp-1">{show.prompt}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -795,7 +796,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         )}
       </div>
 
-      {/* Style Detail Modal */}
+      {/* Style Detail Modal - no quotes */}
       {showStyleModal && (
         <div 
           className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50"
@@ -810,7 +811,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
                 <div className="text-center mb-4">
                   <span className="text-5xl">{myProfile.avatar}</span>
                   <h3 className="text-xl font-bold text-slate-100 mt-2">{myProfile.name}</h3>
-                  <p className="text-orange-400 font-medium mt-1">"{myStyle.short}"</p>
+                  <p className="text-orange-400 font-medium mt-1">{myStyle.short}</p>
                 </div>
                 <p className="text-slate-300 text-center leading-relaxed">
                   {myStyle.detail?.endsWith('.') ? myStyle.detail : `${myStyle.detail}.`}
@@ -821,7 +822,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
                 <div className="text-center mb-4">
                   <span className="text-5xl">{opponentProfile.avatar}</span>
                   <h3 className="text-xl font-bold text-slate-100 mt-2">{opponentProfile.name}</h3>
-                  <p className="text-orange-400 font-medium mt-1">"{opponentStyle.short}"</p>
+                  <p className="text-orange-400 font-medium mt-1">{opponentStyle.short}</p>
                 </div>
                 <p className="text-slate-300 text-center leading-relaxed">
                   {opponentStyle.detail?.endsWith('.') ? opponentStyle.detail : `${opponentStyle.detail}.`}

@@ -227,9 +227,8 @@ serve(async (req) => {
         ? rivalry.profile_a.name 
         : rivalry.profile_b.name;
       
-      // Check if unanimous (all judges agreed)
-      const totalJudges = Object.keys(show.judge_data?.scores || {}).length;
-      const unanimous = (judgeVotes.a === totalJudges || judgeVotes.b === totalJudges);
+      // Determine if unanimous (all judges agreed)
+      const unanimous = (judgeVotes.a === 3 || judgeVotes.b === 3);
 
       roundStats.push({
         round: show.show_number,
@@ -242,7 +241,7 @@ serve(async (req) => {
       });
     });
 
-    // Determine winner with tiebreaker logic
+    // Determine overall winner
     let winnerId = rivalry.profile_a.id;
     let winnerName = rivalry.profile_a.name;
     let loserName = rivalry.profile_b.name;
@@ -359,13 +358,13 @@ Generate a JSON response as Ripley analyzing this rivalry:
   "ripley_tip": "1-2 sentences of forward-looking advice for BOTH players based on patterns in THIS rivalry. Address each by name. Be specific — reference actual tendencies you noticed. Encouraging but honest.",
   
   "winner_style": {
-    "short": "2-4 words capturing their creative vibe (e.g., 'Clever wordsmith', 'Chaotic genius', 'Relatable storyteller')",
-    "detail": "One sentence explaining their approach based on their answers"
+    "short": "EXACTLY 2-4 words only. A punchy label like 'Wordplay wizard' or 'Chaos agent'. NO full sentences.",
+    "detail": "One full sentence explaining their approach based on their actual answers."
   },
   
   "loser_style": {
-    "short": "2-4 words capturing their creative vibe",
-    "detail": "One sentence explaining their approach based on their answers"
+    "short": "EXACTLY 2-4 words only. A punchy label. NO full sentences.",
+    "detail": "One full sentence explaining their approach based on their actual answers."
   }
 }
 

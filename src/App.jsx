@@ -172,7 +172,13 @@ function GameRouter({
   }
 
   if (currentScreen === 'screen6') {
-    return <Screen6 onNavigate={handleNavigate} showId={showId} />;
+    return (
+      <Screen6 
+        onNavigate={handleNavigate} 
+        showId={showId} 
+        activeProfileId={activeProfileId} 
+      />
+    );
   }
 
   if (currentScreen === 'screen6summary') {
