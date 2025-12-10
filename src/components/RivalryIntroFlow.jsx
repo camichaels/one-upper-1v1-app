@@ -19,6 +19,22 @@ const RIPLEY_INTROS = [
   "I run the show. The judges do the hard part."
 ];
 
+// Randomized intro screen titles
+const INTRO_TITLES = [
+  "It's on!",
+  "Game on!",
+  "Here we go!",
+  "Let the rivalry begin!",
+  "And so it begins...",
+  "Ready... set...",
+  "Let's goooo!",
+  "Oh, it's ON.",
+  "Showtime!",
+  "Buckle up.",
+  "No turning back now.",
+  "Challenge accepted."
+];
+
 // Randomized game explanations
 const GAME_EXPLANATIONS = [
   {
@@ -83,6 +99,7 @@ export default function RivalryIntroFlow({
   onComplete
 }) {
   const [currentScreen, setCurrentScreen] = useState(1);
+  const [introTitle] = useState(() => pickRandom(INTRO_TITLES));
   const [ripleyGreeting] = useState(() => pickRandom(RIPLEY_GREETINGS));
   const [ripleyIntro] = useState(() => pickRandom(RIPLEY_INTROS));
   const [gameExplanation] = useState(() => pickRandom(GAME_EXPLANATIONS));
@@ -132,7 +149,12 @@ export default function RivalryIntroFlow({
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
         <Header />
-        <div className="max-w-md mx-auto w-full mt-8">
+        <div className="max-w-md mx-auto w-full mt-4">
+
+          {/* Intro title */}
+          <h1 className="text-2xl font-bold text-slate-100 text-center mb-6">
+            {introTitle}
+          </h1>
 
           {/* Ripley speech bubble */}
           <div className="bg-slate-800/80 rounded-2xl p-5 w-full mb-8">
@@ -203,7 +225,7 @@ export default function RivalryIntroFlow({
               </div>
             )}
             <div>
-              <span className="text-slate-400 text-sm">Types of questions: </span>
+              <span className="text-slate-400 text-sm">The vibe: </span>
               <span className="text-slate-200">{categoryDisplay}</span>
             </div>
           </div>
@@ -224,7 +246,7 @@ export default function RivalryIntroFlow({
             onClick={() => setCurrentScreen(3)}
             className="w-full py-4 bg-orange-500 hover:bg-orange-400 text-white font-semibold rounded-xl transition-colors"
           >
-            Here's How to Win
+            How It Works
           </button>
         </div>
       </div>
@@ -241,7 +263,8 @@ export default function RivalryIntroFlow({
           {/* Game Objective Box */}
           <div className="bg-slate-800/50 rounded-2xl p-5 mb-6">
             <p className="text-slate-400 text-sm mb-1">Game objective:</p>
-            <p className="text-slate-200">Write the most outlandish answer to ridiculous prompts.</p>
+            <p className="text-slate-200 mb-2">Write the most outlandish answer to ridiculous prompts.</p>
+            <p className="text-slate-200">Three judges decide who did it better.</p>
           </div>
 
           {/* Ripley speech bubble */}
@@ -281,7 +304,7 @@ export default function RivalryIntroFlow({
         <div className="max-w-md mx-auto w-full mt-8">
 
           {/* Judges title */}
-          <p className="text-slate-400 text-sm mb-3">Your judges for this rivalry:</p>
+          <p className="text-slate-400 text-sm mb-3">Today's judges:</p>
 
           {/* Judge cards */}
           <div className="space-y-3 mb-6">
@@ -360,7 +383,7 @@ export default function RivalryIntroFlow({
                 onClick={() => setSelectedJudge(null)}
                 className="w-full py-3 bg-orange-500 hover:bg-orange-400 text-white font-semibold rounded-lg transition-colors"
               >
-                Close
+                Got It
               </button>
             </div>
           </div>

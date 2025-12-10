@@ -9,6 +9,17 @@ import InterstitialScreen from './InterstitialScreen';
 import VerdictFlow from './VerdictFlow';
 import RivalryIntroFlow from './RivalryIntroFlow';
 
+// Rotating headlines for waiting state
+const WAITING_HEADLINES = [
+  "Locked in!",
+  "Done!",
+  "You're in.",
+  "Nice.",
+  "Submitted!",
+  "Your move's made.",
+  "Now we wait..."
+];
+
 export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId, verdictStep, setVerdictStep }) {
   const [loading, setLoading] = useState(true);
   const [rivalry, setRivalry] = useState(null);
@@ -33,6 +44,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   const [showIntroFlow, setShowIntroFlow] = useState(false);
   const [rivalryJudges, setRivalryJudges] = useState([]);
   const [rivalryCancelled, setRivalryCancelled] = useState(false);
+  const [waitingHeadline] = useState(() => WAITING_HEADLINES[Math.floor(Math.random() * WAITING_HEADLINES.length)]);
   const prevShowIdRef = useRef(null);
 
   // Reset verdictStep when moving to a new show
@@ -952,6 +964,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     return (
       <InterstitialScreen
         emceeText={interstitialText}
+        nextRound={currentShow.show_number + 1}
         onComplete={async () => {
           // Load the next show FIRST, before hiding interstitial
           const nextShowNumber = currentShow.show_number + 1;
@@ -1076,6 +1089,11 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
             <MenuButton />
           </div>
 
+          {/* Waiting headline */}
+          <h1 className="text-2xl font-bold text-slate-100 text-center mb-6">
+            {waitingHeadline}
+          </h1>
+
           {/* Prompt - Hero */}
           <div className="mb-6 text-center">
             <p className="text-2xl font-bold text-slate-100">{currentShow.prompt}</p>
@@ -1103,12 +1121,12 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
             {/* Waiting status */}
             <div className="text-slate-300 text-lg text-center">⏳ Waiting for {opponentProfile.name}...</div>
 
-            {/* Nudge button */}
+            {/* Nudge button - secondary style */}
             <button
               onClick={() => setShowNudgeModal(true)}
-              className="w-full py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
+              className="w-full py-4 bg-slate-700 text-slate-200 rounded-xl hover:bg-slate-600 transition-all font-semibold border border-slate-600"
             >
-              NUDGE {opponentProfile.name.toUpperCase()}
+              Nudge {opponentProfile.name}
             </button>
           </div>
         </div>
@@ -1161,25 +1179,25 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
               <h3 className="text-lg font-bold text-slate-100 mb-2">
-                Send a Nudge?
+                Nudge {opponentProfile?.name}?
               </h3>
               {opponentProfile?.sms_consent ? (
                 <>
                   <p className="text-slate-300 text-sm mb-6">
-                    {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
+                    {opponentProfile?.name} got a notification when you submitted. Send another?
                   </p>
                   <div className="space-y-2">
                     <button
                       onClick={sendNudge}
                       className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
                     >
-                      Send Nudge
+                      Send
                     </button>
                     <button
                       onClick={() => setShowNudgeModal(false)}
                       className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
                     >
-                      Cancel
+                      Never mind
                     </button>
                   </div>
                 </>
@@ -1279,7 +1297,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
 
           {/* Deliberating message */}
           <div className="text-center space-y-8">
-            <div className="text-xl text-slate-200 font-medium">JUDGES DELIBERATING...</div>
+            <div className="text-xl text-slate-200 font-medium">Judges deliberating...</div>
             
             {/* Orbiting judges */}
             <div className="relative w-48 h-48 mx-auto">
@@ -1539,17 +1557,18 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
                 className="w-full h-32 p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 resize-none mb-2 focus:outline-none focus:border-orange-500 transition-colors"
                 maxLength={300}
               />
-              <div className="text-sm text-right mb-4">
-                <span className={wordCount > 30 ? 'text-red-400' : 'text-slate-400'}>
+              <div className="flex justify-between text-sm mb-4">
+                <span className={wordCount > 30 ? 'text-red-400' : 'text-slate-500'}>
                   {wordCount}/30 words
                 </span>
+                <span className="text-slate-500">Be bold. Be weird. Be unexpected.</span>
               </div>
               <button
                 onClick={submitAnswer}
                 disabled={!myAnswer.trim() || wordCount > 30}
                 className="w-full py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 font-semibold"
               >
-                Submit Your Answer
+                Lock It In
               </button>
             </div>
           )}
@@ -1607,25 +1626,25 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
             <h3 className="text-lg font-bold text-slate-100 mb-2">
-              Send a Nudge?
+              Nudge {opponentProfile?.name}?
             </h3>
             {opponentProfile?.sms_consent ? (
               <>
                 <p className="text-slate-300 text-sm mb-6">
-                  {opponentProfile?.name} already got a notification when you submitted your answer. Send an extra nudge?
+                  {opponentProfile?.name} got a notification when you submitted. Send another?
                 </p>
                 <div className="space-y-2">
                   <button
                     onClick={sendNudge}
                     className="w-full py-3 bg-orange-500 text-white font-medium rounded hover:bg-orange-400"
                   >
-                    Send Nudge
+                    Send
                   </button>
                   <button
                     onClick={() => setShowNudgeModal(false)}
                     className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
                   >
-                    Cancel
+                    Never mind
                   </button>
                 </div>
               </>

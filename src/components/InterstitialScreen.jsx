@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import Header from './Header';
 
-export default function InterstitialScreen({ emceeText, onComplete }) {
+export default function InterstitialScreen({ emceeText, onComplete, nextRound }) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex flex-col px-5 py-8">
       <Header />
@@ -19,12 +19,12 @@ export default function InterstitialScreen({ emceeText, onComplete }) {
           {emceeText}
         </p>
       
-        {/* Single continue button - no countdown */}
+        {/* Continue button with round number */}
         <button
           onClick={onComplete}
           className="w-full max-w-sm px-6 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
         >
-          Continue
+          {nextRound ? `On to Round ${nextRound}` : 'Continue'}
         </button>
       </div>
     </div>

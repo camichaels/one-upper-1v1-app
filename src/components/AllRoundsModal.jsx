@@ -28,24 +28,29 @@ export default function AllRoundsModal({
             <p className="text-slate-400 text-center py-8">No completed rounds yet.</p>
           ) : (
             sortedShows.map((show) => {
-              const winnerIsA = show.winner_id === rivalry.profile_a_id;
-              const winnerName = winnerIsA ? rivalry.profile_a.name : rivalry.profile_b.name;
-              const loserName = winnerIsA ? rivalry.profile_b.name : rivalry.profile_a.name;
+              // Get my profile and opponent profile
+              const iAmProfileA = activeProfileId === rivalry.profile_a_id;
+              const myName = iAmProfileA ? rivalry.profile_a.name : rivalry.profile_b.name;
+              const opponentName = iAmProfileA ? rivalry.profile_b.name : rivalry.profile_a.name;
               
-              // Calculate scores
-              let winnerScore = 0;
-              let loserScore = 0;
+              // Calculate scores for me and opponent
+              let myScore = 0;
+              let opponentScore = 0;
               if (show.judge_data?.scores) {
                 Object.values(show.judge_data.scores).forEach(data => {
-                  if (winnerIsA) {
-                    winnerScore += data.profile_a_score;
-                    loserScore += data.profile_b_score;
+                  if (iAmProfileA) {
+                    myScore += data.profile_a_score;
+                    opponentScore += data.profile_b_score;
                   } else {
-                    winnerScore += data.profile_b_score;
-                    loserScore += data.profile_a_score;
+                    myScore += data.profile_b_score;
+                    opponentScore += data.profile_a_score;
                   }
                 });
               }
+              
+              // Determine winner
+              const iWon = myScore > opponentScore;
+              const opponentWon = opponentScore > myScore;
 
               return (
                 <button
@@ -56,7 +61,7 @@ export default function AllRoundsModal({
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <p className="font-bold text-slate-100">Round {show.show_number}</p>
-                      <p className="text-sm text-slate-400 line-clamp-2">{show.prompt}</p>
+                      <p className="text-sm text-slate-300 line-clamp-2">{show.prompt}</p>
                     </div>
                     <svg 
                       className="w-5 h-5 text-slate-500 flex-shrink-0 mt-1" 
@@ -67,8 +72,14 @@ export default function AllRoundsModal({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
-                  <p className="text-sm text-slate-300">
-                    {winnerName}: {winnerScore} • {loserName}: {loserScore}
+                  <p className="text-sm">
+                    <span className={iWon ? 'text-orange-400 font-semibold' : 'text-slate-400'}>
+                      {myName}: {myScore}
+                    </span>
+                    <span className="text-slate-500"> • </span>
+                    <span className={opponentWon ? 'text-orange-400 font-semibold' : 'text-slate-400'}>
+                      {opponentName}: {opponentScore}
+                    </span>
                   </p>
                 </button>
               );

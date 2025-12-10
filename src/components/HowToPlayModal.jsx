@@ -13,27 +13,27 @@ export default function HowToPlayModal({ onClose }) {
           <ul className="space-y-2 text-slate-300 text-sm">
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Every Rivalry is 5 Rounds</span>
+              <span>5 rounds per rivalry</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Both Players Answer the Same Prompt</span>
+              <span>Both rivals answer the same prompt</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>3 AI Judges Score You (1-10 each)</span>
+              <span>3 AI judges score you 1-10 each</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Highest Total Score Wins the Round</span>
+              <span>Highest score wins the round</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Tied Score? First to Submit Wins!</span>
+              <span>Tied? Fastest answer wins.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Most Round Wins Gets the Golden Mic 🎤</span>
+              <span>Win the most rounds, win the Golden Mic</span>
             </li>
           </ul>
         </div>
@@ -44,19 +44,15 @@ export default function HowToPlayModal({ onClose }) {
           <ul className="space-y-2 text-slate-300 text-sm">
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Be funny, creative, or outrageous</span>
+              <span>Be funny. Be weird. Be memorable.</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Check out the judges' personalities (find ways to appeal to them)</span>
+              <span>Learn the judges - play to their quirks</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Speed matters when it's close!</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-orange-500 flex-shrink-0">•</span>
-              <span>Check out judge banter and past round scores</span>
+              <span>Review past rounds for intel</span>
             </li>
           </ul>
         </div>
@@ -90,7 +86,7 @@ export default function HowToPlayModal({ onClose }) {
           onClick={onClose}
           className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all font-semibold"
         >
-          Got It!
+          Got It
         </button>
       </div>
     </div>

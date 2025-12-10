@@ -47,6 +47,79 @@ const STAKES_SUGGESTIONS = [
   "naming rights for something"
 ];
 
+// Judge quotes - same pool as Showdown
+const JUDGE_QUOTES = [
+  { text: "Bore me and I'll know.", judge: "Judge Savage", emoji: "🔥" },
+  { text: "Safe answers finish last.", judge: "Judge Savage", emoji: "🔥" },
+  { text: "Make me feel something. That's all I ask.", judge: "Judge Riley", emoji: "💙" },
+  { text: "Heart wins here. Bring yours.", judge: "Judge Riley", emoji: "💙" },
+  { text: "Impress me. Intellectually.", judge: "Judge Snoot", emoji: "🎓" },
+  { text: "I award points for elegance. Plan accordingly.", judge: "Judge Snoot", emoji: "🎓" },
+  { text: "Do you have what it takes? We'll find out.", judge: "Judge Coach", emoji: "💪" },
+  { text: "Leave it all on the field.", judge: "Judge Coach", emoji: "💪" },
+  { text: "My scoring logic? Wouldn't you like to know.", judge: "Judge Wildcard", emoji: "🎲" },
+  { text: "I might love it. I might not. Even I don't know yet.", judge: "Judge Wildcard", emoji: "🎲" },
+  { text: "Main character energy only, please.", judge: "Judge Diva", emoji: "🎬" },
+  { text: "Give me drama or give me nothing.", judge: "Judge Diva", emoji: "🎬" },
+  { text: "HUMOR.EXE loading... prepare for evaluation.", judge: "Judge GLiTCH", emoji: "🤖" },
+  { text: "Your response will be processed. Resistance is suboptimal.", judge: "Judge GLiTCH", emoji: "🤖" },
+  { text: "Explain 'funny' again? Slowly this time.", judge: "Judge Zorp", emoji: "👽" },
+  { text: "Earth humor remains... confusing. But I am ready.", judge: "Judge Zorp", emoji: "👽" },
+  { text: "Bars. Flow. Victory. Let's go.", judge: "Judge Hype", emoji: "🎤" },
+  { text: "Spit your best. I'll judge the rest.", judge: "Judge Hype", emoji: "🎤" },
+  { text: "Back in my day, we were actually funny.", judge: "Judge Gramps", emoji: "👴" },
+  { text: "Show me something timeless, kid.", judge: "Judge Gramps", emoji: "👴" },
+  { text: "Can this joke scale? Let's find out.", judge: "Judge Mogul", emoji: "💸" },
+  { text: "Disrupt my expectations or pivot out.", judge: "Judge Mogul", emoji: "💸" },
+  { text: "Your answer is a mirror. What will it reflect?", judge: "Judge Guru", emoji: "🧘" },
+  { text: "The real one-upper was inside you all along. Maybe.", judge: "Judge Guru", emoji: "🧘" },
+  { text: "Too wholesome and I'll pretend to hate it.", judge: "Judge Edge", emoji: "🔪" },
+  { text: "Make it weird. I can take it.", judge: "Judge Edge", emoji: "🔪" },
+  { text: "I've studied 10,000 jokes. Surprise me.", judge: "Judge Scholar", emoji: "📚" },
+  { text: "Structurally, this should be interesting.", judge: "Judge Scholar", emoji: "📚" },
+  { text: "Comedy is dead. Prove me wrong.", judge: "Judge Artiste", emoji: "🎨" },
+  { text: "I don't expect you to understand my scoring.", judge: "Judge Artiste", emoji: "🎨" },
+  { text: "No pain, no gain. Same goes for jokes.", judge: "Judge Tank", emoji: "🏋️" },
+  { text: "Hit me with your PR. Personal Response.", judge: "Judge Tank", emoji: "🏋️" },
+  { text: "Clutch or kick. Your call.", judge: "Judge Gamer", emoji: "🎮" },
+  { text: "Time to lock in. No throwing.", judge: "Judge Gamer", emoji: "🎮" },
+  { text: "I detect notes of... potential.", judge: "Judge Sommelier", emoji: "🍷" },
+  { text: "Let's see if this answer has legs.", judge: "Judge Sommelier", emoji: "🍷" },
+  { text: "Rules? I don't remember agreeing to rules.", judge: "Judge Chaos", emoji: "🎪" },
+  { text: "Scoring is a construct. But I'll do it anyway.", judge: "Judge Chaos", emoji: "🎪" },
+  { text: "This better be seasoned properly.", judge: "Judge Chef", emoji: "👨‍🍳" },
+  { text: "Raw talent only. No microwaved answers.", judge: "Judge Chef", emoji: "👨‍🍳" },
+  { text: "I've become the judge. There is no me anymore.", judge: "Judge Method", emoji: "🎭" },
+  { text: "Show me truth. I'll know if you're faking.", judge: "Judge Method", emoji: "🎭" },
+  { text: "Make some noise or get off the stage.", judge: "Judge Rockstar", emoji: "🎸" },
+  { text: "This ain't soundcheck. Bring the arena energy.", judge: "Judge Rockstar", emoji: "🎸" },
+  { text: "Hypothesis: you're funny. Let's test it.", judge: "Judge Scientist", emoji: "🔬" },
+  { text: "Your humor will be measured. Precisely.", judge: "Judge Scientist", emoji: "🔬" },
+  { text: "Everyone's a winner! But also, someone has to lose.", judge: "Judge Wholesome", emoji: "🌈" },
+  { text: "I believe in you! Now don't let me down.", judge: "Judge Wholesome", emoji: "🌈" },
+  { text: "I've witnessed a million joke deaths. Don't join them.", judge: "Judge Reaper", emoji: "💀" },
+  { text: "Make me laugh, or join my list.", judge: "Judge Reaper", emoji: "💀" },
+  { text: "A rivalry isn't personal. Okay, it's a little personal.", judge: "Judge Diva", emoji: "🎬" },
+  { text: "Two enter. One leaves slightly smugger.", judge: "Judge Savage", emoji: "🔥" },
+  { text: "The best rivalries are built on mutual respect. And trash talk.", judge: "Judge Coach", emoji: "💪" },
+];
+
+// Greeting rotations for returning users
+const GREETINGS = [
+  (name) => `Hey ${name}!`,
+  (name) => `Let's go, ${name}!`,
+  (name) => `Back for more, ${name}?`,
+  (name) => `${name}! Welcome back.`,
+  (name) => `${name}'s here!`,
+  (name) => `${name} has entered.`,
+  (name) => `Oh, it's on, ${name}.`,
+  (name) => `${name}! Let's do this.`,
+  (name) => `Ready, ${name}?`,
+  (name) => `Hey hey, ${name}!`,
+  (name) => `${name}'s back!`,
+  (name) => `What's up, ${name}?`,
+];
+
 // Prompt categories
 const PROMPT_CATEGORIES = [
   { key: 'mixed', label: 'Surprise Me', emoji: '🔀' },
@@ -97,6 +170,16 @@ export default function Screen1({ onNavigate }) {
   const [resumeCode, setResumeCode] = useState('');
   const [resumeError, setResumeError] = useState('');
   const [isResuming, setIsResuming] = useState(false);
+  
+  // Judge quote (State A)
+  const [judgeQuote] = useState(() => 
+    JUDGE_QUOTES[Math.floor(Math.random() * JUDGE_QUOTES.length)]
+  );
+  
+  // Greeting rotation (State B)
+  const [greetingIndex] = useState(() => 
+    Math.floor(Math.random() * GREETINGS.length)
+  );
   
   // Forgot code state (State A)
   const [showForgotCodeModal, setShowForgotCodeModal] = useState(false);
@@ -636,7 +719,7 @@ useEffect(() => {
 
       // Validate format
       if (!isValidCodeFormat(formattedCode)) {
-        setResumeError('Invalid Profile ID format');
+        setResumeError('Hmm, that doesn\'t look right');
         setIsResuming(false);
         return;
       }
@@ -649,7 +732,7 @@ useEffect(() => {
         .single();
 
       if (error || !existingProfile) {
-        setResumeError('Profile ID not found. Check and try again.');
+        setResumeError('We couldn\'t find that one. Double check?');
         setIsResuming(false);
         return;
       }
@@ -662,7 +745,7 @@ useEffect(() => {
       window.location.reload();
     } catch (err) {
       console.error('Error resuming:', err);
-      setResumeError('Failed to resume. Try again.');
+      setResumeError('Something went wrong. Try again?');
       setIsResuming(false);
     }
   };
@@ -862,7 +945,7 @@ useEffect(() => {
 
       // Validate format (4 chars)
       if (code.length !== 4) {
-        setJoinError('Invalid invite code');
+        setJoinError('Hmm, that code didn\'t work. Double check it?');
         setIsJoining(false);
         return;
       }
@@ -878,14 +961,14 @@ useEffect(() => {
         .single();
 
       if (inviteError || !invite) {
-        setJoinError('Invalid invite code. Check with your friend.');
+        setJoinError('Hmm, that code didn\'t work. Double check it?');
         setIsJoining(false);
         return;
       }
 
       // Check if expired
       if (new Date(invite.expires_at) < new Date()) {
-        setJoinError('This invite has expired. Ask your friend for a new one.');
+        setJoinError('This code expired. Time for a fresh one!');
         setIsJoining(false);
         return;
       }
@@ -899,7 +982,7 @@ useEffect(() => {
 
       // Check if entering own code
       if (invite.creator_profile_id === profile.id) {
-        setJoinError("You can't join your own invite!");
+        setJoinError('Nice try, but you can\'t challenge yourself!');
         setIsJoining(false);
         return;
       }
@@ -1223,7 +1306,7 @@ useEffect(() => {
   if (currentState === 'A') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <HeaderWithBack backTo="/go" />
+        {!showForm ? <HeaderWithBack backTo="/go" /> : <Header />}
         <div className="max-w-md mx-auto">
           
           {/* Show personalized message if coming from /join link */}
@@ -1242,63 +1325,78 @@ useEffect(() => {
 
           {!showForm ? (
             <>
-              <p className="text-slate-300 text-center mb-4 text-lg">
-                New here? Let's get you started!
-              </p>
+              {/* Tagline */}
+              <h1 className="text-2xl font-bold text-orange-400 text-center mb-8">
+                Ready to out-think a friend?
+              </h1>
               
               <button
                 onClick={() => setShowForm(true)}
-                className="w-full py-4 bg-orange-500 text-white font-semibold rounded-lg shadow-lg hover:bg-orange-400 transition-all"
+                className="w-full py-4 bg-orange-500 text-white font-semibold rounded-xl shadow-lg hover:bg-orange-400 transition-all text-lg"
               >
-                Create Profile
+                Create Your Profile
               </button>
 
               {/* Resume Section */}
               <div className="mt-8">
-                <p className="text-slate-400 text-center text-sm mb-3">
-                  Been here before?
+                <p className="text-slate-300 text-center text-sm mb-3">
+                  Back for more?
                 </p>
                 
-                <input
-                  type="text"
-                  value={resumeCode}
-                  onChange={(e) => setResumeCode(e.target.value)}
-                  placeholder="Enter your Profile ID"
-                  className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg uppercase"
-                />
+                {/* Inline input + Go button */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={resumeCode}
+                    onChange={(e) => setResumeCode(e.target.value.toUpperCase())}
+                    placeholder="Your Profile ID"
+                    className="flex-1 bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
+                  />
+                  <button
+                    onClick={handleResume}
+                    disabled={!resumeCode.trim() || isResuming}
+                    className="px-6 py-3 bg-slate-700 text-slate-200 font-semibold rounded-xl hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isResuming ? '...' : 'Go'}
+                  </button>
+                </div>
                 
                 {resumeError && (
-                  <p className="text-red-400 text-sm mt-1">{resumeError}</p>
+                  <p className="text-red-400 text-sm mt-2 text-center">{resumeError}</p>
                 )}
-                
-                <button
-                  onClick={handleResume}
-                  disabled={!resumeCode.trim() || isResuming}
-                  className="w-full mt-3 py-3 bg-slate-600/50 text-slate-200 font-medium rounded-lg border border-slate-500 hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isResuming ? 'Resuming...' : 'Resume'}
-                </button>
                 
                 {/* Forgot Code Link */}
                 <button
                   onClick={() => setShowForgotCodeModal(true)}
-                  className="w-full mt-2 text-slate-400 text-sm hover:text-slate-300 transition-colors"
+                  className="w-full mt-3 text-slate-500 text-sm hover:text-slate-400 transition-colors"
                 >
                   Forgot your Profile ID?
                 </button>
               </div>
+
+              {/* Judge Quote */}
+              {judgeQuote && (
+                <div className="text-center mt-12">
+                  <p className="text-slate-400 italic text-sm">
+                    {judgeQuote.text}
+                  </p>
+                  <p className="text-slate-500 text-xs mt-1">
+                    {judgeQuote.emoji} {judgeQuote.judge}
+                  </p>
+                </div>
+              )}
             </>
           ) : (
             /* Profile Creation Form */
             <form onSubmit={handleCreateProfile} className="space-y-4">
-              <h3 className="text-xl font-bold text-orange-500 mb-4">
+              <h3 className="text-xl font-bold text-orange-500 mb-4 text-center">
                 Create Your Profile
               </h3>
               
               {/* Avatar Picker */}
               <div>
                 <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Avatar:
+                  Pick your fighter:
                 </label>
                 <div className="grid grid-cols-4 gap-3">
                   {AVATARS.map((av) => (
@@ -1320,14 +1418,14 @@ useEffect(() => {
               
               {/* Name Input */}
               <div>
-                <label className="text-sm text-slate-400 mb-1 block">
-                  What should we call you?
+                <label className="block text-sm font-semibold text-slate-200 mb-2">
+                  What do they call you?
                 </label>
                 <input
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Your name"
+                  placeholder="Enter your name"
                   maxLength={20}
                   className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
@@ -1352,17 +1450,18 @@ useEffect(() => {
               {/* Bio Input */}
               <div>
                 <label className="block text-sm font-semibold text-slate-200 mb-2">
-                  Bio <span className="text-slate-500 font-normal">(optional):</span>
+                  Brag a little:
                 </label>
                 <input
                   type="text"
                   value={formData.bio}
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  placeholder="Pun enthusiast"
-                  maxLength={50}
+                  placeholder="I once got a standing ovation for parallel parking..."
+                  maxLength={100}
+                  required
                   className="w-full px-4 py-3 bg-slate-700/50 border border-slate-600 rounded-md text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors"
                 />
-                <p className="text-xs text-slate-500 mt-1">Max 50 characters</p>
+                <p className="text-xs text-slate-500 mt-1 text-right">{formData.bio?.length || 0}/100</p>
               </div>
 
               {/* SMS Consent */}
@@ -1399,7 +1498,7 @@ useEffect(() => {
                 disabled={isSubmitting}
                 className="w-full py-4 bg-orange-500 text-white font-semibold rounded-lg shadow-lg hover:bg-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isSubmitting ? 'Creating...' : 'Create'}
+                {isSubmitting ? 'Creating...' : 'Let\'s Go'}
               </button>
               
               <button
@@ -1469,14 +1568,14 @@ useEffect(() => {
                   /* Phone input */
                   <>
                     <p className="text-slate-300 text-sm">
-                      Enter the phone number you used to create your profile:
+                      What phone number is on your profile?
                     </p>
                     
                     <input
                       type="tel"
                       value={forgotCodePhone}
                       onChange={(e) => setForgotCodePhone(e.target.value)}
-                      placeholder="(555) 123-4567"
+                      placeholder="415-555-1234"
                       className="w-full bg-slate-900 border border-slate-600 rounded-lg px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500"
                       autoFocus
                     />
@@ -1490,7 +1589,7 @@ useEffect(() => {
                       disabled={!forgotCodePhone.trim() || isForgotCodeLoading}
                       className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-3 px-6 rounded-lg transition-colors"
                     >
-                      {isForgotCodeLoading ? 'Looking up...' : 'Find My Profile'}
+                      {isForgotCodeLoading ? 'Looking...' : 'Look Me Up'}
                     </button>
                   </>
                 )}
@@ -1514,11 +1613,8 @@ useEffect(() => {
           <div className="relative">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-slate-100">
-                Hi, {profile.name}! {profile.avatar}
+                {GREETINGS[greetingIndex](profile.name)}
               </h2>
-              <p className="text-slate-400 text-sm mt-1">
-                Your Profile ID: <span className="text-slate-300">{profile.code}</span>
-              </p>
             </div>
             <div className="absolute top-0 right-0">
               <button 
@@ -1546,15 +1642,6 @@ useEffect(() => {
                       className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
                     >
                       Your Profiles
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        setShowAbout(true);
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      About One-Upper
                     </button>
                     <button
                       onClick={() => {
@@ -1633,7 +1720,7 @@ useEffect(() => {
                   onClick={() => setShowStartExpanded(!showStartExpanded)}
                   className="w-full bg-orange-500 hover:bg-orange-400 text-white py-4 px-6 rounded-xl font-semibold transition-colors flex items-center justify-center gap-2"
                 >
-                  <span>🎤 Start a Rivalry</span>
+                  <span>Start a Rivalry</span>
                   {showStartExpanded ? (
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -1650,7 +1737,7 @@ useEffect(() => {
                   <div className="bg-slate-800/50 rounded-xl p-4 space-y-4">
                     {/* Category Grid */}
                     <div className="space-y-3">
-                      <label className="text-sm text-slate-400 font-medium">Pick a category:</label>
+                      <label className="text-sm text-slate-200 font-semibold">Set the vibe:</label>
                       <div className="grid grid-cols-2 gap-2">
                         {PROMPT_CATEGORIES.map((cat) => (
                           <button
@@ -1671,30 +1758,19 @@ useEffect(() => {
 
                     {/* Stakes input */}
                     <div className="space-y-2">
-                      <label className="text-sm text-slate-400">Up the stakes (optional):</label>
+                      <label className="text-sm text-slate-200 font-semibold">Up the stakes (optional):</label>
                       <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <input
-                            type="text"
-                            value={stakes}
-                            onChange={(e) => setStakes(e.target.value.slice(0, 50))}
-                            placeholder="bragging rights? a burrito?"
-                            className="w-full bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-3 pr-8 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors text-sm"
-                          />
-                          {stakes && (
-                            <button
-                              type="button"
-                              onClick={() => setStakes('')}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors text-lg font-bold"
-                            >
-                              ×
-                            </button>
-                          )}
-                        </div>
+                        <input
+                          type="text"
+                          value={stakes}
+                          onChange={(e) => setStakes(e.target.value.slice(0, 50))}
+                          placeholder="bragging rights? a burrito?"
+                          className="flex-1 bg-slate-700/50 border border-slate-600 rounded-lg px-3 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors text-sm h-12"
+                        />
                         <button
                           type="button"
                           onClick={getRandomStakes}
-                          className="bg-slate-700 hover:bg-slate-600 text-slate-100 px-3 py-3 rounded-lg transition-colors text-lg border border-slate-600"
+                          className="bg-slate-700 hover:bg-slate-600 text-slate-100 px-3 rounded-lg transition-colors text-lg border border-slate-600 h-12 w-12 flex items-center justify-center"
                           title="Random suggestion"
                         >
                           🎲
@@ -1711,7 +1787,7 @@ useEffect(() => {
                             disabled={isGeneratingInvite}
                             className="w-full bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white py-3 px-4 rounded-lg font-semibold transition-colors"
                           >
-                            {isGeneratingInvite ? 'Creating...' : 'Create Invite Code'}
+                            {isGeneratingInvite ? 'Generating...' : 'Generate Invite Code'}
                           </button>
                           {inviteError && (
                             <p className="text-red-400 text-sm text-center">{inviteError}</p>
@@ -1720,11 +1796,11 @@ useEffect(() => {
                       ) : (
                         <>
                           <div className="text-center">
-                            <p className="text-sm text-slate-400 mb-2">Share this code with your rival:</p>
+                            <p className="text-sm text-slate-400 mb-2">Send this to your rival:</p>
                             <div className="text-4xl font-mono font-bold text-orange-500 tracking-widest mb-1">
                               {inviteCode}
                             </div>
-                            <p className="text-xs text-slate-500">Expires in 24 hours</p>
+                            <p className="text-xs text-slate-500">Good for 24 hours</p>
                           </div>
                           <div className="flex gap-3">
                             <button
@@ -1744,7 +1820,7 @@ useEffect(() => {
                             onClick={resetInviteCode}
                             className="w-full text-slate-500 hover:text-slate-300 text-sm py-2 transition-colors"
                           >
-                            Create new code
+                            Generate new code
                           </button>
                         </>
                       )}
@@ -1758,8 +1834,20 @@ useEffect(() => {
                 onClick={() => setShowJoinModal(true)}
                 className="w-full bg-slate-700 hover:bg-slate-600 text-slate-100 py-4 px-6 rounded-xl font-medium transition-colors border border-slate-600"
               >
-                Have an Invite Code?
+                Got an Invite?
               </button>
+            </div>
+          )}
+
+          {/* Judge Quote */}
+          {judgeQuote && (
+            <div className="text-center mt-8">
+              <p className="text-slate-400 italic text-sm">
+                {judgeQuote.text}
+              </p>
+              <p className="text-slate-500 text-xs mt-1">
+                {judgeQuote.emoji} {judgeQuote.judge}
+              </p>
             </div>
           )}
 
@@ -1784,7 +1872,7 @@ useEffect(() => {
                   </button>
                 </div>
 
-                <p className="text-slate-300">Enter invite code:</p>
+                <p className="text-slate-300">Enter the code:</p>
 
                 <input
                   type="text"
@@ -1821,7 +1909,7 @@ useEffect(() => {
                   disabled={friendCode.length !== 4 || isJoining}
                   className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-slate-700 disabled:text-slate-500 text-white font-bold py-4 px-6 rounded-lg transition-colors text-lg"
                 >
-                  {isJoining ? 'Starting...' : 'Start Rivalry'}
+                  {isJoining ? 'Joining...' : 'Let\'s Go'}
                 </button>
               </div>
             </div>
@@ -1874,15 +1962,6 @@ if (currentState === 'C') {
                     className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
                   >
                     Your Profiles
-                  </button>
-                  <button
-                    onClick={() => {
-                      setShowMenu(false);
-                      setShowAbout(true);
-                    }}
-                    className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                  >
-                    About One-Upper
                   </button>
                   <button
                     onClick={() => {

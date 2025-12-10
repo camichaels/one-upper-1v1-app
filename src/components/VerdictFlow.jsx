@@ -25,6 +25,12 @@ const ripleyBanterIntros = [
   "Judges, break it down for us.",
   "What's the verdict looking like, judges?",
   "Alright judges, give us the scoop.",
+  "The judges have thoughts...",
+  "Let's eavesdrop on the judges...",
+  "Judges, take it away...",
+  "Here's what the judges are saying...",
+  "The judges are weighing in...",
+  "Let's see what the judges think...",
 ];
 
 // Ripley verdict lines (triggered by situation)
@@ -74,9 +80,9 @@ const ripleyVerdictLines = {
 // Artifact configuration
 const artifactConfig = {
   'celebrity_match': { icon: '⭐', label: 'Celebrity Match' },
-  'fake_headline': { icon: '📰', label: 'Fake Headline' },
-  'fact_check': { icon: '✅', label: 'Fact Check' },
-  'rivalry_recap': { icon: '🎭', label: 'Rivalry Recap' },
+  'fake_headline': { icon: '📰', label: 'In related news…' },
+  'fact_check': { icon: '🤓', label: 'Actually...' },
+  'rivalry_recap': { icon: '🎙️', label: 'Ripley' },
 };
 
 export default function VerdictFlow({
@@ -371,12 +377,12 @@ export default function VerdictFlow({
 
   // Ripley bubble component (consistent with judge style)
   const RipleyBubble = ({ text }) => (
-    <div className="bg-orange-500/10 rounded-xl p-4">
+    <div className="bg-slate-800/50 rounded-xl p-4">
       <div className="flex items-start gap-3">
         <span className="text-2xl">🎙️</span>
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-bold text-orange-500">Ripley</span>
+            <span className="text-sm font-bold text-orange-400">Ripley</span>
           </div>
           <p className="text-slate-200 text-sm leading-relaxed">{text}</p>
         </div>
@@ -434,7 +440,7 @@ export default function VerdictFlow({
             onClick={() => setStep(2)}
             className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
           >
-            Hear from the judges
+            To the Judges
           </button>
         </div>
 
@@ -478,29 +484,29 @@ export default function VerdictFlow({
             <MenuButton />
           </div>
 
-          {/* Prompt */}
-          <div className="mb-4 text-center">
-            <p className="text-lg font-semibold text-slate-300">{currentShow.prompt}</p>
-          </div>
-
-          {/* Ripley intro to banter */}
-          <div className="mb-4">
+          {/* Ripley banter intro */}
+          <div className="mb-6">
             <RipleyBubble text={ripleyBanterIntro} />
           </div>
 
-          {/* Judge banter - each judge gets their own bubble */}
+          {/* Banter bubbles - alternating left/right like conversation */}
           <div className="space-y-3 mb-8">
-            {banter.map((item, i) => {
-              const judge = judgeProfiles.find(j => j.key === item.judge);
+            {banter.map((line, i) => {
+              const judge = judgeProfiles.find(j => j.key === line.judge);
+              const isEven = i % 2 === 0;
+              
               return (
-                <div key={i} className="bg-slate-800/50 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">{judge?.emoji || '❓'}</span>
-                    <div className="flex-1">
+                <div 
+                  key={i} 
+                  className={`flex ${isEven ? 'justify-start' : 'justify-end'}`}
+                >
+                  <div className="max-w-[85%]">
+                    <div className="bg-slate-800/70 rounded-xl p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-bold text-slate-300">{judge?.name || item.judge}</span>
+                        <span className="text-lg">{judge?.emoji || '❓'}</span>
+                        <span className="text-sm font-bold text-slate-400">{judge?.name || line.judge}</span>
                       </div>
-                      <p className="text-slate-200 text-sm leading-relaxed">{item.comment}</p>
+                      <p className="text-slate-200 text-sm">{line.text}</p>
                     </div>
                   </div>
                 </div>
@@ -508,12 +514,12 @@ export default function VerdictFlow({
             })}
           </div>
 
-          {/* Next button */}
+          {/* Next button - no arrow, cleaner ellipsis */}
           <button
             onClick={() => setStep(3)}
             className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
           >
-            See who won
+            And the winner is…
           </button>
         </div>
 
@@ -550,18 +556,6 @@ export default function VerdictFlow({
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
         <div className="max-w-md mx-auto">
-          {/* Header row */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
-          </div>
-
-          {/* Prompt */}
-          <div className="mb-6 text-center">
-            <p className="text-lg font-semibold text-slate-300">{currentShow.prompt}</p>
-          </div>
-
           {/* Winner announcement - centered */}
           <div className="text-center mb-6">
             {/* Golden Mic for winner */}
@@ -571,10 +565,13 @@ export default function VerdictFlow({
               </div>
             )}
             
-            {/* Winner headline */}
-            <h1 className="text-2xl font-bold text-orange-500 mb-2">
-              {winnerName.toUpperCase()} WINS THE ROUND!
-            </h1>
+            {/* Winner headline with menu */}
+            <div className="flex items-center justify-center gap-2 mb-2">
+              <h1 className="text-2xl font-bold text-orange-500">
+                {winnerName.toUpperCase()} WINS THE ROUND!
+              </h1>
+              <MenuButton />
+            </div>
             
             {/* Score */}
             <p className="text-3xl font-bold text-slate-100 mb-3">
@@ -595,9 +592,8 @@ export default function VerdictFlow({
             ) : null}
           </div>
 
-          {/* Rivalry Standings - no border */}
+          {/* Rivalry Standings - no label */}
           <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-            <h3 className="text-xs font-bold text-slate-400 text-center mb-3">RIVALRY STANDINGS</h3>
             <div className="flex justify-center gap-8">
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2">
@@ -622,12 +618,12 @@ export default function VerdictFlow({
             <RipleyBubble text={ripleyVerdict} />
           </div>
 
-          {/* Next button - no arrow */}
+          {/* Next button */}
           <button
             onClick={() => setStep(4)}
             className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
           >
-            Get the breakdown
+            The Breakdown
           </button>
         </div>
 
@@ -697,7 +693,7 @@ export default function VerdictFlow({
                   <span className="text-xl">{winnerProfile.avatar}</span>
                   <span className="font-bold text-slate-100">{winnerProfile.name}</span>
                 </div>
-                <span className="text-xl font-bold text-orange-500">{winnerScore}</span>
+                <span className="text-lg font-bold text-orange-500">{winnerScore}</span>
               </div>
               <p className="text-slate-200 text-sm">
                 {currentShow.winner_id === currentShow.profile_a_id 
@@ -715,7 +711,7 @@ export default function VerdictFlow({
                   <span className="text-xl">{loserProfile.avatar}</span>
                   <span className="font-bold text-slate-100">{loserProfile.name}</span>
                 </div>
-                <span className="text-xl font-bold text-slate-400">{loserScore}</span>
+                <span className="text-lg font-bold text-slate-400">{loserScore}</span>
               </div>
               <p className="text-slate-200 text-sm">
                 {loserId === currentShow.profile_a_id 
@@ -733,28 +729,29 @@ export default function VerdictFlow({
                 const profileAScore = data.profile_a_score;
                 const profileBScore = data.profile_b_score;
                 
-                // Higher scorer first for this judge
-                const higherName = profileAScore >= profileBScore 
-                  ? rivalry.profile_a.name 
-                  : rivalry.profile_b.name;
-                const higherScore = Math.max(profileAScore, profileBScore);
-                const lowerName = profileAScore >= profileBScore 
-                  ? rivalry.profile_b.name 
-                  : rivalry.profile_a.name;
-                const lowerScore = Math.min(profileAScore, profileBScore);
+                // Get scores for viewer (me) and opponent
+                const myScore = activeProfileId === rivalry.profile_a_id ? profileAScore : profileBScore;
+                const opponentScore = activeProfileId === rivalry.profile_a_id ? profileBScore : profileAScore;
+                
+                // Determine if I won this judge
+                const iWonThisJudge = myScore > opponentScore;
+                const opponentWonThisJudge = opponentScore > myScore;
                 
                 return (
                   <div 
                     key={judgeKey} 
                     className="bg-slate-800/30 rounded-xl p-3"
                   >
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{judge?.emoji || '❓'}</span>
-                        <span className="text-sm font-bold text-slate-300">{judge?.name || judgeKey}</span>
-                      </div>
-                      <span className="text-sm text-slate-400">
-                        {higherName}: {higherScore} • {lowerName}: {lowerScore}
+                    <div className="flex items-center flex-wrap gap-x-1 mb-1">
+                      <span className="text-lg">{judge?.emoji || '❓'}</span>
+                      <span className="text-sm font-bold text-slate-300">{judge?.name || judgeKey}</span>
+                      <span className="text-sm text-slate-500">—</span>
+                      <span className={`text-sm ${iWonThisJudge ? 'text-orange-400 font-semibold' : 'text-slate-400'}`}>
+                        {myProfile.name}: {myScore}
+                      </span>
+                      <span className="text-sm text-slate-500">•</span>
+                      <span className={`text-sm ${opponentWonThisJudge ? 'text-orange-400 font-semibold' : 'text-slate-400'}`}>
+                        {opponentProfile.name}: {opponentScore}
                       </span>
                     </div>
                     <p className="text-sm text-slate-400 italic">{data.comment}</p>
@@ -764,29 +761,53 @@ export default function VerdictFlow({
             </div>
           )}
 
-          {/* Artifact - no border */}
+          {/* Artifact - rivalry_recap styled as Ripley bubble */}
           {currentArtifact && (
-            <div className="bg-slate-800/30 rounded-xl p-4 mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-lg">{artifactConfig[currentArtifact.type]?.icon || '✨'}</span>
-                  <span className="text-sm font-bold text-slate-300">
-                    {artifactConfig[currentArtifact.type]?.label || 'Artifact'}
-                  </span>
+            currentArtifact.type === 'rivalry_recap' ? (
+              <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🎙️</span>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-bold text-orange-400">Ripley</span>
+                      {artifacts.length > 1 && (
+                        <button
+                          onClick={cycleArtifact}
+                          className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-sm text-slate-200 leading-relaxed">{currentArtifact.text}</p>
+                  </div>
                 </div>
-                {artifacts.length > 1 && (
-                  <button
-                    onClick={cycleArtifact}
-                    className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                )}
               </div>
-              <p className="text-sm text-slate-200 leading-relaxed">{currentArtifact.text}</p>
-            </div>
+            ) : (
+              <div className="bg-slate-800/30 rounded-xl p-4 mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{artifactConfig[currentArtifact.type]?.icon || '✨'}</span>
+                    <span className="text-sm font-bold text-slate-300">
+                      {artifactConfig[currentArtifact.type]?.label || 'Artifact'}
+                    </span>
+                  </div>
+                  {artifacts.length > 1 && (
+                    <button
+                      onClick={cycleArtifact}
+                      className="text-slate-400 hover:text-slate-200 transition-colors p-1"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                <p className="text-sm text-slate-200 leading-relaxed">{currentArtifact.text}</p>
+              </div>
+            )
           )}
 
           {/* Next button - no arrow */}
@@ -803,7 +824,7 @@ export default function VerdictFlow({
           >
             {currentShow.show_number === (rivalry?.match_length || 5)
               ? 'See Rivalry Summary' 
-              : `On to Round ${currentShow.show_number + 1}`}
+              : 'Next Up'}
           </button>
         </div>
 
