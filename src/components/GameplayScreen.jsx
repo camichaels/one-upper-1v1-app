@@ -45,7 +45,9 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   const [rivalryJudges, setRivalryJudges] = useState([]);
   const [rivalryCancelled, setRivalryCancelled] = useState(false);
   const [waitingHeadline] = useState(() => WAITING_HEADLINES[Math.floor(Math.random() * WAITING_HEADLINES.length)]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const prevShowIdRef = useRef(null);
+  const judgingTriggeredRef = useRef(false); // Prevent multiple judge-show calls
 
   // Reset verdictStep when moving to a new show
   useEffect(() => {
@@ -55,6 +57,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         setVerdictStep(1);
       }
       prevShowIdRef.current = currentShow.id;
+      judgingTriggeredRef.current = false; // Reset judging guard for new show
     }
   }, [currentShow?.id]);
 
@@ -394,6 +397,13 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   async function submitAnswer() {
     if (!myAnswer.trim() || wordCount > 30) return;
 
+    // Prevent double-submission
+    if (isSubmitting) {
+      console.log('[submitAnswer] Already submitting, ignoring');
+      return;
+    }
+    setIsSubmitting(true);
+
     // Check if rivalry was cancelled
     if (rivalryCancelled) {
       return;
@@ -471,12 +481,19 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     }
 
     if (bothSubmittedNow) {
-      setIsJudgingOwner(true);
-      await triggerJudging();
+      // Prevent multiple judge-show calls
+      if (judgingTriggeredRef.current) {
+        console.log('[submitAnswer] Judging already triggered for this show, skipping');
+      } else {
+        judgingTriggeredRef.current = true;
+        setIsJudgingOwner(true);
+        await triggerJudging();
+      }
     }
 
     setMyAnswer('');
     setWordCount(0);
+    setIsSubmitting(false);
   }
 
   async function triggerJudging() {
