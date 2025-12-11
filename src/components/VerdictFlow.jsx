@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
+import { supabase } from '../lib/supabase';
 import Header from './Header';
 import HowToPlayModal from './HowToPlayModal';
 import AllRoundsModal from './AllRoundsModal';
@@ -113,6 +114,10 @@ export default function VerdictFlow({
   const [showAllRounds, setShowAllRounds] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const confettiShownRef = useRef(false);
+  
+  // Step 3 animation states
+  const [micSettled, setMicSettled] = useState(false);
+  const [showContent, setShowContent] = useState(false);
 
   // DEBUG: Log when step changes
   useEffect(() => {
@@ -152,17 +157,63 @@ export default function VerdictFlow({
     }
   }, [currentShow?.id]);
 
-  // Confetti on Step 3 for winner (including tiebreaker wins)
+  // Step 3 animation: mic celebration for winner, immediate content for loser
   useEffect(() => {
-    if (step === 3 && currentShow.winner_id === activeProfileId && !confettiShownRef.current) {
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-      confettiShownRef.current = true;
+    if (step === 3) {
+      const iAmWinner = currentShow.winner_id === activeProfileId;
+      
+      if (iAmWinner && !confettiShownRef.current) {
+        // Winner: fire confetti, then settle mic after 2s, then show content
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.4 }
+        });
+        confettiShownRef.current = true;
+        
+        // Mic settles after 2 seconds
+        const settleTimer = setTimeout(() => setMicSettled(true), 2000);
+        // Content appears after mic settles
+        const contentTimer = setTimeout(() => setShowContent(true), 2200);
+        
+        return () => {
+          clearTimeout(settleTimer);
+          clearTimeout(contentTimer);
+        };
+      } else if (!iAmWinner) {
+        // Loser: show content immediately, no animation
+        setMicSettled(true);
+        setShowContent(true);
+      }
     }
   }, [step, currentShow.winner_id, activeProfileId]);
+
+  // Reset animation states when step changes away from 3
+  useEffect(() => {
+    if (step !== 3) {
+      setMicSettled(false);
+      setShowContent(false);
+    }
+  }, [step]);
+
+  // Pre-fetch rivalry summary on final round (fire-and-forget)
+  // This starts the AI generation early so it's ready when user clicks "See Rivalry Summary"
+  useEffect(() => {
+    const matchLength = rivalry?.match_length || 5;
+    const isFinalRound = currentShow.show_number === matchLength;
+    
+    if (isFinalRound && rivalry?.id) {
+      console.log('[VerdictFlow] Final round detected - pre-fetching rivalry summary');
+      // Fire and forget - don't await, don't handle response
+      // The edge function is idempotent and handles race conditions
+      supabase.functions.invoke('summarize-rivalry', {
+        body: { rivalryId: rivalry.id }
+      }).catch(err => {
+        // Silent fail - RivalrySummaryScreen will retry if needed
+        console.log('[VerdictFlow] Summary pre-fetch started (or already in progress)');
+      });
+    }
+  }, [currentShow.show_number, rivalry?.id, rivalry?.match_length]);
 
   function getVerdictLine() {
     const isWinner = currentShow.winner_id === activeProfileId;
@@ -316,6 +367,10 @@ export default function VerdictFlow({
   const iAmWinner = currentShow.winner_id === activeProfileId;
   const micHolderId = myWins > opponentWins ? activeProfileId : 
     (opponentWins > myWins ? opponentProfile.id : rivalry.mic_holder_id);
+
+  // Calculate viewer-left scores for Step 3
+  const myTotalScore = getTotalScore(activeProfileId);
+  const opponentTotalScore = getTotalScore(opponentProfile.id);
 
   // Menu component (reused across steps)
   const MenuButton = () => (
@@ -548,83 +603,146 @@ export default function VerdictFlow({
     );
   }
 
-  // STEP 3: The Winner
+  // STEP 3: The Winner (with mic animation for winner)
   if (step === 3) {
     const headline = currentShow.judge_data?.headline;
+    
+    // Winner sees animated mic first, then content
+    // Loser sees content immediately (no mic, no animation)
     
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
         <Header />
+        
+        {/* CSS for mic animation */}
+        <style>{`
+          @keyframes micBounce {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-20px) scale(1.1); }
+          }
+          @keyframes micSettle {
+            0% { 
+              transform: translateY(0) scale(1);
+              opacity: 1;
+            }
+            100% { 
+              transform: translateY(-100px) scale(0.4);
+              opacity: 0;
+            }
+          }
+          .mic-bounce {
+            animation: micBounce 0.6s ease-in-out infinite;
+          }
+          .mic-settle {
+            animation: micSettle 0.3s ease-out forwards;
+          }
+        `}</style>
+        
         <div className="max-w-md mx-auto">
-          {/* Winner announcement - centered */}
-          <div className="text-center mb-6">
-            {/* Golden Mic for winner */}
-            {iAmWinner && (
-              <div className="mb-3">
-                <img src={GoldenMic} alt="mic" className="w-12 h-12 mx-auto" />
-              </div>
-            )}
-            
-            {/* Winner headline with menu */}
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <h1 className="text-2xl font-bold text-orange-500">
-                {winnerName.toUpperCase()} WINS THE ROUND!
+          {/* Winner: Big centered mic animation (before content reveals) */}
+          {iAmWinner && !showContent && (
+            <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
+              <img 
+                src={GoldenMic} 
+                alt="Golden Mic" 
+                className={`w-32 h-32 drop-shadow-[0_0_30px_rgba(251,191,36,0.6)] ${micSettled ? 'mic-settle' : 'mic-bounce'}`}
+              />
+              <h1 className="text-3xl font-bold text-orange-500 mt-6 animate-pulse">
+                YOU WIN!
               </h1>
-              <MenuButton />
             </div>
-            
-            {/* Score */}
-            <p className="text-3xl font-bold text-slate-100 mb-3">
-              {winnerScore} - {loserScore}
-            </p>
-            
-            {/* Tiebreaker explanation or AI Headline */}
-            {isTie ? (
-              <div className="bg-slate-800/50 rounded-xl p-3 mb-4">
-                <p className="text-slate-300 text-sm">
-                  <span className="text-orange-400 font-semibold">Tiebreaker!</span> {winnerName} submitted first.
+          )}
+          
+          {/* Loser: No mic celebration, just show "opponent wins" immediately */}
+          {!iAmWinner && !showContent && (
+            <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
+              <h1 className="text-2xl font-bold text-slate-300">
+                {winnerName} takes this round
+              </h1>
+            </div>
+          )}
+          
+          {/* Main content (appears after animation for winner, immediately for loser) */}
+          {showContent && (
+            <>
+              {/* Winner announcement - centered */}
+              <div className="text-center mb-6">
+                {/* Golden Mic for winner only */}
+                {iAmWinner && (
+                  <div className="mb-3">
+                    <img 
+                      src={GoldenMic} 
+                      alt="mic" 
+                      className="w-12 h-12 mx-auto drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]" 
+                    />
+                  </div>
+                )}
+                
+                {/* Winner headline with menu */}
+                <div className="flex items-center justify-center gap-2 mb-2">
+                  <h1 className="text-2xl font-bold text-orange-500">
+                    {winnerName.toUpperCase()} WINS THE ROUND!
+                  </h1>
+                  <MenuButton />
+                </div>
+                
+                {/* Score - viewer on left */}
+                <p className="text-3xl font-bold text-slate-100 mb-3">
+                  {myTotalScore} - {opponentTotalScore}
                 </p>
+                
+                {/* Tiebreaker explanation or AI Headline */}
+                {isTie ? (
+                  <div className="bg-slate-800/50 rounded-xl p-3 mb-4">
+                    <p className="text-slate-300 text-sm">
+                      <span className="text-orange-400 font-semibold">Tiebreaker!</span> {winnerName} submitted first.
+                    </p>
+                  </div>
+                ) : headline ? (
+                  <p className="text-slate-300 italic text-lg mb-4">
+                    {headline}
+                  </p>
+                ) : null}
               </div>
-            ) : headline ? (
-              <p className="text-slate-300 italic text-lg mb-4">
-                {headline}
-              </p>
-            ) : null}
-          </div>
 
-          {/* Rivalry Standings - no label */}
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-            <div className="flex justify-center gap-8">
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2">
-                  {micHolderId === activeProfileId && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
-                  <span className="text-2xl font-bold text-slate-100">{myWins}</span>
+              {/* Ripley verdict - moved above standings */}
+              <div className="mb-6">
+                <RipleyBubble text={ripleyVerdict} />
+              </div>
+
+              {/* Round Wins box */}
+              <div className="mb-8">
+                <div className="bg-slate-800/50 rounded-xl p-4">
+                  <p className="text-sm text-slate-400 mb-3 text-center">Round Wins</p>
+                  <div className="flex justify-center gap-8">
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {micHolderId === activeProfileId && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
+                        <span className="text-2xl font-bold text-slate-100">{myWins}</span>
+                      </div>
+                      <p className="text-sm text-slate-400">{myProfile.name}</p>
+                    </div>
+                    <div className="text-slate-600 text-2xl font-bold">-</div>
+                    <div className="text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        {micHolderId === opponentProfile.id && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
+                        <span className="text-2xl font-bold text-slate-100">{opponentWins}</span>
+                      </div>
+                      <p className="text-sm text-slate-400">{opponentProfile.name}</p>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-sm text-slate-400">{myProfile.name}</p>
               </div>
-              <div className="text-slate-600 text-2xl font-bold">-</div>
-              <div className="text-center">
-                <div className="flex items-center justify-center gap-2">
-                  {micHolderId === opponentProfile.id && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
-                  <span className="text-2xl font-bold text-slate-100">{opponentWins}</span>
-                </div>
-                <p className="text-sm text-slate-400">{opponentProfile.name}</p>
-              </div>
-            </div>
-          </div>
 
-          {/* Ripley verdict */}
-          <div className="mb-8">
-            <RipleyBubble text={ripleyVerdict} />
-          </div>
-
-          {/* Next button */}
-          <button
-            onClick={() => setStep(4)}
-            className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
-          >
-            The Breakdown
-          </button>
+              {/* Next button */}
+              <button
+                onClick={() => setStep(4)}
+                className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
+              >
+                The Breakdown
+              </button>
+            </>
+          )}
         </div>
 
         {/* Modals */}
@@ -836,10 +954,10 @@ export default function VerdictFlow({
             rivalry={rivalry}
             activeProfileId={activeProfileId}
             onClose={() => setShowAllRounds(false)}
-onSelectRound={(showId) => {
-  setShowAllRounds(false);
-  onNavigate('screen6', { showId, activeProfileId });
-}}
+            onSelectRound={(showId) => {
+              setShowAllRounds(false);
+              onNavigate('screen6', { showId, activeProfileId });
+            }}
           />
         )}
         {showCancelModal && (

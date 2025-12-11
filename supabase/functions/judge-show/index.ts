@@ -277,9 +277,30 @@ Format:
 
     // Strip markdown if present
     judgeResponseText = judgeResponseText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+    
+    // More robust JSON extraction: find the first { and last }
+    const firstBrace = judgeResponseText.indexOf('{')
+    const lastBrace = judgeResponseText.lastIndexOf('}')
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      judgeResponseText = judgeResponseText.slice(firstBrace, lastBrace + 1)
+    }
+    
+    // Remove trailing commas (invalid JSON but Claude sometimes adds them)
+    judgeResponseText = judgeResponseText.replace(/,(\s*[}\]])/g, '$1')
 
     // Parse Claude's response
-    const judgeResponse = JSON.parse(judgeResponseText)
+    let judgeResponse
+    try {
+      judgeResponse = JSON.parse(judgeResponseText)
+    } catch (parseError) {
+      console.error('JSON parse error:', parseError)
+      console.error('Raw response:', anthropicData.content[0].text)
+      console.error('Cleaned response:', judgeResponseText)
+      return new Response(
+        JSON.stringify({ error: parseError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Build scores object using judge KEYS (not names)
     const scores: Record<string, any> = {}
