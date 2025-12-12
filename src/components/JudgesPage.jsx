@@ -38,24 +38,20 @@ export default function JudgesPage() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          {/* Logo */}
-          <div className="text-center mb-6">
-            <h1 className="text-4xl font-black text-orange-500">
-              ONE-UPPER <span className="text-3xl">💬</span>
-            </h1>
+          {/* Back button left, logo centered - same row */}
+          <div className="relative flex items-center justify-center mb-8">
+            <button
+              onClick={() => navigate('/')}
+              className="absolute left-0 flex items-center gap-1 text-slate-400 hover:text-slate-100 transition-colors text-sm"
+            >
+              <span>←</span>
+              <span>Back</span>
+            </button>
+            <img src="/logo-wide.png" alt="One-Upper" className="h-10" />
           </div>
 
-          {/* Back Button */}
-          <button
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-slate-300 hover:text-slate-100 transition-colors mb-6 text-lg"
-          >
-            <span>←</span>
-            <span>Back</span>
-          </button>
-
-          {/* Page Title */}
-          <h2 className="text-3xl font-bold text-orange-500 mb-2">Meet the Judges</h2>
+          {/* Page Title - Centered */}
+          <h2 className="text-3xl font-bold text-orange-500 text-center">Meet the Judges</h2>
           
         </div>
 
@@ -115,7 +111,7 @@ export default function JudgesPage() {
               onClick={() => setSelectedJudge(null)}
               className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
             >
-              Close
+              Got It
             </button>
           </div>
         </div>

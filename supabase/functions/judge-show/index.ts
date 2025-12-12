@@ -70,6 +70,20 @@ serve(async (req) => {
       )
     }
 
+    // IDEMPOTENCY CHECK: If show is already complete, return existing results
+    if (show.status === 'complete' && show.winner_id) {
+      console.log(`Show ${showId} already judged - returning existing results`)
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          winner_id: show.winner_id,
+          already_judged: true,
+          message: 'Show was already judged'
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Fetch judge profiles
     const { data: judges, error: judgesError } = await supabase
       .from('judges')
