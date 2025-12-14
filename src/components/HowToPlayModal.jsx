@@ -1,7 +1,7 @@
 export default function HowToPlayModal({ onClose }) {
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-      <div className="bg-slate-800 border-2 border-orange-500 rounded-lg p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-800 border border-slate-600 rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-orange-500">How to Play</h2>
