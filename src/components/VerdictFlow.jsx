@@ -1,38 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { supabase } from '../lib/supabase';
-import Header from './Header';
+import HeaderWithMenu from './HeaderWithMenu';
 import HowToPlayModal from './HowToPlayModal';
 import AllRoundsModal from './AllRoundsModal';
 import GoldenMic from '../assets/microphone.svg';
-
-// Ripley intro lines for Step 1 (random selection)
-const ripleyIntros = [
-  "Both answers are in. Let's see what you two came up with...",
-  "Alright, answers locked! Time to see who brought their A-game.",
-  "The responses are in. Let's see what we're working with...",
-  "Both of you have spoken. Now let's see who said what.",
-  "Answers submitted! Let's take a look at the competition.",
-  "Time to reveal! What did you two come up with?",
-  "The creative juices have flowed. Let's see the results...",
-  "Both contestants have answered. Drumroll please...",
-];
-
-// Ripley lines for Step 2 (judge banter intro)
-const ripleyBanterIntros = [
-  "Judges, what are you thinking?",
-  "Let's hear what the judges have to say...",
-  "Over to you, judges!",
-  "Judges, break it down for us.",
-  "What's the verdict looking like, judges?",
-  "Alright judges, give us the scoop.",
-  "The judges have thoughts...",
-  "Let's eavesdrop on the judges...",
-  "Judges, take it away...",
-  "Here's what the judges are saying...",
-  "The judges are weighing in...",
-  "Let's see what the judges think...",
-];
 
 // Ripley verdict lines (triggered by situation)
 const ripleyVerdictLines = {
@@ -74,16 +46,7 @@ const ripleyVerdictLines = {
   default: [
     "Another round in the books!",
     "The judges have spoken!",
-    "And there you have it!",
   ],
-};
-
-// Artifact configuration
-const artifactConfig = {
-  'celebrity_match': { icon: '⭐', label: 'Celebrity Match' },
-  'fake_headline': { icon: '📰', label: 'In related news…' },
-  'fact_check': { icon: '🤓', label: 'Actually...' },
-  'rivalry_recap': { icon: '🎙️', label: 'Ripley' },
 };
 
 export default function VerdictFlow({
@@ -101,122 +64,119 @@ export default function VerdictFlow({
   initialStep = 1,
   onStepChange,
 }) {
-  // DEBUG: Log initialStep and step
-  console.log('[VerdictFlow] initialStep:', initialStep, 'will initialize step with this value');
+  // Map initialStep to screen name
+  // Old: 1=answers, 2=banter, 3=winner, 4=breakdown
+  // New: 1=answers+banter, 2=scores, 3=wrapup
+  // For SMS deep links, initialStep=1 means start fresh
+  const getInitialScreen = () => {
+    if (initialStep >= 3) return 'wrapup'; // Old steps 3-4 map to wrapup-ish
+    if (initialStep === 2) return 'scores';
+    return 'answers';
+  };
   
-  const [step, setStep] = useState(initialStep);
-  const [ripleyIntro, setRipleyIntro] = useState('');
-  const [ripleyBanterIntro, setRipleyBanterIntro] = useState('');
-  const [ripleyVerdict, setRipleyVerdict] = useState('');
-  const [currentArtifactIndex, setCurrentArtifactIndex] = useState(0);
+  // Screen state: 'answers', 'scores', 'wrapup'
+  const [screen, setScreen] = useState(getInitialScreen);
+  
+  // Animation states for answers screen
+  const [answersInitialized, setAnswersInitialized] = useState(false);
+  const [answersRevealed, setAnswersRevealed] = useState(false);
+  const [banterItems, setBanterItems] = useState([]);
+  
+  // Animation states for scores screen
+  const [revealedJudges, setRevealedJudges] = useState([]);
+  const [runningScoreLeft, setRunningScoreLeft] = useState(0);
+  const [runningScoreRight, setRunningScoreRight] = useState(0);
+  const [winnerRevealed, setWinnerRevealed] = useState(false);
+  const [scoreFlash, setScoreFlash] = useState(false);
+  
+  // Animation states for wrapup screen
+  const [wrapupStage, setWrapupStage] = useState(0);
+  
+  // Modal states
   const [showMenu, setShowMenu] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [showAllRounds, setShowAllRounds] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const confettiShownRef = useRef(false);
   
-  // Step 3 animation states
-  const [micSettled, setMicSettled] = useState(false);
-  const [showContent, setShowContent] = useState(false);
+  const confettiRef = useRef(false);
 
-  // DEBUG: Log when step changes
-  useEffect(() => {
-    console.log('[VerdictFlow] step changed to:', step);
-  }, [step]);
-
-  // Sync step with parent when it changes
-  useEffect(() => {
-    console.log('[VerdictFlow] calling onStepChange with:', step);
-    if (onStepChange) {
-      onStepChange(step);
-    }
-  }, [step, onStepChange]);
-
-  // Initialize Ripley lines on mount
-  useEffect(() => {
-    console.log('[VerdictFlow useEffect] Running - currentShow.id:', currentShow?.id, 'previousShows.length:', previousShows.length);
-    console.log('[VerdictFlow useEffect] previousShows ids:', previousShows.map(s => s.id));
-    
-    // Random intro for Step 1
-    const randomIntro = ripleyIntros[Math.floor(Math.random() * ripleyIntros.length)];
-    setRipleyIntro(randomIntro);
-
-    // Random banter intro for Step 2
-    const randomBanterIntro = ripleyBanterIntros[Math.floor(Math.random() * ripleyBanterIntros.length)];
-    setRipleyBanterIntro(randomBanterIntro);
-
-    // Determine verdict line based on situation
-    const verdictLine = getVerdictLine();
-    console.log('[VerdictFlow useEffect] verdictLine:', verdictLine);
-    setRipleyVerdict(verdictLine);
-
-    // Randomize starting artifact
-    const artifacts = getAllArtifacts();
-    if (artifacts.length > 0) {
-      setCurrentArtifactIndex(Math.floor(Math.random() * artifacts.length));
-    }
-  }, [currentShow?.id]);
-
-  // Step 3 animation: mic celebration for winner, immediate content for loser
-  useEffect(() => {
-    if (step === 3) {
-      const iAmWinner = currentShow.winner_id === activeProfileId;
-      
-      if (iAmWinner && !confettiShownRef.current) {
-        // Winner: fire confetti, then settle mic after 2s, then show content
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.4 }
-        });
-        confettiShownRef.current = true;
-        
-        // Mic settles after 2 seconds
-        const settleTimer = setTimeout(() => setMicSettled(true), 2000);
-        // Content appears after mic settles
-        const contentTimer = setTimeout(() => setShowContent(true), 2200);
-        
-        return () => {
-          clearTimeout(settleTimer);
-          clearTimeout(contentTimer);
-        };
-      } else if (!iAmWinner) {
-        // Loser: show content immediately, no animation
-        setMicSettled(true);
-        setShowContent(true);
-      }
-    }
-  }, [step, currentShow.winner_id, activeProfileId]);
-
-  // Reset animation states when step changes away from 3
-  useEffect(() => {
-    if (step !== 3) {
-      setMicSettled(false);
-      setShowContent(false);
-    }
-  }, [step]);
-
-  // Pre-fetch rivalry summary on final round (fire-and-forget)
-  // This starts the AI generation early so it's ready when user clicks "See Rivalry Summary"
-  useEffect(() => {
-    const matchLength = rivalry?.match_length || 5;
-    const isFinalRound = currentShow.show_number === matchLength;
-    
-    if (isFinalRound && rivalry?.id) {
-      console.log('[VerdictFlow] Final round detected - pre-fetching rivalry summary');
-      // Fire and forget - don't await, don't handle response
-      // The edge function is idempotent and handles race conditions
-      supabase.functions.invoke('summarize-rivalry', {
-        body: { rivalryId: rivalry.id }
-      }).catch(err => {
-        // Silent fail - RivalrySummaryScreen will retry if needed
-        console.log('[VerdictFlow] Summary pre-fetch started (or already in progress)');
+  // ============================================
+  // DERIVED DATA
+  // ============================================
+  
+  const judges = currentShow.judge_data?.scores ? Object.entries(currentShow.judge_data.scores) : [];
+  const banter = currentShow.judge_data?.banter || [];
+  
+  // Get profiles in consistent left/right order (viewer always on left)
+  const leftProfile = myProfile;
+  const rightProfile = opponentProfile;
+  const leftIsProfileA = activeProfileId === currentShow.profile_a_id;
+  
+  // Calculate scores
+  function getScoreForProfile(profileId, judgeData) {
+    const isProfileA = profileId === currentShow.profile_a_id;
+    return isProfileA ? judgeData.profile_a_score : judgeData.profile_b_score;
+  }
+  
+  function getTotalScore(profileId) {
+    if (!currentShow.judge_data?.scores) return 0;
+    const isProfileA = profileId === currentShow.profile_a_id;
+    return Object.values(currentShow.judge_data.scores).reduce((sum, data) => {
+      return sum + (isProfileA ? data.profile_a_score : data.profile_b_score);
+    }, 0);
+  }
+  
+  const totalLeft = getTotalScore(leftProfile.id);
+  const totalRight = getTotalScore(rightProfile.id);
+  
+  const winnerIsLeft = currentShow.winner_id === leftProfile.id;
+  const iAmWinner = currentShow.winner_id === activeProfileId;
+  const winnerName = currentShow.winner_id === rivalry.profile_a_id 
+    ? rivalry.profile_a.name 
+    : rivalry.profile_b.name;
+  
+  // Round wins calculation
+  const pastShows = previousShows.filter(s => s.id !== currentShow.id);
+  const myWins = pastShows.filter(s => s.winner_id === activeProfileId).length + 
+    (currentShow.winner_id === activeProfileId ? 1 : 0);
+  const opponentWins = pastShows.filter(s => s.winner_id === opponentProfile.id).length +
+    (currentShow.winner_id === opponentProfile.id ? 1 : 0);
+  
+  // Tiebreaker detection
+  const isTie = currentShow.judge_data?.was_tiebreaker || totalLeft === totalRight;
+  
+  // Final round detection
+  const matchLength = rivalry?.match_length || 5;
+  const isFinalRound = currentShow.show_number === matchLength;
+  
+  // Get answers
+  const leftAnswer = leftIsProfileA ? currentShow.profile_a_answer : currentShow.profile_b_answer;
+  const rightAnswer = leftIsProfileA ? currentShow.profile_b_answer : currentShow.profile_a_answer;
+  
+  // Get all artifacts and pick a random one
+  function getAllArtifacts() {
+    const artifacts = [];
+    if (currentShow.judge_data?.rivalry_comment) {
+      artifacts.push({
+        type: 'rivalry_recap',
+        text: currentShow.judge_data.rivalry_comment.text,
       });
     }
-  }, [currentShow.show_number, rivalry?.id, rivalry?.match_length]);
-
+    if (currentShow.judge_data?.artifacts) {
+      artifacts.push(...currentShow.judge_data.artifacts);
+    }
+    return artifacts;
+  }
+  
+  // Pick random artifact on mount
+  const [selectedArtifact] = useState(() => {
+    const artifacts = getAllArtifacts();
+    if (artifacts.length === 0) return null;
+    return artifacts[Math.floor(Math.random() * artifacts.length)];
+  });
+  
+  // Get verdict line based on game state
   function getVerdictLine() {
-    const isWinner = currentShow.winner_id === activeProfileId;
     const winnerScore = getTotalScore(currentShow.winner_id);
     const loserId = currentShow.winner_id === currentShow.profile_a_id 
       ? currentShow.profile_b_id 
@@ -224,16 +184,8 @@ export default function VerdictFlow({
     const loserScore = getTotalScore(loserId);
     const scoreDiff = winnerScore - loserScore;
     
-    // Filter out current show to avoid double-counting
-    const pastShows = previousShows.filter(s => s.id !== currentShow.id);
-    
-    // DEBUG: Log streak calculation
-    console.log('[VerdictFlow] Streak calc - currentShow.id:', currentShow.id, 'show_number:', currentShow.show_number);
-    console.log('[VerdictFlow] previousShows count:', previousShows.length, 'pastShows count:', pastShows.length);
-    console.log('[VerdictFlow] pastShows:', pastShows.map(s => ({ id: s.id, show_number: s.show_number, winner_id: s.winner_id })));
-    
-    // Calculate current win streak for winner
-    let winStreak = 1; // Current win counts
+    // Calculate win streak
+    let winStreak = 1;
     const winnerId = currentShow.winner_id;
     for (const show of pastShows) {
       if (show.status === 'complete' && show.winner_id === winnerId) {
@@ -242,506 +194,251 @@ export default function VerdictFlow({
         break;
       }
     }
-    console.log('[VerdictFlow] winStreak:', winStreak, 'winnerId:', winnerId);
-
-    // Check for lead change (comeback)
+    
+    // Check for comeback
     const myWinsBefore = pastShows.filter(s => s.winner_id === activeProfileId).length;
     const oppWinsBefore = pastShows.filter(s => s.winner_id !== activeProfileId && s.winner_id).length;
-    const myWinsNow = myWinsBefore + (isWinner ? 1 : 0);
-    const oppWinsNow = oppWinsBefore + (isWinner ? 0 : 1);
+    const myWinsNow = myWinsBefore + (iAmWinner ? 1 : 0);
+    const oppWinsNow = oppWinsBefore + (iAmWinner ? 0 : 1);
     const wasLosingNowWinning = myWinsBefore < oppWinsBefore && myWinsNow > oppWinsNow;
     
-    // Final round - use rivalry.match_length from database
-    const matchLength = rivalry?.match_length || 5;
-    if (currentShow.show_number === matchLength) {
-      return getRandomLine(ripleyVerdictLines.final_round);
-    }
-    
-    // Perfect sweep
-    if (winStreak === 5) {
-      return getRandomLine(ripleyVerdictLines.perfect_sweep);
-    }
-    
-    // Streaks
-    if (winStreak === 4) {
-      return getRandomLine(ripleyVerdictLines.streak_4);
-    }
-    if (winStreak === 3) {
-      return getRandomLine(ripleyVerdictLines.streak_3);
-    }
-    
-    // Comeback
-    if (wasLosingNowWinning) {
-      return getRandomLine(ripleyVerdictLines.comeback);
-    }
-    
-    // Blowout (6+ point difference)
-    if (scoreDiff >= 6) {
-      return getRandomLine(ripleyVerdictLines.blowout_winner);
-    }
-    
-    // Close game (2 or less)
-    if (scoreDiff <= 2) {
-      return getRandomLine(ripleyVerdictLines.close_game);
-    }
-    
+    if (isFinalRound) return getRandomLine(ripleyVerdictLines.final_round);
+    if (winStreak === 5) return getRandomLine(ripleyVerdictLines.perfect_sweep);
+    if (winStreak === 4) return getRandomLine(ripleyVerdictLines.streak_4);
+    if (winStreak === 3) return getRandomLine(ripleyVerdictLines.streak_3);
+    if (wasLosingNowWinning) return getRandomLine(ripleyVerdictLines.comeback);
+    if (scoreDiff >= 6) return getRandomLine(ripleyVerdictLines.blowout_winner);
+    if (scoreDiff <= 2) return getRandomLine(ripleyVerdictLines.close_game);
     return getRandomLine(ripleyVerdictLines.default);
   }
-
+  
   function getRandomLine(lines) {
     return lines[Math.floor(Math.random() * lines.length)];
   }
+  
+  // Store verdict line on mount
+  const [verdictLine] = useState(() => getVerdictLine());
 
-  function getTotalScore(profileId) {
-    if (!currentShow.judge_data?.scores) return 0;
-    const isProfileA = profileId === currentShow.profile_a_id;
-    return Object.values(currentShow.judge_data.scores).reduce((sum, data) => {
-      return sum + (isProfileA ? data.profile_a_score : data.profile_b_score);
-    }, 0);
-  }
-
-  function getWinnerName() {
-    if (currentShow.winner_id === rivalry.profile_a_id) {
-      return rivalry.profile_a.name;
+  // ============================================
+  // EFFECTS
+  // ============================================
+  
+  // Sync screen state with parent via onStepChange
+  useEffect(() => {
+    if (onStepChange) {
+      const stepMap = { answers: 1, scores: 2, wrapup: 3 };
+      onStepChange(stepMap[screen] || 1);
     }
-    return rivalry.profile_b.name;
-  }
+  }, [screen, onStepChange]);
+  
+  // Pre-fetch rivalry summary on final round
+  useEffect(() => {
+    if (isFinalRound && rivalry?.id) {
+      supabase.functions.invoke('summarize-rivalry', {
+        body: { rivalryId: rivalry.id }
+      }).catch(() => {});
+    }
+  }, [isFinalRound, rivalry?.id]);
 
-  function getMyAnswer() {
-    return activeProfileId === currentShow.profile_a_id 
-      ? currentShow.profile_a_answer 
-      : currentShow.profile_b_answer;
-  }
-
-  function getOpponentAnswer() {
-    return activeProfileId === currentShow.profile_a_id 
-      ? currentShow.profile_b_answer 
-      : currentShow.profile_a_answer;
-  }
-
-  function getAllArtifacts() {
-    const artifacts = [];
-    
-    // Add rivalry_recap if exists
-    if (currentShow.judge_data?.rivalry_comment) {
-      artifacts.push({
-        type: 'rivalry_recap',
-        text: currentShow.judge_data.rivalry_comment.text,
-        judge: currentShow.judge_data.rivalry_comment.judge,
+  // ============================================
+  // SCREEN 1: ANSWERS + BANTER
+  // ============================================
+  
+  useEffect(() => {
+    if (screen === 'answers') {
+      // Reset all state first
+      setAnswersInitialized(false);
+      setAnswersRevealed(false);
+      setBanterItems([]);
+      
+      // Small delay to ensure state is reset before showing
+      const initTimer = setTimeout(() => {
+        setAnswersInitialized(true);
+      }, 50);
+      
+      // Then start revealing
+      const revealTimer = setTimeout(() => {
+        setAnswersRevealed(true);
+      }, 150);
+      
+      const banterTimers = banter.map((_, i) => {
+        return setTimeout(() => {
+          setBanterItems(prev => [...prev, i]);
+        }, 1100 + (i * 1200));
       });
+      
+      return () => {
+        clearTimeout(initTimer);
+        clearTimeout(revealTimer);
+        banterTimers.forEach(t => clearTimeout(t));
+      };
     }
-    
-    // Add other artifacts
-    if (currentShow.judge_data?.artifacts) {
-      artifacts.push(...currentShow.judge_data.artifacts);
+  }, [screen, currentShow.id]);
+
+  // ============================================
+  // SCREEN 2: SCORE REVEAL
+  // ============================================
+  
+  useEffect(() => {
+    if (screen === 'scores') {
+      setRevealedJudges([]);
+      setRunningScoreLeft(0);
+      setRunningScoreRight(0);
+      setWinnerRevealed(false);
+      setScoreFlash(false);
+      confettiRef.current = false;
+      
+      judges.forEach(([judgeKey, data], i) => {
+        setTimeout(() => {
+          setRevealedJudges(prev => [...prev, judgeKey]);
+          
+          setTimeout(() => {
+            setScoreFlash(true);
+            setTimeout(() => {
+              const leftScore = getScoreForProfile(leftProfile.id, data);
+              const rightScore = getScoreForProfile(rightProfile.id, data);
+              setRunningScoreLeft(prev => prev + leftScore);
+              setRunningScoreRight(prev => prev + rightScore);
+              setTimeout(() => setScoreFlash(false), 300);
+            }, 150);
+          }, 500);
+        }, i * 2000);
+      });
+      
+      // Winner reveal - tight timing after last judge
+      setTimeout(() => {
+        setWinnerRevealed(true);
+        if (iAmWinner && !confettiRef.current) {
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.3 }
+          });
+          confettiRef.current = true;
+        }
+      }, judges.length * 2000 + 100);
     }
-    
-    return artifacts;
-  }
+  }, [screen]);
 
-  function cycleArtifact() {
-    const artifacts = getAllArtifacts();
-    if (artifacts.length > 1) {
-      setCurrentArtifactIndex((prev) => (prev + 1) % artifacts.length);
+  // ============================================
+  // SCREEN 3: WRAPUP
+  // ============================================
+  
+  useEffect(() => {
+    if (screen === 'wrapup') {
+      setWrapupStage(0);
+      
+      const timer1 = setTimeout(() => setWrapupStage(1), 1200);
+      const timer2 = setTimeout(() => setWrapupStage(2), 1600);
+      
+      return () => {
+        clearTimeout(timer1);
+        clearTimeout(timer2);
+      };
     }
-  }
+  }, [screen]);
 
-  // Calculate scores and standings
-  const winnerScore = getTotalScore(currentShow.winner_id);
-  const loserId = currentShow.winner_id === currentShow.profile_a_id 
-    ? currentShow.profile_b_id 
-    : currentShow.profile_a_id;
-  const loserScore = getTotalScore(loserId);
-  const winnerName = getWinnerName();
-  // Check if this was a tiebreaker (from judge_data or by comparing scores)
-  const isTie = currentShow.judge_data?.was_tiebreaker || winnerScore === loserScore;
+  // ============================================
+  // MENU HANDLERS
+  // ============================================
   
-  // Filter out current show from previousShows to avoid double-counting
-  const pastShows = previousShows.filter(s => s.id !== currentShow.id);
-  
-  const myWins = pastShows.filter(s => s.winner_id === activeProfileId).length + 
-    (currentShow.winner_id === activeProfileId ? 1 : 0);
-  const opponentWins = pastShows.filter(s => s.winner_id === opponentProfile.id).length +
-    (currentShow.winner_id === opponentProfile.id ? 1 : 0);
-  
-  const iAmWinner = currentShow.winner_id === activeProfileId;
-  const micHolderId = myWins > opponentWins ? activeProfileId : 
-    (opponentWins > myWins ? opponentProfile.id : rivalry.mic_holder_id);
+  const handleMenuAction = (action) => {
+    setShowMenu(false);
+    switch (action) {
+      case 'allRounds':
+        setShowAllRounds(true);
+        break;
+      case 'profiles':
+        onNavigate('screen2');
+        break;
+      case 'howToPlay':
+        setShowHowToPlay(true);
+        break;
+      case 'cancel':
+        setShowCancelModal(true);
+        break;
+    }
+  };
 
-  // Calculate viewer-left scores for Step 3
-  const myTotalScore = getTotalScore(activeProfileId);
-  const opponentTotalScore = getTotalScore(opponentProfile.id);
-
-  // Menu component (reused across steps)
-  const MenuButton = () => (
-    <div className="relative">
-      <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="text-slate-400 hover:text-white text-2xl w-8 h-8 flex items-center justify-center"
-      >
-        ⋮
-      </button>
-      {showMenu && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setShowMenu(false)}
+  // ============================================
+  // RENDER: ANSWERS + BANTER SCREEN
+  // ============================================
+  
+  if (screen === 'answers') {
+    // Don't render until initialized to prevent flash
+    if (!answersInitialized) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
+          <HeaderWithMenu
+            onAllRounds={() => setShowAllRounds(true)}
+            onProfiles={() => onNavigate('screen2')}
+            onHowToPlay={() => setShowHowToPlay(true)}
+            onCancelRivalry={() => setShowCancelModal(true)}
           />
-          <div className="absolute right-0 mt-2 w-48 bg-slate-800 rounded-lg shadow-xl border border-slate-700 py-2 z-50">
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                setShowAllRounds(true);
-              }}
-              className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
-            >
-              See All Rounds
-            </button>
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                onNavigate('screen2');
-              }}
-              className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
-            >
-              Your Profiles
-            </button>
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                setShowHowToPlay(true);
-              }}
-              className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700"
-            >
-              How to Play
-            </button>
-            <button
-              onClick={() => {
-                setShowMenu(false);
-                setShowCancelModal(true);
-              }}
-              className="w-full text-left px-4 py-2 text-red-400 hover:bg-slate-700 border-t border-slate-700"
-            >
-              Cancel Rivalry
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-
-  // Ripley bubble component (consistent with judge style)
-  const RipleyBubble = ({ text }) => (
-    <div className="bg-slate-800/50 rounded-xl p-4">
-      <div className="flex items-start gap-3">
-        <span className="text-2xl">🎙️</span>
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-bold text-orange-400">Ripley</span>
-          </div>
-          <p className="text-slate-200 text-sm leading-relaxed">{text}</p>
         </div>
-      </div>
-    </div>
-  );
-
-  // STEP 1: The Answers
-  if (step === 1) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />
-        <div className="max-w-md mx-auto">
-          {/* Header row */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
-          </div>
-
-          {/* Prompt - moved before Ripley */}
-          <div className="mb-4 text-center">
-            <p className="text-xl font-bold text-slate-100">{currentShow.prompt}</p>
-          </div>
-
-          {/* Ripley intro */}
-          <div className="mb-6">
-            <RipleyBubble text={ripleyIntro} />
-          </div>
-
-          {/* My Answer - no border */}
-          <div className="mb-3">
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">{myProfile.avatar}</span>
-                <span className="font-bold text-slate-100">{myProfile.name}</span>
-              </div>
-              <p className="text-slate-200">{getMyAnswer()}</p>
-            </div>
-          </div>
-
-          {/* Opponent Answer - no border */}
-          <div className="mb-8">
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">{opponentProfile.avatar}</span>
-                <span className="font-bold text-slate-100">{opponentProfile.name}</span>
-              </div>
-              <p className="text-slate-200">{getOpponentAnswer()}</p>
-            </div>
-          </div>
-
-          {/* Next button - no arrow */}
-          <button
-            onClick={() => setStep(2)}
-            className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
-          >
-            To the Judges
-          </button>
-        </div>
-
-        {/* Modals */}
-        {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
-        {showAllRounds && (
-          <AllRoundsModal 
-            previousShows={[...previousShows]}
-            rivalry={rivalry}
-            activeProfileId={activeProfileId}
-            onClose={() => setShowAllRounds(false)}
-            onSelectRound={(showId) => {
-              setShowAllRounds(false);
-              onNavigate('screen6', { showId });
-            }}
-          />
-        )}
-        {showCancelModal && (
-          <CancelModal 
-            opponentName={opponentProfile.name}
-            onConfirm={onCancelRivalry}
-            onClose={() => setShowCancelModal(false)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // STEP 2: Judge Banter
-  if (step === 2) {
-    const banter = currentShow.judge_data?.banter || [];
+      );
+    }
     
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
+        <HeaderWithMenu
+          onAllRounds={() => setShowAllRounds(true)}
+          onProfiles={() => onNavigate('screen2')}
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onCancelRivalry={() => setShowCancelModal(true)}
+        />
+        
         <div className="max-w-md mx-auto">
-          {/* Header row with Ripley intro instead of plain text */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
-          </div>
-
-          {/* Ripley banter intro */}
-          <div className="mb-6">
-            <RipleyBubble text={ripleyBanterIntro} />
-          </div>
-
-          {/* Banter bubbles - alternating left/right like conversation */}
+          {/* Prompt */}
+          <h1 className="text-xl font-bold text-slate-100 text-center mb-6">
+            {currentShow.prompt}
+          </h1>
+          
+          {/* Answers - fly in from sides */}
           <div className="space-y-3 mb-8">
-            {banter.map((line, i) => {
-              const judge = judgeProfiles.find(j => j.key === line.judge);
-              const isEven = i % 2 === 0;
-              
+            {/* Left (me) - flies in from left */}
+            <div className={`bg-slate-700/40 rounded-xl p-4 transition-all duration-500 ${answersRevealed ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}>
+              <p className="text-slate-100 text-lg text-center mb-1">{leftAnswer}</p>
+              <p className="text-slate-400 text-sm text-center">— {leftProfile.name}</p>
+            </div>
+            
+            {/* Right (opponent) - flies in from right */}
+            <div className={`bg-slate-700/40 rounded-xl p-4 transition-all duration-500 delay-200 ${answersRevealed ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}>
+              <p className="text-slate-100 text-lg text-center mb-1">{rightAnswer}</p>
+              <p className="text-slate-400 text-sm text-center">— {rightProfile.name}</p>
+            </div>
+          </div>
+          
+          {/* Banter - threaded left/right */}
+          <div className="space-y-3 mb-8">
+            {banter.map((item, i) => {
+              const judge = judgeProfiles.find(j => j.key === item.judge);
+              const isLeft = i % 2 === 0;
               return (
                 <div 
-                  key={i} 
-                  className={`flex ${isEven ? 'justify-start' : 'justify-end'}`}
+                  key={i}
+                  className={`flex ${isLeft ? 'justify-start' : 'justify-end'} transition-all duration-500 ${banterItems.includes(i) ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 h-0 overflow-hidden'}`}
                 >
-                  <div className="max-w-[85%]">
-                    <div className="bg-slate-800/70 rounded-xl p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-lg">{judge?.emoji || '❓'}</span>
-                        <span className="text-sm font-bold text-slate-400">{judge?.name || line.judge}</span>
-                      </div>
-                      <p className="text-slate-200 text-sm">{line.text}</p>
+                  <div className={`bg-slate-800/70 rounded-2xl p-4 max-w-[85%] ${isLeft ? 'rounded-tl-sm' : 'rounded-tr-sm'}`}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">{judge?.emoji || '❓'}</span>
+                      <span className="text-orange-400 text-sm font-medium">{judge?.name || item.judge}</span>
                     </div>
+                    <p className="text-slate-200 text-sm">{item.text}</p>
                   </div>
                 </div>
               );
             })}
           </div>
-
-          {/* Next button - no arrow, cleaner ellipsis */}
-          <button
-            onClick={() => setStep(3)}
-            className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
-          >
-            And the winner is…
-          </button>
-        </div>
-
-        {/* Modals */}
-        {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
-        {showAllRounds && (
-          <AllRoundsModal 
-            previousShows={[...previousShows]}
-            rivalry={rivalry}
-            activeProfileId={activeProfileId}
-            onClose={() => setShowAllRounds(false)}
-            onSelectRound={(showId) => {
-              setShowAllRounds(false);
-              onNavigate('screen6', { showId });
-            }}
-          />
-        )}
-        {showCancelModal && (
-          <CancelModal 
-            opponentName={opponentProfile.name}
-            onConfirm={onCancelRivalry}
-            onClose={() => setShowCancelModal(false)}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // STEP 3: The Winner (with mic animation for winner)
-  if (step === 3) {
-    const headline = currentShow.judge_data?.headline;
-    
-    // Winner sees animated mic first, then content
-    // Loser sees content immediately (no mic, no animation)
-    
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />
-        
-        {/* CSS for mic animation */}
-        <style>{`
-          @keyframes micBounce {
-            0%, 100% { transform: translateY(0) scale(1); }
-            50% { transform: translateY(-20px) scale(1.1); }
-          }
-          @keyframes micSettle {
-            0% { 
-              transform: translateY(0) scale(1);
-              opacity: 1;
-            }
-            100% { 
-              transform: translateY(-100px) scale(0.4);
-              opacity: 0;
-            }
-          }
-          .mic-bounce {
-            animation: micBounce 0.6s ease-in-out infinite;
-          }
-          .mic-settle {
-            animation: micSettle 0.3s ease-out forwards;
-          }
-        `}</style>
-        
-        <div className="max-w-md mx-auto">
-          {/* Winner: Big centered mic animation (before content reveals) */}
-          {iAmWinner && !showContent && (
-            <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
-              <img 
-                src={GoldenMic} 
-                alt="Golden Mic" 
-                className={`w-32 h-32 drop-shadow-[0_0_30px_rgba(251,191,36,0.6)] ${micSettled ? 'mic-settle' : 'mic-bounce'}`}
-              />
-              <h1 className="text-3xl font-bold text-orange-500 mt-6 animate-pulse">
-                YOU WIN!
-              </h1>
-            </div>
-          )}
           
-          {/* Loser: No mic celebration, just show "opponent wins" immediately */}
-          {!iAmWinner && !showContent && (
-            <div className="flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
-              <h1 className="text-2xl font-bold text-slate-300">
-                {winnerName} takes this round
-              </h1>
-            </div>
-          )}
-          
-          {/* Main content (appears after animation for winner, immediately for loser) */}
-          {showContent && (
-            <>
-              {/* Winner announcement - centered */}
-              <div className="text-center mb-6">
-                {/* Golden Mic for winner only */}
-                {iAmWinner && (
-                  <div className="mb-3">
-                    <img 
-                      src={GoldenMic} 
-                      alt="mic" 
-                      className="w-12 h-12 mx-auto drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]" 
-                    />
-                  </div>
-                )}
-                
-                {/* Winner headline with menu */}
-                <div className="flex items-center justify-center gap-2 mb-2">
-                  <h1 className="text-2xl font-bold text-orange-500">
-                    {winnerName.toUpperCase()} WINS THE ROUND!
-                  </h1>
-                  <MenuButton />
-                </div>
-                
-                {/* Score - viewer on left */}
-                <p className="text-3xl font-bold text-slate-100 mb-3">
-                  {myTotalScore} - {opponentTotalScore}
-                </p>
-                
-                {/* Tiebreaker explanation or AI Headline */}
-                {isTie ? (
-                  <div className="bg-slate-800/50 rounded-xl p-3 mb-4">
-                    <p className="text-slate-300 text-sm">
-                      <span className="text-orange-400 font-semibold">Tiebreaker!</span> {winnerName} submitted first.
-                    </p>
-                  </div>
-                ) : headline ? (
-                  <p className="text-slate-300 italic text-lg mb-4">
-                    {headline}
-                  </p>
-                ) : null}
-              </div>
-
-              {/* Ripley verdict - moved above standings */}
-              <div className="mb-6">
-                <RipleyBubble text={ripleyVerdict} />
-              </div>
-
-              {/* Round Wins box */}
-              <div className="mb-8">
-                <div className="bg-slate-800/50 rounded-xl p-4">
-                  <p className="text-sm text-slate-400 mb-3 text-center">Round Wins</p>
-                  <div className="flex justify-center gap-8">
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {micHolderId === activeProfileId && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
-                        <span className="text-2xl font-bold text-slate-100">{myWins}</span>
-                      </div>
-                      <p className="text-sm text-slate-400">{myProfile.name}</p>
-                    </div>
-                    <div className="text-slate-600 text-2xl font-bold">-</div>
-                    <div className="text-center">
-                      <div className="flex items-center justify-center gap-2">
-                        {micHolderId === opponentProfile.id && <img src={GoldenMic} alt="mic" className="w-5 h-5" />}
-                        <span className="text-2xl font-bold text-slate-100">{opponentWins}</span>
-                      </div>
-                      <p className="text-sm text-slate-400">{opponentProfile.name}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Next button */}
-              <button
-                onClick={() => setStep(4)}
-                className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
-              >
-                The Breakdown
-              </button>
-            </>
+          {/* Button - only show after all banter */}
+          {banterItems.length >= banter.length && (
+            <button
+              onClick={() => setScreen('scores')}
+              className="w-full py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400"
+            >
+              To the Scores
+            </button>
           )}
         </div>
 
@@ -770,181 +467,133 @@ export default function VerdictFlow({
     );
   }
 
-  // STEP 4: The Breakdown
-  if (step === 4) {
-    const artifacts = getAllArtifacts();
-    const currentArtifact = artifacts[currentArtifactIndex];
-    const winnerProfile = currentShow.winner_id === rivalry.profile_a_id ? rivalry.profile_a : rivalry.profile_b;
-    const loserProfile = currentShow.winner_id === rivalry.profile_a_id ? rivalry.profile_b : rivalry.profile_a;
-    
+  // ============================================
+  // RENDER: SCORE REVEAL SCREEN
+  // ============================================
+  
+  if (screen === 'scores') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <Header />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
+        <HeaderWithMenu
+          onAllRounds={() => setShowAllRounds(true)}
+          onProfiles={() => onNavigate('screen2')}
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onCancelRivalry={() => setShowCancelModal(true)}
+        />
+        
         <div className="max-w-md mx-auto">
-          {/* Header row */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="w-8" />
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
-          </div>
-
-          {/* Prompt */}
-          <div className="mb-4 text-center">
-            <p className="text-lg font-semibold text-slate-300">{currentShow.prompt}</p>
-          </div>
-
-          {/* Tiebreaker note if applicable */}
-          {isTie && (
-            <div className="bg-slate-800/50 rounded-xl p-3 mb-4 text-center">
-              <p className="text-slate-300 text-sm">
-                <span className="text-orange-400 font-semibold">Tiebreaker:</span> {winnerProfile.name} submitted first
-              </p>
+          {/* Winner headline - appears above scoreboard */}
+          {winnerRevealed && (
+            <div className="text-center mb-4 animate-fade-in">
+              <h2 className="text-xl font-bold text-orange-500">
+                {winnerName} wins the round!
+              </h2>
             </div>
           )}
-
-          {/* Winner Answer */}
-          <div className="mb-2">
-            <div className="bg-orange-500/15 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
+          
+          {/* Scoreboard */}
+          <div className="mb-6">
+            <div className={`bg-slate-800/60 rounded-xl py-4 px-6 transition-all duration-150 ${scoreFlash ? 'bg-orange-500/30' : ''}`}>
+              <div className="flex justify-center items-center">
+                {/* Left player with mic space */}
                 <div className="flex items-center gap-2">
-                  <img src={GoldenMic} alt="mic" className="w-5 h-5" />
-                  <span className="text-xl">{winnerProfile.avatar}</span>
-                  <span className="font-bold text-slate-100">{winnerProfile.name}</span>
-                </div>
-                <span className="text-lg font-bold text-orange-500">{winnerScore}</span>
-              </div>
-              <p className="text-slate-200 text-sm">
-                {currentShow.winner_id === currentShow.profile_a_id 
-                  ? currentShow.profile_a_answer 
-                  : currentShow.profile_b_answer}
-              </p>
-            </div>
-          </div>
-
-          {/* Loser Answer */}
-          <div className="mb-4">
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{loserProfile.avatar}</span>
-                  <span className="font-bold text-slate-100">{loserProfile.name}</span>
-                </div>
-                <span className="text-lg font-bold text-slate-400">{loserScore}</span>
-              </div>
-              <p className="text-slate-200 text-sm">
-                {loserId === currentShow.profile_a_id 
-                  ? currentShow.profile_a_answer 
-                  : currentShow.profile_b_answer}
-              </p>
-            </div>
-          </div>
-
-          {/* Judge Scores - separate boxes like before, no borders */}
-          {currentShow.judge_data?.scores && (
-            <div className="space-y-2 mb-4">
-              {Object.entries(currentShow.judge_data.scores).map(([judgeKey, data]) => {
-                const judge = judgeProfiles.find(j => j.key === judgeKey);
-                const profileAScore = data.profile_a_score;
-                const profileBScore = data.profile_b_score;
-                
-                // Get scores for viewer (me) and opponent
-                const myScore = activeProfileId === rivalry.profile_a_id ? profileAScore : profileBScore;
-                const opponentScore = activeProfileId === rivalry.profile_a_id ? profileBScore : profileAScore;
-                
-                // Determine if I won this judge
-                const iWonThisJudge = myScore > opponentScore;
-                const opponentWonThisJudge = opponentScore > myScore;
-                
-                return (
-                  <div 
-                    key={judgeKey} 
-                    className="bg-slate-800/30 rounded-xl p-3"
-                  >
-                    <div className="flex items-center flex-wrap gap-x-1 mb-1">
-                      <span className="text-lg">{judge?.emoji || '❓'}</span>
-                      <span className="text-sm font-bold text-slate-300">{judge?.name || judgeKey}</span>
-                      <span className="text-sm text-slate-500">—</span>
-                      <span className={`text-sm ${iWonThisJudge ? 'text-orange-400 font-semibold' : 'text-slate-400'}`}>
-                        {myProfile.name}: {myScore}
-                      </span>
-                      <span className="text-sm text-slate-500">•</span>
-                      <span className={`text-sm ${opponentWonThisJudge ? 'text-orange-400 font-semibold' : 'text-slate-400'}`}>
-                        {opponentProfile.name}: {opponentScore}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-400 italic">{data.comment}</p>
+                  <div className="w-12 flex justify-center">
+                    {winnerRevealed && winnerIsLeft && (
+                      <img src={GoldenMic} alt="winner" className="w-10 h-10 animate-fade-in" />
+                    )}
                   </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Artifact - rivalry_recap styled as Ripley bubble */}
-          {currentArtifact && (
-            currentArtifact.type === 'rivalry_recap' ? (
-              <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">🎙️</span>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-bold text-orange-400">Ripley</span>
-                      {artifacts.length > 1 && (
-                        <button
-                          onClick={cycleArtifact}
-                          className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </button>
-                      )}
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-slate-100 tabular-nums">
+                      {runningScoreLeft}
                     </div>
-                    <p className="text-sm text-slate-200 leading-relaxed">{currentArtifact.text}</p>
+                    <span className="text-sm text-slate-400">{leftProfile.name}</span>
+                  </div>
+                </div>
+                
+                <div className="text-2xl text-slate-600 mx-6">—</div>
+                
+                {/* Right player with mic space */}
+                <div className="flex items-center gap-2">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-slate-100 tabular-nums">
+                      {runningScoreRight}
+                    </div>
+                    <span className="text-sm text-slate-400">{rightProfile.name}</span>
+                  </div>
+                  <div className="w-12 flex justify-center">
+                    {winnerRevealed && !winnerIsLeft && (
+                      <img src={GoldenMic} alt="winner" className="w-10 h-10 animate-fade-in" />
+                    )}
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="bg-slate-800/30 rounded-xl p-4 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg">{artifactConfig[currentArtifact.type]?.icon || '✨'}</span>
-                    <span className="text-sm font-bold text-slate-300">
-                      {artifactConfig[currentArtifact.type]?.label || 'Artifact'}
+            </div>
+          </div>
+          
+          {/* Judges - newest at top, animate up from bottom */}
+          <div className="space-y-3 mb-8">
+            {[...judges].reverse().map(([judgeKey, data]) => {
+              const judge = judgeProfiles.find(j => j.key === judgeKey);
+              const isRevealed = revealedJudges.includes(judgeKey);
+              const leftScore = getScoreForProfile(leftProfile.id, data);
+              const rightScore = getScoreForProfile(rightProfile.id, data);
+              const leftWon = leftScore > rightScore;
+              const rightWon = rightScore > leftScore;
+              const judgeTie = leftScore === rightScore;
+              
+              if (!isRevealed) return null;
+              
+              return (
+                <div 
+                  key={judgeKey}
+                  className="bg-slate-800/50 rounded-xl p-4 animate-slide-up"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-xl">{judge?.emoji || '❓'}</span>
+                    <span className="font-bold text-orange-400">{judge?.name || judgeKey}</span>
+                  </div>
+                  <p className="text-slate-300 text-sm mb-3">{data.comment}</p>
+                  <div className="flex justify-between text-sm">
+                    <span className={leftWon || judgeTie ? 'text-orange-400 font-bold' : 'text-slate-400'}>
+                      {leftProfile.name}: {leftScore}
+                    </span>
+                    <span className={rightWon || judgeTie ? 'text-orange-400 font-bold' : 'text-slate-400'}>
+                      {rightProfile.name}: {rightScore}
                     </span>
                   </div>
-                  {artifacts.length > 1 && (
-                    <button
-                      onClick={cycleArtifact}
-                      className="text-slate-400 hover:text-slate-200 transition-colors p-1"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
-                <p className="text-sm text-slate-200 leading-relaxed">{currentArtifact.text}</p>
-              </div>
-            )
+              );
+            })}
+          </div>
+          
+          {/* Continue button - only after winner revealed */}
+          {winnerRevealed && (
+            <button
+              onClick={() => setScreen('wrapup')}
+              className="w-full py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400"
+            >
+              Continue
+            </button>
           )}
-
-          {/* Next button - no arrow */}
-          <button
-            onClick={() => {
-              const matchLength = rivalry?.match_length || 5;
-              if (currentShow.show_number === matchLength) {
-                onNavigateToSummary();
-              } else {
-                onNextRound();
-              }
-            }}
-            className="w-full px-4 py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold text-lg"
-          >
-            {currentShow.show_number === (rivalry?.match_length || 5)
-              ? 'See Rivalry Summary' 
-              : 'Next Up'}
-          </button>
         </div>
+        
+        {/* Animation styles */}
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+          }
+          .animate-slide-up {
+            animation: slideUp 0.4s ease-out forwards;
+          }
+        `}</style>
 
         {/* Modals */}
         {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
@@ -956,7 +605,187 @@ export default function VerdictFlow({
             onClose={() => setShowAllRounds(false)}
             onSelectRound={(showId) => {
               setShowAllRounds(false);
-              onNavigate('screen6', { showId, activeProfileId });
+              onNavigate('screen6', { showId });
+            }}
+          />
+        )}
+        {showCancelModal && (
+          <CancelModal 
+            opponentName={opponentProfile.name}
+            onConfirm={onCancelRivalry}
+            onClose={() => setShowCancelModal(false)}
+          />
+        )}
+      </div>
+    );
+  }
+
+  // ============================================
+  // RENDER: WRAPUP SCREEN
+  // ============================================
+  
+  if (screen === 'wrapup') {
+    // For final round, skip the tally and go straight to summary after artifact
+    if (isFinalRound) {
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
+          <HeaderWithMenu
+            onAllRounds={() => setShowAllRounds(true)}
+            onProfiles={() => onNavigate('screen2')}
+            onHowToPlay={() => setShowHowToPlay(true)}
+            onCancelRivalry={() => setShowCancelModal(true)}
+          />
+          
+          <div className="max-w-md mx-auto">
+            {/* Ripley artifact */}
+            {selectedArtifact && (
+              <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">🎙️</span>
+                  <span className="font-bold text-orange-400">Ripley</span>
+                </div>
+                <p className="text-slate-200 text-sm">{selectedArtifact.text}</p>
+              </div>
+            )}
+            
+            {/* Final results - show immediately for final round */}
+            {wrapupStage >= 1 && (
+              <div className="bg-slate-800/30 rounded-xl p-6 mb-8 text-center animate-slide-up">
+                <h3 className="text-slate-400 text-sm mb-4">Final Results</h3>
+                <div className="flex justify-center items-center gap-8">
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-slate-100 mb-1">{myWins}</div>
+                    <span className="text-sm text-slate-400">{myProfile.name}</span>
+                  </div>
+                  <div className="text-2xl text-slate-600">-</div>
+                  <div className="text-center">
+                    <div className="text-4xl font-bold text-slate-100 mb-1">{opponentWins}</div>
+                    <span className="text-sm text-slate-400">{opponentProfile.name}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Button */}
+            {wrapupStage >= 2 && (
+              <button
+                onClick={onNavigateToSummary}
+                className="w-full py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400 animate-slide-up"
+              >
+                See Rivalry Summary
+              </button>
+            )}
+          </div>
+          
+          {/* Animation styles */}
+          <style>{`
+            @keyframes slideUp {
+              from { opacity: 0; transform: translateY(20px); }
+              to { opacity: 1; transform: translateY(0); }
+            }
+            .animate-slide-up {
+              animation: slideUp 0.4s ease-out forwards;
+            }
+          `}</style>
+
+          {/* Modals */}
+          {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+          {showAllRounds && (
+            <AllRoundsModal 
+              previousShows={[...previousShows]}
+              rivalry={rivalry}
+              activeProfileId={activeProfileId}
+              onClose={() => setShowAllRounds(false)}
+              onSelectRound={(showId) => {
+                setShowAllRounds(false);
+                onNavigate('screen6', { showId });
+              }}
+            />
+          )}
+          {showCancelModal && (
+            <CancelModal 
+              opponentName={opponentProfile.name}
+              onConfirm={onCancelRivalry}
+              onClose={() => setShowCancelModal(false)}
+            />
+          )}
+        </div>
+      );
+    }
+    
+    // Non-final rounds
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
+        <HeaderWithMenu
+          onAllRounds={() => setShowAllRounds(true)}
+          onProfiles={() => onNavigate('screen2')}
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onCancelRivalry={() => setShowCancelModal(true)}
+        />
+        
+        <div className="max-w-md mx-auto">
+          {/* Ripley artifact - always visible */}
+          {selectedArtifact && (
+            <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xl">🎙️</span>
+                <span className="font-bold text-orange-400">Ripley</span>
+              </div>
+              <p className="text-slate-200 text-sm">{selectedArtifact.text}</p>
+            </div>
+          )}
+          
+          {/* Rivalry standings - rolls up */}
+          {wrapupStage >= 1 && (
+            <div className="bg-slate-800/30 rounded-xl p-6 mb-8 text-center animate-slide-up">
+              <h3 className="text-slate-400 text-sm mb-4">The Rivalry So Far</h3>
+              <div className="flex justify-center items-center gap-8">
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-slate-100 mb-1">{myWins}</div>
+                  <span className="text-sm text-slate-400">{myProfile.name}</span>
+                </div>
+                <div className="text-2xl text-slate-600">-</div>
+                <div className="text-center">
+                  <div className="text-4xl font-bold text-slate-100 mb-1">{opponentWins}</div>
+                  <span className="text-sm text-slate-400">{opponentProfile.name}</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Button - cascades after leaderboard */}
+          {wrapupStage >= 2 && (
+            <button
+              onClick={onNextRound}
+              className="w-full py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400 animate-slide-up"
+            >
+              Onto Round {currentShow.show_number + 1}
+            </button>
+          )}
+        </div>
+        
+        {/* Animation styles */}
+        <style>{`
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-slide-up {
+            animation: slideUp 0.4s ease-out forwards;
+          }
+        `}</style>
+
+        {/* Modals */}
+        {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
+        {showAllRounds && (
+          <AllRoundsModal 
+            previousShows={[...previousShows]}
+            rivalry={rivalry}
+            activeProfileId={activeProfileId}
+            onClose={() => setShowAllRounds(false)}
+            onSelectRound={(showId) => {
+              setShowAllRounds(false);
+              onNavigate('screen6', { showId });
             }}
           />
         )}

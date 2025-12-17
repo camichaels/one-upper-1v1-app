@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import Header from './Header';
+import HeaderWithMenu from './HeaderWithMenu';
 import HowToPlayModal from './HowToPlayModal';
 
 // Logo
@@ -60,7 +60,8 @@ export default function RivalryIntroFlow({
   profile, 
   opponent,
   judges,
-  onComplete
+  onComplete,
+  onNavigate
 }) {
   // Animation phases
   const [phase, setPhase] = useState('intro'); // 'intro' | 'reveal'
@@ -222,7 +223,10 @@ export default function RivalryIntroFlow({
       {/* MAIN CONTENT - Header hidden during intro */}
       <div className={`${phase === 'intro' ? 'opacity-0' : 'opacity-100'} transition-opacity duration-300`}>
         <div className="px-5 py-6">
-          <Header />
+          <HeaderWithMenu
+            onHowToPlay={() => setShowHowToPlay(true)}
+            onProfiles={() => onNavigate && onNavigate('screen2')}
+          />
         </div>
         
         <div className="max-w-md mx-auto px-6 pb-8">

@@ -7,7 +7,7 @@ import GoldenMic from '../assets/microphone.svg';
 const DEMO_ROUNDS = [
   {
     mode: "rivalry",
-    title: "How a Rivalry Plays Out",
+    title: "How a Rivalry Works",
     prompt: "Worst thing to say at a funeral?",
     step2Subhead: "Take your time. Play from anywhere.",
     step3Subhead: "Three AI judges score each answer. Best total wins.",
@@ -28,10 +28,10 @@ const DEMO_ROUNDS = [
   },
   {
     mode: "showdown",
-    title: "How a Showdown Plays Out",
+    title: "How a Showdown Works",
     prompt: "Worst excuse for being late to work?",
     step2Subhead: "Same room. Same moment. 60 seconds.",
-    step3Subhead: "Three AI judges crown a champion",
+    step3Subhead: "Three AI judges. One winner.",
     players: [
       { icon: "🤓", name: "Alex", isYou: true, answer: "Traffic of ghosts" },
       { icon: "🦄", name: "Sam", isYou: false, answer: "My dog ate my keys" },
@@ -154,7 +154,7 @@ function GameDemoAnimation() {
           Step 1: The Prompt
         </div>
         <p className="text-slate-400 text-sm mb-3">
-          {isShowdown ? "Everyone gets the same prompt" : "Both players get the same ridiculous prompt"}
+          {isShowdown ? "Everyone gets the same prompt" : "Go head-to-head on the same prompt"}
         </p>
         
         <div className="bg-slate-700/50 rounded-xl p-4">
@@ -358,15 +358,14 @@ export default function LandingPage() {
 
         {/* Headline */}
         <h1 className="text-xl md:text-2xl font-bold text-white mb-6">
-          Finally settle who's funnier.
+          Out-funny your friends.
         </h1>
 
         {/* Value prop stack */}
         <div className="space-y-2 mb-10">
-          <p className="text-lg text-slate-300">Ridiculous prompts.</p>
-          <p className="text-lg text-slate-300">Unhinged answers.</p>
-          <p className="text-lg text-slate-300">Ruthless AI judges.</p>
-          <p className="text-lg text-slate-300">Brag rights forever.</p>
+          <p className="text-lg text-slate-300">Answer ridiculous prompts.</p>
+          <p className="text-lg text-slate-300">Get judged by ruthless AI.</p>
+          <p className="text-lg text-slate-300">Win bragging rights forever.</p>
         </div>
 
         {/* CTAs */}
@@ -381,7 +380,7 @@ export default function LandingPage() {
             to="/showdown"
             className="w-full py-4 bg-orange-500 text-white font-semibold text-lg rounded-xl hover:bg-orange-400 transition-colors text-center"
           >
-            Start a Showdown
+            Start a Group Showdown
           </Link>
         </div>
 
@@ -422,18 +421,15 @@ export default function LandingPage() {
           />
           
           {/* Tagline */}
-          <h2 className="text-2xl font-bold text-white mb-2">
-            1 Golden Mic
-          </h2>
-          <h2 className="text-2xl font-bold text-white mb-8">
-            0 excuses
-          </h2>
+          <p className="text-xl font-bold text-white mb-8">
+            Win the Golden Mic. Settle the debate.<br />No excuses.
+          </p>
           
           {/* Stats */}
           <div className="space-y-3 text-slate-300">
             <p>🎤 147 rivalries started this week</p>
             <p>🌮 28 taco dinners wagered</p>
-            <p>💔 3 friendships taking a break</p>
+            <p>💔 3 friendships now taking a break</p>
           </div>
         </div>
       </section>
@@ -454,9 +450,9 @@ export default function LandingPage() {
                 <span className="text-3xl">🎤</span>
                 <h3 className="text-xl font-bold text-orange-500">Rivalry</h3>
               </div>
-              <p className="text-slate-400 text-base mb-4">One-on-One · Play anytime</p>
+              <p className="text-slate-400 text-base mb-4">One-on-One · Play anywhere</p>
               <p className="text-slate-300 mb-5">
-                Challenge a friend, anywhere. Winner takes the mic.
+                Challenge a friend. Answer when you want.
               </p>
               <Link
                 to="/play"
@@ -474,13 +470,13 @@ export default function LandingPage() {
               </div>
               <p className="text-slate-400 text-base mb-4">3-5 players · Live play</p>
               <p className="text-slate-300 mb-5">
-                Same room, same time. Crown a champion.
+                Same room. Same time. Real-time chaos.
               </p>
               <Link
                 to="/showdown"
                 className="block w-full py-3 bg-orange-500 text-white font-semibold rounded-xl hover:bg-orange-400 transition-colors text-center"
               >
-                Start a Showdown
+                Start a Group Showdown
               </Link>
             </div>
           </div>
@@ -493,19 +489,14 @@ export default function LandingPage() {
       <section className="px-6 py-16 bg-slate-900">
         <div className="max-w-md mx-auto text-center">
           <h2 className="text-orange-500 font-bold text-sm uppercase tracking-widest mb-6">
-            Why Play
+            Competitive Nonsense
           </h2>
           
-          <p className="text-xl font-bold text-white mb-8">
-            Part brain boost, all buddy boast
-          </p>
-
           <div className="space-y-4">
-            <p className="text-slate-300">💡 Flex your creative muscles</p>
-            <p className="text-slate-300">😈 Go places polite convo won't</p>
-            <p className="text-slate-300">👀 See how your friends really think</p>
+            <p className="text-slate-300">💪 Flex your creative muscles</p>
+            <p className="text-slate-300">👀 Learn how weird your friends are</p>
             <p className="text-slate-300">🔥 Get roasted by AI (affectionately)</p>
-            <p className="text-slate-300">🏆 Settle it once and for all</p>
+            <p className="text-slate-300">🏆 Settle who's funniest once and for all</p>
           </div>
         </div>
       </section>
@@ -520,7 +511,7 @@ export default function LandingPage() {
           </h2>
           
           <p className="text-slate-300 mb-8">
-            25 AI personalities. 3 judge each game. None are pushovers.
+            25 AI personalities. 3 judge each game.<br />None are pushovers.
           </p>
 
           {/* Judge cards */}
@@ -596,7 +587,7 @@ export default function LandingPage() {
               to="/showdown"
               className="w-full py-4 bg-orange-500 text-white font-semibold text-lg rounded-xl hover:bg-orange-400 transition-colors text-center"
             >
-              Start a Showdown
+              Start a Group Showdown
             </Link>
           </div>
           

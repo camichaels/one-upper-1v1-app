@@ -2,7 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import Header from './Header';
+import HeaderWithMenu from './HeaderWithMenu';
 import HowToPlayModal from './HowToPlayModal';
+import DeliberationChat from './DeliberationChat';
 import AllRoundsModal from './AllRoundsModal';
 import GoldenMic from '../assets/microphone.svg';
 import InterstitialScreen from './InterstitialScreen';
@@ -12,12 +14,17 @@ import RivalryIntroFlow from './RivalryIntroFlow';
 // Rotating headlines for waiting state
 const WAITING_HEADLINES = [
   "Locked in!",
-  "Done!",
   "You're in.",
-  "Nice.",
-  "Submitted!",
-  "Your move's made.",
-  "Now we wait..."
+  "Done and done.",
+  "Nailed it.",
+  "Looking good.",
+  "Feeling confident?",
+  "Oh yeah.",
+  "Boom.",
+  "That's the one.",
+  "No take-backs.",
+  "Bold move.",
+  "That's how it's done."
 ];
 
 export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId, verdictStep, setVerdictStep }) {
@@ -46,6 +53,10 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   const [rivalryCancelled, setRivalryCancelled] = useState(false);
   const [waitingHeadline] = useState(() => WAITING_HEADLINES[Math.floor(Math.random() * WAITING_HEADLINES.length)]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [promptRevealed, setPromptRevealed] = useState(false);
+  const [contentRevealed, setContentRevealed] = useState(false);
+  const [promptScreenInitialized, setPromptScreenInitialized] = useState(false);
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const prevShowIdRef = useRef(null);
   const judgingTriggeredRef = useRef(false); // Prevent multiple judge-show calls
 
@@ -224,6 +235,37 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
 
     fetchJudgeProfiles();
   }, [currentShow?.judges]);
+
+  // Prompt reveal animation when entering yourTurn state
+  useEffect(() => {
+    // Only animate on yourTurn state
+    if (!currentShow) return;
+    
+    const myAnswer_db = activeProfileId === currentShow.profile_a_id 
+      ? currentShow.profile_a_answer 
+      : currentShow.profile_b_answer;
+    const isYourTurn = currentShow.status !== 'judging' && currentShow.status !== 'complete' && !myAnswer_db;
+    
+    if (isYourTurn) {
+      // Reset animations - set initialized false first
+      setPromptScreenInitialized(false);
+      setPromptRevealed(false);
+      setContentRevealed(false);
+      
+      // Small delay before showing anything
+      const initTimer = setTimeout(() => setPromptScreenInitialized(true), 50);
+      
+      // Stagger the reveals
+      const promptTimer = setTimeout(() => setPromptRevealed(true), 350);
+      const contentTimer = setTimeout(() => setContentRevealed(true), 850);
+      
+      return () => {
+        clearTimeout(initTimer);
+        clearTimeout(promptTimer);
+        clearTimeout(contentTimer);
+      };
+    }
+  }, [currentShow?.id, activeProfileId]);
 
   async function loadRivalryAndShow() {
     setLoading(true);
@@ -610,12 +652,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         .single();
 
       if (existingShow) {
-        if (existingShow.emcee_text && nextShowNumber > 1) {
-          setInterstitialText(existingShow.emcee_text);
-          setShowInterstitial(true);
-          return;
-        }
-        
+        // Skip interstitial - go directly to show
         setCurrentShow(existingShow);
         return;
       }
@@ -680,24 +717,14 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
             .single();
           
           if (fetchedShow) {
-            if (fetchedShow.emcee_text && nextShowNumber > 1) {
-              setInterstitialText(fetchedShow.emcee_text);
-              setShowInterstitial(true);
-              return;
-            }
-            
+            // Skip interstitial - go directly to show
             setCurrentShow(fetchedShow);
           }
         } else {
           console.error('Error creating next show:', error);
         }
       } else {
-        if (newShow.emcee_text && nextShowNumber > 1) {
-          setInterstitialText(newShow.emcee_text);
-          setShowInterstitial(true);
-          return;
-        }
-        
+        // Skip interstitial - go directly to next show
         setCurrentShow(newShow);
       }
     } catch (err) {
@@ -856,6 +883,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         profile={myProfile}
         opponent={opponentProfile}
         judges={rivalryJudges}
+        onNavigate={onNavigate}
         onComplete={async () => {
           setShowIntroFlow(false);
           // Reload to get the show
@@ -1093,59 +1121,38 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     return quipFn(opponentProfile.name);
   };
 
-  // WAITING STATE - Stripped down, focused on your answer
+  // WAITING STATE - Animated, focused on confirmation
   if (state === 'waiting') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
-        <Header />
+        <HeaderWithMenu
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onAllRounds={() => setShowAllRounds(true)}
+          onProfiles={() => onNavigate('screen2')}
+          onCancel={() => setShowCancelModal(true)}
+          showAllRounds={previousShows.length > 0}
+        />
         <div className="max-w-md mx-auto">
-          {/* Minimal header: Round + Menu */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="w-8"></div>
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
-          </div>
 
-          {/* Waiting headline */}
-          <h1 className="text-2xl font-bold text-slate-100 text-center mb-6">
+          {/* Confirmation headline */}
+          <h1 className="text-2xl font-bold text-orange-500 text-center mb-4">
             {waitingHeadline}
           </h1>
 
-          {/* Prompt - Hero */}
-          <div className="mb-6 text-center">
-            <p className="text-2xl font-bold text-slate-100">{currentShow.prompt}</p>
+          {/* Prompt - white, same size as headline */}
+          <p className="text-slate-100 text-2xl font-bold text-center mb-6">{currentShow.prompt}</p>
+
+          {/* Answer box with checkmark label */}
+          <div className="bg-slate-800/50 rounded-xl p-4 mb-8 border border-slate-700/50">
+            <div className="text-green-400 text-sm font-semibold mb-2">✓ Your answer</div>
+            <p className="text-slate-200 text-lg">{myAnswer_db}</p>
           </div>
 
-          {/* Content */}
-          <div className="space-y-5">
-            {/* Your submitted answer - read-only, no border */}
-            <div className="bg-slate-800/50 rounded-xl p-4 text-left">
-              <div className="text-green-400 text-sm font-semibold mb-2">✓ Your answer</div>
-              <p className="text-slate-200">{myAnswer_db}</p>
-            </div>
-
-            {/* Ripley quip - read-only, no border */}
-            <div className="bg-slate-800/50 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <span className="text-2xl">🎙️</span>
-                <div className="text-left">
-                  <div className="text-orange-400 text-sm font-medium">Ripley</div>
-                  <p className="text-slate-200">{getWaitingQuip()}</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Waiting status */}
-            <div className="text-slate-300 text-lg text-center">⏳ Waiting for {opponentProfile.name}...</div>
-
-            {/* Nudge button - secondary style */}
-            <button
-              onClick={() => setShowNudgeModal(true)}
-              className="w-full py-4 bg-slate-700 text-slate-200 rounded-xl hover:bg-slate-600 transition-all font-semibold border border-slate-600"
-            >
-              Nudge {opponentProfile.name}
-            </button>
+          {/* Waiting indicator - just text, pulsing */}
+          <div className="text-center animate-pulse">
+            <span className="text-slate-400 text-lg">⏳ Waiting on {opponentProfile.name}...</span>
           </div>
+
         </div>
 
         {/* Modals */}
@@ -1299,147 +1306,80 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     );
   }
 
-  // JUDGING STATE - Stripped down with orbiting judges
+  // JUDGING STATE - Chat bubbles from deliberating judges
   if (state === 'judging') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
-        <Header />
-        <div className="max-w-md mx-auto">
-          {/* Minimal header: Round + Menu */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="w-8"></div>
-            <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
-          </div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6 flex flex-col">
+        <HeaderWithMenu
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onAllRounds={() => setShowAllRounds(true)}
+          onProfiles={() => onNavigate('screen2')}
+          onCancel={() => setShowCancelModal(true)}
+          showAllRounds={previousShows.length > 0}
+        />
+        <div className="max-w-md mx-auto flex-1 flex flex-col w-full">
 
-          {/* Deliberating message */}
-          <div className="text-center space-y-8">
-            <div className="text-xl text-slate-200 font-medium">Judges deliberating...</div>
-            
-            {/* Orbiting judges */}
-            <div className="relative w-48 h-48 mx-auto">
-              <div className="judges-orbit w-full h-full relative">
-                {judgeProfiles.map((judge, i) => {
-                  const angle = (i * 120 - 90) * (Math.PI / 180); // Start from top, 120° apart
-                  const radius = 70;
-                  const x = Math.cos(angle) * radius;
-                  const y = Math.sin(angle) * radius;
-                  
-                  return (
-                    <div
-                      key={judge.key}
-                      className="absolute left-1/2 top-1/2"
-                      style={{
-                        transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
-                      }}
+          {/* Headline */}
+          <h1 className="text-2xl font-bold text-orange-500 text-center mb-2">
+            Consulting the judges...
+          </h1>
+
+          {/* Deliberation bubble - takes up remaining space, centers vertically */}
+          <DeliberationChat judgeProfiles={judgeProfiles} />
+
+          {/* Timeout handling */}
+          {isJudgingOwner && (
+            <>
+              {judgingTimeout >= 30 && judgingTimeout < 60 && (
+                <div className="text-slate-400 text-sm text-center">
+                  🤔 This is taking longer than usual...
+                </div>
+              )}
+
+              {judgingTimeout >= 60 && (
+                <div className="space-y-4 text-center">
+                  <div className="text-yellow-400 text-sm">
+                    ⚠️ Judging seems stuck. You can:
+                  </div>
+                  <div className="flex gap-3 justify-center flex-wrap">
+                    <button
+                      onClick={handleRetryJudging}
+                      disabled={isRetrying}
+                      className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
                     >
-                      <div className="judge-item-inner flex flex-col items-center">
-                        <span className="text-4xl">{judge.emoji}</span>
-                        <span className="text-xs text-slate-400 mt-1">{judge.name}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Timeout handling */}
-            {isJudgingOwner && (
-              <>
-                {judgingTimeout >= 30 && judgingTimeout < 60 && (
-                  <div className="text-slate-400 text-sm">
-                    🤔 This is taking longer than usual...
-                  </div>
-                )}
-
-                {judgingTimeout >= 60 && (
-                  <div className="space-y-4">
-                    <div className="text-yellow-400 text-sm">
-                      ⚠️ Judging seems stuck. You can:
-                    </div>
-                    <div className="flex gap-3 justify-center flex-wrap">
-                      <button
-                        onClick={handleRetryJudging}
-                        disabled={isRetrying}
-                        className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium"
-                      >
-                        {isRetrying ? 'Retrying...' : 'Try Again'}
-                      </button>
-                      <button
-                        onClick={handlePickRandomWinner}
-                        disabled={isRetrying}
-                        className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
-                      >
-                        Pick Random Winner
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowMenu(false);
-                          setShowSkipModal(true);
-                        }}
-                        disabled={isRetrying}
-                        className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
-                      >
-                        Skip This Round
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {!isJudgingOwner && judgingTimeout >= 60 && (
-              <div className="text-slate-400 text-sm">
-                ⏳ Still waiting on judges... Your opponent can retry if needed.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Modals */}
-        {selectedJudge && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-800 border-2 border-slate-600 rounded-lg p-6 max-w-md w-full">
-              <div className="text-center mb-4">
-                <div className="text-6xl mb-2">{selectedJudge.emoji}</div>
-                <h2 className="text-2xl font-bold text-orange-500">{selectedJudge.name}</h2>
-              </div>
-              
-              <div className="mb-4">
-                <h3 className="text-sm font-bold text-slate-400 mb-1">JUDGING STYLE:</h3>
-                <p className="text-slate-200">{selectedJudge.description}</p>
-              </div>
-              
-              {selectedJudge.examples && (
-                <div className="mb-6">
-                  <h3 className="text-sm font-bold text-slate-400 mb-2">CLASSIC ONE-LINERS:</h3>
-                  <div className="space-y-1">
-                    {selectedJudge.examples.split('|').map((example, i) => {
-                      const cleanExample = example.trim();
-                      const oneLiners = cleanExample.split(/",\s*"/).map(line => 
-                        line.replace(/^["']|["']$/g, '').trim()
-                      );
-                      
-                      return oneLiners.map((oneLiner, j) => (
-                        <div key={`${i}-${j}`} className="text-sm text-slate-300 italic">
-                          "{oneLiner}"
-                        </div>
-                      ));
-                    })}
+                      {isRetrying ? 'Retrying...' : 'Try Again'}
+                    </button>
+                    <button
+                      onClick={handlePickRandomWinner}
+                      disabled={isRetrying}
+                      className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
+                    >
+                      Pick Random Winner
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMenu(false);
+                        setShowSkipModal(true);
+                      }}
+                      disabled={isRetrying}
+                      className="px-6 py-3 bg-slate-600 text-slate-200 rounded-lg hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-medium border border-slate-500"
+                    >
+                      Skip This Round
+                    </button>
                   </div>
                 </div>
               )}
-              
-              <button
-                onClick={() => setSelectedJudge(null)}
-                className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-400 transition-all"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
+            </>
+          )}
 
+          {!isJudgingOwner && judgingTimeout >= 60 && (
+            <div className="text-slate-400 text-sm text-center">
+              ⏳ Still waiting on judges... Your opponent can retry if needed.
+            </div>
+          )}
+        </div>
+
+        {/* Modals */}
         {showCancelModal && (
           <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
             <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
@@ -1517,18 +1457,37 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   }
 
   // YOUR TURN STATE - Full context, answer input
+  // Show minimal screen until initialized to prevent flash
+  if (!promptScreenInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
+        <HeaderWithMenu
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onAllRounds={() => setShowAllRounds(true)}
+          onProfiles={() => onNavigate('screen2')}
+          onCancel={() => setShowCancelModal(true)}
+          showAllRounds={previousShows.length > 0}
+        />
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-6">
-      <Header />
+      <HeaderWithMenu
+        onHowToPlay={() => setShowHowToPlay(true)}
+        onAllRounds={() => setShowAllRounds(true)}
+        onProfiles={() => onNavigate('screen2')}
+        onCancel={() => setShowCancelModal(true)}
+        showAllRounds={previousShows.length > 0}
+      />
       <div className="max-w-md mx-auto">
         
-        {/* Context Box - Round, Score, Judges */}
-        <div className="bg-slate-800/50 rounded-2xl p-4 mb-6">
-          {/* Round + Menu */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="w-8"></div>
+        {/* Context - Round, Score, Judges (no box, fades when input focused) */}
+        <div className={`mb-6 transition-opacity duration-300 ${isInputFocused ? 'opacity-30' : 'opacity-100'}`}>
+          {/* Round */}
+          <div className="text-center mb-3">
             <h2 className="text-xl font-bold text-slate-300">Round {currentShow.show_number} of {rivalry?.match_length || 5}</h2>
-            <MenuButton />
           </div>
           
           {/* Score Line */}
@@ -1540,7 +1499,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
             <span>{opponentProfile.name.split(' ')[0]}: <span className="font-bold">{opponentWins}</span></span>
           </div>
           
-          {/* Judges - clickable, so they get border */}
+          {/* Judges - clickable */}
           <div className="flex justify-center gap-2">
             {currentShow.judges.map((judgeKey, i) => {
               const judge = judgeProfiles.find(j => j.key === judgeKey);
@@ -1548,7 +1507,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
                 <button
                   key={i}
                   onClick={() => handleShowJudgeProfile(judgeKey)}
-                  className="px-2 py-1 bg-slate-700/50 border border-slate-600 rounded-lg hover:bg-slate-600 transition-colors text-slate-200 text-sm"
+                  className="px-3 py-1.5 bg-slate-800/50 border border-slate-600 rounded-lg hover:bg-slate-700 hover:border-slate-500 transition-all text-slate-200 text-sm"
                 >
                   {judge?.emoji || '❓'} {judge?.name || judgeKey}
                 </button>
@@ -1557,21 +1516,23 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
           </div>
         </div>
 
-        {/* Prompt - Hero */}
-        <div className="mb-6 text-center">
+        {/* Prompt - Hero with animation */}
+        <div className={`mb-6 text-center transition-all duration-500 ${promptRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <p className="text-2xl font-bold text-slate-100">{currentShow.prompt}</p>
         </div>
 
-        {/* Main Content */}
-        <div className="mb-6">
+        {/* Main Content - Answer area with animation */}
+        <div className={`mb-6 transition-all duration-500 ${contentRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           {/* State A: Your Turn */}
           {state === 'yourTurn' && (
             <div>
               <textarea
                 value={myAnswer}
                 onChange={handleAnswerChange}
+                onFocus={() => setIsInputFocused(true)}
+                onBlur={() => setIsInputFocused(false)}
                 placeholder="Drop your best answer here..."
-                className="w-full h-32 p-3 bg-slate-700/50 border border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 resize-none mb-2 focus:outline-none focus:border-orange-500 transition-colors"
+                className="w-full h-32 p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 resize-none mb-2 focus:outline-none focus:border-orange-500 transition-all text-lg"
                 maxLength={300}
               />
               <div className="flex justify-between text-sm mb-4">
@@ -1582,10 +1543,10 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
               </div>
               <button
                 onClick={submitAnswer}
-                disabled={!myAnswer.trim() || wordCount > 30}
-                className="w-full py-4 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all disabled:bg-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 font-semibold"
+                disabled={!myAnswer.trim() || wordCount > 30 || isSubmitting}
+                className="w-full py-4 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-xl hover:from-orange-400 hover:to-orange-500 transition-all disabled:from-slate-600 disabled:to-slate-600 disabled:cursor-not-allowed disabled:text-slate-400 font-semibold text-lg shadow-lg shadow-orange-500/20 disabled:shadow-none"
               >
-                Lock It In
+                {isSubmitting ? 'Submitting...' : 'Lock It In'}
               </button>
             </div>
           )}

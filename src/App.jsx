@@ -18,6 +18,7 @@ import JudgesPage from './components/JudgesPage';
 import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import useOnlineStatus from './hooks/useOnlineStatus';
+import VerdictFlowPrototype from './components/VerdictFlowPrototype';
 
 // Showdown components
 import ShowdownEntry from './components/showdown/ShowdownEntry';
@@ -38,6 +39,9 @@ function App() {
     <ErrorBoundary>
       {!isOnline && <OfflineBanner />}
       <Routes>
+        {/* TEMP PROTO */}
+        <Route path="/prototype" element={<VerdictFlowPrototype />} />
+
         {/* Landing Page */}
         <Route path="/" element={<LandingPage />} />
         
@@ -165,6 +169,7 @@ function GameRouter({
         onNavigate={handleNavigate} 
         activeProfileId={activeProfileId}
         rivalryId={rivalryId}
+        showId={showId}
         verdictStep={verdictStep}
         setVerdictStep={setVerdictStep}
       />

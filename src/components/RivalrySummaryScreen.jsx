@@ -155,6 +155,9 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [showStyleModal, setShowStyleModal] = useState(null); // 'winner' | 'loser' | null
   const [animationTriggered, setAnimationTriggered] = useState(false);
   const [showRematchModal, setShowRematchModal] = useState(false);
+  
+  // Staged reveal animation
+  const [revealStage, setRevealStage] = useState(0);
 
   // Determine if we came from history browsing or just completed a rivalry
   const isFromHistory = context === 'from_history';
@@ -202,14 +205,25 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
       if (shouldAnimate) {
         setShowMicAnimation(true);
         sessionStorage.setItem(animationKey, 'true');
-        // After animation, reveal content
+        // After animation, reveal content with staged delays
         setTimeout(() => {
           setShowMicAnimation(false);
           setAnimationComplete(true);
+          // Stage 0: headline/score (immediate)
+          setRevealStage(1);
+          // Stage 1: Ripley analysis
+          setTimeout(() => setRevealStage(2), 800);
+          // Stage 2: Player cards
+          setTimeout(() => setRevealStage(3), 1600);
+          // Stage 3: Ripley tips
+          setTimeout(() => setRevealStage(4), 2400);
+          // Stage 4: Buttons
+          setTimeout(() => setRevealStage(5), 3000);
         }, 2500);
       } else {
-        // No animation - show content immediately
+        // No animation - show content immediately (skip staged reveals)
         setAnimationComplete(true);
+        setRevealStage(5);
       }
     }
   }, [summary, rivalry, animationTriggered]);
@@ -568,7 +582,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         )}
 
         {/* Golden Mic + Headline + Score */}
-        <div className="text-center space-y-3">
+        <div className={`text-center space-y-3 transition-all duration-500 ${revealStage >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           {/* Golden Mic - only show for winner */}
           {iWon && (
             <img 
@@ -609,74 +623,20 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           )}
         </div>
 
-        {/* Ripley Analysis */}
-        <div className="bg-slate-800/50 rounded-xl p-5">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="text-xl">🎙️</span>
-            <span className="text-orange-400 font-semibold">Ripley</span>
-          </div>
+        {/* Ripley Analysis - inline format */}
+        <div className={`bg-slate-800/50 rounded-xl p-5 transition-all duration-500 ${revealStage >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <p className="text-slate-200 leading-relaxed">
+            <span className="text-xl mr-2">🎙️</span>
             {summary.ai_generated?.ripley_analysis || "A hard-fought rivalry between two worthy competitors."}
           </p>
         </div>
 
-        {/* Stats Carousel - only show if we have stats data */}
-        {hasAnyStats && currentStatDisplay && (
-          <div className="bg-slate-800/50 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <button 
-                onClick={handlePrevStat}
-                className="text-slate-400 hover:text-slate-200 p-2 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              
-              <div className="text-center flex-1">
-                <div className="text-sm text-slate-400 mb-1">
-                  {currentStatConfig.emoji} {currentStatConfig.label}
-                </div>
-                <div className="text-slate-200 font-medium">
-                  {currentStatDisplay}
-                </div>
-                {currentStatContext && (
-                  <div className="text-xs text-slate-400 mt-1 line-clamp-1">
-                    {currentStatContext}
-                  </div>
-                )}
-              </div>
-              
-              <button 
-                onClick={handleNextStat}
-                className="text-slate-400 hover:text-slate-200 p-2 transition-colors"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-            
-            {/* Dots indicator */}
-            <div className="flex justify-center gap-1 mt-3">
-              {STAT_CONFIGS.map((_, idx) => (
-                <div 
-                  key={idx}
-                  className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                    idx === currentStatIndex ? 'bg-orange-400' : 'bg-slate-600'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Player Style Cards - no quotes */}
+        {/* Player Style Cards - animate from edges */}
         <div className="grid grid-cols-2 gap-3">
-          {/* My Style */}
+          {/* My Style - slides in from left */}
           <button
             onClick={() => setShowStyleModal('me')}
-            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center hover:bg-slate-700/50 transition-colors"
+            className={`bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center hover:bg-slate-700/50 transition-all duration-500 ${revealStage >= 3 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'}`}
           >
             <div className="flex items-center justify-center gap-2 mb-2">
               <span className="text-2xl">{myProfile.avatar}</span>
@@ -685,10 +645,10 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
             <p className="text-orange-400 text-sm font-medium">{myStyle.short}</p>
           </button>
 
-          {/* Opponent Style */}
+          {/* Opponent Style - slides in from right */}
           <button
             onClick={() => setShowStyleModal('opponent')}
-            className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center hover:bg-slate-700/50 transition-colors"
+            className={`bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-center hover:bg-slate-700/50 transition-all duration-500 delay-100 ${revealStage >= 3 ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-8'}`}
           >
             <div className="flex items-center justify-center gap-2 mb-2">
               <span className="text-2xl">{opponentProfile.avatar}</span>
@@ -698,11 +658,11 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
           </button>
         </div>
 
-        {/* Ripley's Take */}
-        <div className="bg-slate-800/50 rounded-xl p-5">
+        {/* Ripley's Tips */}
+        <div className={`bg-slate-800/50 rounded-xl p-5 transition-all duration-500 ${revealStage >= 4 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <div className="flex items-center gap-2 mb-3">
             <span className="text-xl">🎙️</span>
-            <span className="text-orange-400 font-semibold">Ripley's Take</span>
+            <span className="text-orange-400 font-semibold">Ripley's Tips</span>
           </div>
           <p className="text-slate-200 leading-relaxed">
             {summary.ai_generated?.ripley_tip || "Keep practicing and come back stronger next time."}
@@ -712,7 +672,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         {/* Past Rounds - Collapsible */}
         <button
           onClick={() => setShowHistory(!showHistory)}
-          className="w-full py-3 bg-slate-800/50 border border-slate-700 rounded-xl font-semibold hover:bg-slate-700 transition-colors flex items-center justify-center gap-2 text-slate-200"
+          className={`w-full py-3 bg-slate-800/50 border border-slate-700 rounded-xl font-semibold hover:bg-slate-700 transition-all duration-500 flex items-center justify-center gap-2 text-slate-200 ${revealStage >= 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
         >
           {showHistory ? (
             <>
@@ -756,7 +716,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-3">
+        <div className={`flex gap-3 transition-all duration-500 ${revealStage >= 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
           <button
             onClick={handleShareSummary}
             disabled={isSharing}
@@ -834,7 +794,7 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
               onClick={() => setShowStyleModal(null)}
               className="w-full mt-6 py-3 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold rounded-xl transition-colors"
             >
-              Close
+              Got It
             </button>
           </div>
         </div>
