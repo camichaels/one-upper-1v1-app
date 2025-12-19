@@ -16,7 +16,7 @@ const DEMO_ROUNDS = [
       { icon: "🦄", name: "Morgan", isYou: false, answer: "He owed me money" }
     ],
     winnerIndex: 0,
-    winnerHeadline: "Alex claims the mic with an absolutely devastating take",
+    winnerHeadline: "Alex wins the round with an absolutely devastating take",
     cycle: [
       { type: "judge", emoji: "🎭", name: "Diva", text: "Morgan's was bitter. Alex's was DEVASTATING. Icon behavior." },
       { type: "artifact", icon: "⭐", label: "Celebrity Match", text: "Alex's answer has strong Aubrey Plaza energy" },
@@ -39,7 +39,7 @@ const DEMO_ROUNDS = [
       { icon: "🌵", name: "Riley", isYou: false, answer: "I was early yesterday" }
     ],
     winnerIndex: 2,
-    winnerHeadline: "Jamie is crowned champion with philosophical chaos",
+    winnerHeadline: "Jamie wins the round with philosophical chaos",
     cycle: [
       { type: "judge", emoji: "🎭", name: "Diva", text: "Time is a flat circle? UNHINGED. I'm obsessed." },
       { type: "artifact", icon: "⭐", label: "Celebrity Match", text: "Jamie's answer radiates chaotic Matthew McConaughey energy" },
@@ -226,7 +226,7 @@ function GameDemoAnimation() {
         </p>
         
         {/* Winner banner */}
-        <div className={`bg-orange-500 rounded-xl p-4 text-center mb-3 transition-all duration-300 ${
+        <div className={`bg-emerald-500 rounded-xl p-4 text-center mb-3 transition-all duration-300 ${
           animationStep >= 3 ? 'scale-100' : 'scale-95'
         }`}>
           <p className="text-white font-bold text-lg">{round.winnerHeadline}</p>
@@ -257,7 +257,7 @@ function GameDemoAnimation() {
 
         {/* 5 rounds context */}
         <p className="text-slate-400 text-sm mt-4">
-          5 rounds. Most wins takes the Golden Mic.
+          5 rounds. Most points crowns a champion.
         </p>
       </div>
 

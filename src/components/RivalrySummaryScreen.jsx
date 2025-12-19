@@ -149,7 +149,6 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   const [shareMessage, setShareMessage] = useState(null);
   
   // New state for animations and UI
-  const [showMicAnimation, setShowMicAnimation] = useState(false);
   const [animationComplete, setAnimationComplete] = useState(false);
   const [currentStatIndex, setCurrentStatIndex] = useState(0);
   const [showStyleModal, setShowStyleModal] = useState(null); // 'winner' | 'loser' | null
@@ -162,10 +161,6 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   // Determine if we came from history browsing or just completed a rivalry
   const isFromHistory = context === 'from_history';
   const isReturningFromRound = context === 'from_rivalry_summary';
-
-  // Check if we've already shown animation for this rivalry
-  const animationKey = `micAnimation_${rivalryId}`;
-  const hasSeenAnimation = sessionStorage.getItem(animationKey) === 'true';
 
   useEffect(() => {
     loadSummary();
@@ -194,36 +189,26 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
     }
   }
 
-  // Trigger mic animation for winner after summary loads (only once ever)
+  // Trigger staged reveal after summary loads
+  // (Win/lose animation now happens in VerdictFlow, so we skip straight to content)
   useEffect(() => {
     if (summary && rivalry && !animationTriggered) {
       setAnimationTriggered(true);
       
-      const iWon = summary.final_score.winner_id === activeProfileId;
-      const shouldAnimate = iWon && !isFromHistory && !isReturningFromRound && !hasSeenAnimation;
+      const skipStagedReveal = isFromHistory || isReturningFromRound;
       
-      if (shouldAnimate) {
-        setShowMicAnimation(true);
-        sessionStorage.setItem(animationKey, 'true');
-        // After animation, reveal content with staged delays
-        setTimeout(() => {
-          setShowMicAnimation(false);
-          setAnimationComplete(true);
-          // Stage 0: headline/score (immediate)
-          setRevealStage(1);
-          // Stage 1: Ripley analysis
-          setTimeout(() => setRevealStage(2), 800);
-          // Stage 2: Player cards
-          setTimeout(() => setRevealStage(3), 1600);
-          // Stage 3: Ripley tips
-          setTimeout(() => setRevealStage(4), 2400);
-          // Stage 4: Buttons
-          setTimeout(() => setRevealStage(5), 3000);
-        }, 2500);
-      } else {
-        // No animation - show content immediately (skip staged reveals)
+      if (skipStagedReveal) {
+        // Show everything immediately
         setAnimationComplete(true);
         setRevealStage(5);
+      } else {
+        // Staged reveal for coming from VerdictFlow
+        setAnimationComplete(true);
+        setRevealStage(1);
+        setTimeout(() => setRevealStage(2), 800);
+        setTimeout(() => setRevealStage(3), 1600);
+        setTimeout(() => setRevealStage(4), 2400);
+        setTimeout(() => setRevealStage(5), 3000);
       }
     }
   }, [summary, rivalry, animationTriggered]);
@@ -525,27 +510,6 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
   // Check if any stats are available (for old rivalries, may be all null)
   const hasAnyStats = summary.stats && Object.values(summary.stats).some(v => v !== null && v !== undefined);
 
-  // Winner animation screen
-  if (showMicAnimation) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
-        <div className="text-center animate-pulse">
-          <img 
-            src={GoldenMic} 
-            alt="Golden Mic" 
-            className="w-32 h-32 mx-auto mb-6 drop-shadow-[0_0_30px_rgba(251,191,36,0.5)]"
-          />
-          <h1 className="text-3xl font-bold text-orange-400 mb-2">
-            You Won!
-          </h1>
-          <p className="text-slate-300">
-            The Golden Mic is yours
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   // Wait for animation to complete before showing content
   if (!animationComplete) {
     return null;
@@ -734,15 +698,17 @@ export default function RivalrySummaryScreen({ rivalryId, onNavigate, activeProf
             </button>
           ) : (
             <>
+              {/* Rematch temporarily disabled - uncomment when ready
               <button
                 onClick={() => setShowRematchModal(true)}
                 className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
               >
                 Rematch
               </button>
+              */}
               <button
                 onClick={handleChallengeNewFriend}
-                className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 text-slate-200 rounded-xl hover:bg-slate-600 transition-all font-semibold"
+                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-xl hover:bg-orange-400 transition-all font-semibold"
               >
                 New Rivalry
               </button>

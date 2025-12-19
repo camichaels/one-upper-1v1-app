@@ -994,6 +994,9 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
     state = 'judging';
   } else if (currentShow.status === 'complete') {
     state = 'verdict';
+  } else if (myAnswer_db && opponentAnswer_db) {
+    // Both answers are in - show judging state immediately (avoid waiting blip)
+    state = 'judging';
   } else if (myAnswer_db) {
     state = 'waiting';
   }

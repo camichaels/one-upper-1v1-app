@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../Header';
 import ShowdownMenu from './ShowdownMenu';
@@ -65,6 +65,12 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
   const [judgeIntroLine] = useState(() => getRandomLine(JUDGE_INTRO_LINES));
   const [selectedJudge, setSelectedJudge] = useState(null);
 
+  // Animation states for welcome screen
+  const [welcomeStage, setWelcomeStage] = useState(0);
+  
+  // Animation states for judges screen (-1 = not started yet)
+  const [judgesStage, setJudgesStage] = useState(-1);
+
   const isHost = currentPlayer?.is_host;
   const playerCount = showdown?.players?.length || 0;
   const judges = showdown?.judges || [];
@@ -72,6 +78,40 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
   
   // Use intro_step from showdown (synced via real-time)
   const introStep = showdown?.intro_step || 'welcome';
+
+  // Welcome screen animation sequence
+  useEffect(() => {
+    if (introStep === 'welcome') {
+      setWelcomeStage(0);
+      const timers = [
+        setTimeout(() => setWelcomeStage(1), 100),    // Ripley bubble
+        setTimeout(() => setWelcomeStage(2), 800),    // Welcome line
+        setTimeout(() => setWelcomeStage(3), 1600),   // Ripley intro
+        setTimeout(() => setWelcomeStage(4), 2400),   // Instructions
+        setTimeout(() => setWelcomeStage(5), 3200),   // Vibe box
+        setTimeout(() => setWelcomeStage(6), 3800),   // Button
+      ];
+      return () => timers.forEach(t => clearTimeout(t));
+    }
+  }, [introStep]);
+
+  // Judges screen animation sequence
+  useEffect(() => {
+    if (introStep === 'judges') {
+      // Reset to -1 first to ensure clean start
+      setJudgesStage(-1);
+      const timers = [
+        setTimeout(() => setJudgesStage(0), 50),      // Ready to start
+        setTimeout(() => setJudgesStage(1), 150),     // Title
+        setTimeout(() => setJudgesStage(2), 750),     // Judge 1
+        setTimeout(() => setJudgesStage(3), 1350),    // Judge 2
+        setTimeout(() => setJudgesStage(4), 1950),    // Judge 3
+        setTimeout(() => setJudgesStage(5), 2650),    // Ripley comment
+        setTimeout(() => setJudgesStage(6), 3250),    // Button
+      ];
+      return () => timers.forEach(t => clearTimeout(t));
+    }
+  }, [introStep]);
 
   async function handleContinue() {
     if (introStep === 'welcome') {
@@ -136,34 +176,58 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
         
         <div className="max-w-md mx-auto mt-4">
           {/* Ripley speech bubble */}
-          <div className="bg-slate-800/80 rounded-2xl p-5 mb-6">
+          <div 
+            className={`bg-slate-800/80 rounded-2xl p-5 mb-6 transition-all duration-500 ${
+              welcomeStage >= 1 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
             <div className="flex items-center gap-2 mb-4">
               <span className="text-2xl">🎙️</span>
               <span className="text-orange-400 font-semibold">Ripley</span>
             </div>
             
-            <p className="text-slate-100 mb-3">
+            <p 
+              className={`text-slate-100 mb-3 transition-all duration-500 ${
+                welcomeStage >= 2 ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
               {welcomeLine}
             </p>
             
-            <p className="text-slate-300 mb-3">
+            <p 
+              className={`text-slate-300 mb-3 transition-all duration-500 ${
+                welcomeStage >= 3 ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
               {ripleyIntro}
             </p>
 
-            <p className="text-slate-300">
+            <p 
+              className={`text-slate-300 transition-all duration-500 ${
+                welcomeStage >= 4 ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
               Everyone answers the same prompt. You guess who wrote what, 
               pick who you think judges will love, then the judges have their say.
             </p>
           </div>
 
           {/* Category info */}
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-8">
+          <div 
+            className={`bg-slate-800/50 rounded-xl p-4 mb-8 transition-all duration-500 ${
+              welcomeStage >= 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
             <span className="text-slate-400 text-sm">Prompt vibe: </span>
             <span className="text-slate-200">{categoryDisplay}</span>
           </div>
 
           {/* Continue button */}
-          <div>
+          <div 
+            className={`transition-all duration-500 ${
+              welcomeStage >= 6 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+            }`}
+          >
             {isHost ? (
               <button
                 onClick={handleContinue}
@@ -184,6 +248,24 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
 
   // Step 2: Meet the judges (with popup modal)
   // This shows when introStep === 'judges'
+  
+  // Don't render content until animation is ready - show empty container
+  if (judgesStage < 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
+        <Header />
+        <ShowdownMenu 
+          isHost={isHost}
+          onLeave={handleLeave}
+          onEndShowdown={handleEndShowdown}
+        />
+        <div className="max-w-md mx-auto mt-4">
+          {/* Empty placeholder - same structure, no content */}
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
       <Header />
@@ -195,7 +277,13 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
       
       <div className="max-w-md mx-auto mt-4">
         {/* Judges title */}
-        <p className="text-slate-400 text-sm mb-3">Today's judges:</p>
+        <p 
+          className={`text-slate-400 text-sm mb-3 transition-all duration-500 ${
+            judgesStage >= 1 ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          Today's judges:
+        </p>
 
         {/* Judge cards - tap to open modal */}
         <div className="space-y-3 mb-6">
@@ -203,7 +291,9 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
             <button
               key={judge.key || index}
               onClick={() => setSelectedJudge(judge)}
-              className="w-full bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-left hover:bg-slate-700/50 transition-colors"
+              className={`w-full bg-slate-800/50 border border-slate-700 rounded-xl p-4 text-left hover:bg-slate-700/50 transition-all duration-500 ${
+                judgesStage >= index + 2 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8'
+              }`}
             >
               <div className="flex items-center gap-3">
                 <span className="text-3xl">{judge.emoji}</span>
@@ -217,7 +307,11 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
         </div>
 
         {/* Ripley comment */}
-        <div className="bg-slate-800/80 rounded-2xl p-5 mb-8">
+        <div 
+          className={`bg-slate-800/80 rounded-2xl p-5 mb-8 transition-all duration-500 ${
+            judgesStage >= 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+        >
           <div className="flex items-center gap-2 mb-2">
             <span className="text-xl">🎙️</span>
             <span className="text-orange-400 font-semibold text-sm">Ripley</span>
@@ -228,7 +322,11 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
         </div>
 
         {/* Let's go button */}
-        <div>
+        <div 
+          className={`transition-all duration-500 ${
+            judgesStage >= 6 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+          }`}
+        >
           {isHost ? (
             <button
               onClick={handleContinue}

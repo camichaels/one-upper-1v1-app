@@ -1,18 +1,38 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
-export default function HeaderWithMenu({ 
+export default function HeaderWithBackAndMenu({ 
+  backTo,
+  backLabel = 'Back',
+  onBack,
   onHowToPlay, 
   onAllRounds,
   onProfiles,
-  onSkip, 
   onCancel,
-  showAllRounds = true,
-  showSkip = false 
+  onLogOut,
+  showAllRounds = true
 }) {
+  const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
+
+  function handleBack() {
+    if (onBack) {
+      onBack();
+    } else if (backTo) {
+      navigate(backTo);
+    }
+  }
 
   return (
     <div className="relative flex items-center justify-center py-4">
+      {/* Back button - left aligned */}
+      <button
+        onClick={handleBack}
+        className="absolute left-0 text-slate-400 hover:text-slate-200 text-sm flex items-center gap-1"
+      >
+        ← {backLabel}
+      </button>
+      
       {/* Logo - centered */}
       <img src="/logo-wide.png" alt="One-Upper" className="h-8" />
       
@@ -27,7 +47,7 @@ export default function HeaderWithMenu({
         
         {showMenu && (
           <>
-            {/* Backdrop to close menu - covers entire screen */}
+            {/* Backdrop to close menu */}
             <div 
               className="fixed inset-0 bg-black/20 z-[60]" 
               onClick={() => setShowMenu(false)}
@@ -71,15 +91,15 @@ export default function HeaderWithMenu({
                 </button>
               )}
               
-              {showSkip && onSkip && (
+              {onLogOut && (
                 <button
                   onClick={() => {
                     setShowMenu(false);
-                    onSkip();
+                    onLogOut();
                   }}
                   className="w-full px-4 py-2 text-left text-slate-300 hover:bg-slate-700 transition-colors"
                 >
-                  Skip Round
+                  Log Out
                 </button>
               )}
               

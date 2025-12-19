@@ -6,6 +6,29 @@ import HowToPlayModal from './HowToPlayModal';
 import AllRoundsModal from './AllRoundsModal';
 import GoldenMic from '../assets/microphone.svg';
 
+// Rivalry outcome headlines
+const winnerHeadlines = [
+  "You Won!",
+  "Victory!",
+  "Crushed It!",
+  "Champion!",
+  "Mic Drop!",
+  "Legendary!",
+  "Nailed It!",
+  "Top Dog!",
+];
+
+const loserHeadlines = [
+  "Not This Time",
+  "So Close!",
+  "Tough Break",
+  "Next Time!",
+  "Almost Had It",
+  "Oof.",
+  "Welp.",
+  "Bested!",
+];
+
 // Ripley verdict lines (triggered by situation)
 const ripleyVerdictLines = {
   blowout_winner: [
@@ -74,13 +97,14 @@ export default function VerdictFlow({
     return 'answers';
   };
   
-  // Screen state: 'answers', 'scores', 'wrapup'
+  // Screen state: 'answers', 'scores', 'wrapup', 'rivalry_outcome'
   const [screen, setScreen] = useState(getInitialScreen);
   
   // Animation states for answers screen
   const [answersInitialized, setAnswersInitialized] = useState(false);
   const [answersRevealed, setAnswersRevealed] = useState(false);
   const [banterItems, setBanterItems] = useState([]);
+  const [buttonReady, setButtonReady] = useState(false);
   
   // Animation states for scores screen
   const [revealedJudges, setRevealedJudges] = useState([]);
@@ -91,6 +115,15 @@ export default function VerdictFlow({
   
   // Animation states for wrapup screen
   const [wrapupStage, setWrapupStage] = useState(0);
+  
+  // Animation states for rivalry outcome (final round)
+  const [showRivalryOutcome, setShowRivalryOutcome] = useState(false);
+  
+  // Randomized outcome headlines (picked once on mount)
+  const [outcomeHeadline] = useState(() => ({
+    winner: winnerHeadlines[Math.floor(Math.random() * winnerHeadlines.length)],
+    loser: loserHeadlines[Math.floor(Math.random() * loserHeadlines.length)],
+  }));
   
   // Modal states
   const [showMenu, setShowMenu] = useState(false);
@@ -141,6 +174,9 @@ export default function VerdictFlow({
     (currentShow.winner_id === activeProfileId ? 1 : 0);
   const opponentWins = pastShows.filter(s => s.winner_id === opponentProfile.id).length +
     (currentShow.winner_id === opponentProfile.id ? 1 : 0);
+  
+  // Rivalry winner (for final round)
+  const iWonRivalry = myWins > opponentWins;
   
   // Tiebreaker detection
   const isTie = currentShow.judge_data?.was_tiebreaker || totalLeft === totalRight;
@@ -250,6 +286,7 @@ export default function VerdictFlow({
       setAnswersInitialized(false);
       setAnswersRevealed(false);
       setBanterItems([]);
+      setButtonReady(false);
       
       // Small delay to ensure state is reset before showing
       const initTimer = setTimeout(() => {
@@ -267,9 +304,15 @@ export default function VerdictFlow({
         }, 1100 + (i * 1200));
       });
       
+      // Show button shortly after last banter appears
+      const buttonTimer = setTimeout(() => {
+        setButtonReady(true);
+      }, 1100 + ((banter.length - 1) * 1200) + 500);
+      
       return () => {
         clearTimeout(initTimer);
         clearTimeout(revealTimer);
+        clearTimeout(buttonTimer);
         banterTimers.forEach(t => clearTimeout(t));
       };
     }
@@ -280,45 +323,66 @@ export default function VerdictFlow({
   // ============================================
   
   useEffect(() => {
-    if (screen === 'scores') {
-      setRevealedJudges([]);
-      setRunningScoreLeft(0);
-      setRunningScoreRight(0);
-      setWinnerRevealed(false);
-      setScoreFlash(false);
-      confettiRef.current = false;
-      
-      judges.forEach(([judgeKey, data], i) => {
-        setTimeout(() => {
-          setRevealedJudges(prev => [...prev, judgeKey]);
-          
-          setTimeout(() => {
-            setScoreFlash(true);
-            setTimeout(() => {
-              const leftScore = getScoreForProfile(leftProfile.id, data);
-              const rightScore = getScoreForProfile(rightProfile.id, data);
-              setRunningScoreLeft(prev => prev + leftScore);
-              setRunningScoreRight(prev => prev + rightScore);
-              setTimeout(() => setScoreFlash(false), 300);
-            }, 150);
-          }, 500);
-        }, i * 2000);
-      });
-      
-      // Winner reveal - tight timing after last judge
+    if (screen !== 'scores') return;
+    
+    // Reset all scores to 0 first
+    setRevealedJudges([]);
+    setRunningScoreLeft(0);
+    setRunningScoreRight(0);
+    setWinnerRevealed(false);
+    setScoreFlash(false);
+    confettiRef.current = false;
+    
+    // Use a cancelled flag to stop animations if effect re-runs
+    let cancelled = false;
+    
+    judges.forEach(([judgeKey, data], i) => {
       setTimeout(() => {
-        setWinnerRevealed(true);
-        if (iAmWinner && !confettiRef.current) {
-          confetti({
-            particleCount: 100,
-            spread: 70,
-            origin: { y: 0.3 }
-          });
-          confettiRef.current = true;
-        }
-      }, judges.length * 2000 + 100);
-    }
-  }, [screen]);
+        if (cancelled) return;
+        setRevealedJudges(prev => [...prev, judgeKey]);
+        
+        // Flash almost immediately after judge appears
+        setTimeout(() => {
+          if (cancelled) return;
+          setScoreFlash(true);
+          
+          // Update score quickly
+          setTimeout(() => {
+            if (cancelled) return;
+            const leftScore = getScoreForProfile(leftProfile.id, data);
+            const rightScore = getScoreForProfile(rightProfile.id, data);
+            setRunningScoreLeft(prev => prev + leftScore);
+            setRunningScoreRight(prev => prev + rightScore);
+            
+            // Flash off
+            setTimeout(() => {
+              if (cancelled) return;
+              setScoreFlash(false);
+            }, 250);
+          }, 100);
+        }, 150);
+      }, i * 2000);
+    });
+    
+    // Winner reveal - tight timing after last judge
+    setTimeout(() => {
+      if (cancelled) return;
+      setWinnerRevealed(true);
+      if (iAmWinner && !confettiRef.current) {
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.3 }
+        });
+        confettiRef.current = true;
+      }
+    }, judges.length * 2000 + 100);
+    
+    // Cleanup: set cancelled flag
+    return () => {
+      cancelled = true;
+    };
+  }, [screen, currentShow.id]);
 
   // ============================================
   // SCREEN 3: WRAPUP
@@ -337,6 +401,34 @@ export default function VerdictFlow({
       };
     }
   }, [screen]);
+
+  // ============================================
+  // RIVALRY OUTCOME (Final Round)
+  // ============================================
+  
+  useEffect(() => {
+    if (screen === 'rivalry_outcome' && iWonRivalry) {
+      // Big confetti celebration for rivalry win
+      confetti({
+        particleCount: 150,
+        spread: 100,
+        origin: { y: 0.4 }
+      });
+      // Second burst
+      setTimeout(() => {
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5, x: 0.3 }
+        });
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5, x: 0.7 }
+        });
+      }, 300);
+    }
+  }, [screen, iWonRivalry]);
 
   // ============================================
   // MENU HANDLERS
@@ -373,7 +465,7 @@ export default function VerdictFlow({
             onAllRounds={() => setShowAllRounds(true)}
             onProfiles={() => onNavigate('screen2')}
             onHowToPlay={() => setShowHowToPlay(true)}
-            onCancelRivalry={() => setShowCancelModal(true)}
+            onCancel={() => setShowCancelModal(true)}
           />
         </div>
       );
@@ -385,7 +477,7 @@ export default function VerdictFlow({
           onAllRounds={() => setShowAllRounds(true)}
           onProfiles={() => onNavigate('screen2')}
           onHowToPlay={() => setShowHowToPlay(true)}
-          onCancelRivalry={() => setShowCancelModal(true)}
+          onCancel={() => setShowCancelModal(true)}
         />
         
         <div className="max-w-md mx-auto">
@@ -431,8 +523,8 @@ export default function VerdictFlow({
             })}
           </div>
           
-          {/* Button - only show after all banter */}
-          {banterItems.length >= banter.length && (
+          {/* Button - only show after all banter has animated in */}
+          {buttonReady && (
             <button
               onClick={() => setScreen('scores')}
               className="w-full py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400"
@@ -478,7 +570,7 @@ export default function VerdictFlow({
           onAllRounds={() => setShowAllRounds(true)}
           onProfiles={() => onNavigate('screen2')}
           onHowToPlay={() => setShowHowToPlay(true)}
-          onCancelRivalry={() => setShowCancelModal(true)}
+          onCancel={() => setShowCancelModal(true)}
         />
         
         <div className="max-w-md mx-auto">
@@ -493,7 +585,12 @@ export default function VerdictFlow({
           
           {/* Scoreboard */}
           <div className="mb-6">
-            <div className={`bg-slate-800/60 rounded-xl py-4 px-6 transition-all duration-150 ${scoreFlash ? 'bg-orange-500/30' : ''}`}>
+            <div 
+              className="rounded-xl py-4 px-6 transition-all duration-150"
+              style={{ 
+                backgroundColor: scoreFlash ? 'rgba(249, 115, 22, 0.3)' : 'rgba(30, 41, 59, 0.6)'
+              }}
+            >
               <div className="flex justify-center items-center">
                 {/* Left player with mic space */}
                 <div className="flex items-center gap-2">
@@ -569,7 +666,13 @@ export default function VerdictFlow({
           {/* Continue button - only after winner revealed */}
           {winnerRevealed && (
             <button
-              onClick={() => setScreen('wrapup')}
+              onClick={() => {
+                if (isFinalRound) {
+                  setScreen('rivalry_outcome');
+                } else {
+                  setScreen('wrapup');
+                }
+              }}
               className="w-full py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400"
             >
               Continue
@@ -621,6 +724,51 @@ export default function VerdictFlow({
   }
 
   // ============================================
+  // RENDER: RIVALRY OUTCOME SCREEN (Final Round Only)
+  // ============================================
+  
+  if (screen === 'rivalry_outcome') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="text-center">
+          {iWonRivalry ? (
+            <>
+              <img 
+                src={GoldenMic} 
+                alt="Golden Mic" 
+                className="w-32 h-32 mx-auto mb-6 drop-shadow-[0_0_30px_rgba(251,191,36,0.5)] animate-pulse"
+              />
+              <h1 className="text-3xl font-bold text-orange-400 mb-2">
+                {outcomeHeadline.winner}
+              </h1>
+              <p className="text-slate-300 mb-8">
+                The Golden Mic is yours
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="text-6xl mb-6">😔</div>
+              <h1 className="text-3xl font-bold text-slate-300 mb-2">
+                {outcomeHeadline.loser}
+              </h1>
+              <p className="text-slate-400 mb-8">
+                {opponentProfile.name} claims the Golden Mic
+              </p>
+            </>
+          )}
+          
+          <button
+            onClick={onNavigateToSummary}
+            className="px-8 py-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-400"
+          >
+            See Rivalry Summary
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================
   // RENDER: WRAPUP SCREEN
   // ============================================
   
@@ -633,7 +781,7 @@ export default function VerdictFlow({
             onAllRounds={() => setShowAllRounds(true)}
             onProfiles={() => onNavigate('screen2')}
             onHowToPlay={() => setShowHowToPlay(true)}
-            onCancelRivalry={() => setShowCancelModal(true)}
+            onCancel={() => setShowCancelModal(true)}
           />
           
           <div className="max-w-md mx-auto">
@@ -720,7 +868,7 @@ export default function VerdictFlow({
           onAllRounds={() => setShowAllRounds(true)}
           onProfiles={() => onNavigate('screen2')}
           onHowToPlay={() => setShowHowToPlay(true)}
-          onCancelRivalry={() => setShowCancelModal(true)}
+          onCancel={() => setShowCancelModal(true)}
         />
         
         <div className="max-w-md mx-auto">

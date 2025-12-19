@@ -81,6 +81,7 @@ export default function RivalryIntroFlow({
   // UI state
   const [selectedJudge, setSelectedJudge] = useState(null);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
 
   // Check rivalry history between these two players
@@ -226,6 +227,7 @@ export default function RivalryIntroFlow({
           <HeaderWithMenu
             onHowToPlay={() => setShowHowToPlay(true)}
             onProfiles={() => onNavigate && onNavigate('screen2')}
+            onCancel={() => setShowCancelModal(true)}
           />
         </div>
         
@@ -423,6 +425,44 @@ export default function RivalryIntroFlow({
       {/* How To Play Modal */}
       {showHowToPlay && (
         <HowToPlayModal onClose={() => setShowHowToPlay(false)} />
+      )}
+
+      {/* Cancel Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-800 border border-slate-600 rounded-lg p-6 max-w-sm w-full">
+            <h3 className="text-lg font-bold text-slate-100 mb-2">
+              Cancel Rivalry?
+            </h3>
+            <p className="text-slate-300 text-sm mb-4">
+              This will end your Rivalry with {opponent?.name || 'your opponent'}. This cannot be undone.
+            </p>
+            <div className="space-y-2">
+              <button
+                onClick={async () => {
+                  try {
+                    await supabase
+                      .from('rivalries')
+                      .delete()
+                      .eq('id', rivalry.id);
+                    onNavigate && onNavigate('screen1');
+                  } catch (err) {
+                    console.error('Failed to cancel rivalry:', err);
+                  }
+                }}
+                className="w-full py-3 bg-red-600 text-white font-medium rounded hover:bg-red-500"
+              >
+                Cancel Rivalry
+              </button>
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="w-full py-2 bg-slate-600/50 text-slate-200 font-medium rounded border border-slate-500 hover:bg-slate-600"
+              >
+                Keep Playing
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

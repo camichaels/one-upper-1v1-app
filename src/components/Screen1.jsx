@@ -6,6 +6,7 @@ import { getRandomPrompt, selectJudges } from '../utils/prompts';
 import { normalizePhone, validatePhone } from '../utils/phoneUtils';
 import Header from './Header';
 import HeaderWithBack from './HeaderWithBack';
+import HeaderWithBackAndMenu from './HeaderWithBackAndMenu';
 import HowToPlayModal from './HowToPlayModal';
 import AboutModal from './AboutModal';
 import OnboardingFlow from './OnboardingFlow';
@@ -216,6 +217,10 @@ export default function Screen1({ onNavigate }) {
   const [inviteCode, setInviteCode] = useState(null); // The generated 4-char code
   const [isGeneratingInvite, setIsGeneratingInvite] = useState(false);
   const [inviteError, setInviteError] = useState('');
+
+  // Pending invites state (open invites created by this user)
+  const [pendingInvites, setPendingInvites] = useState([]);
+  const [isLoadingPendingInvites, setIsLoadingPendingInvites] = useState(false);
 
   // Onboarding state
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -1205,6 +1210,33 @@ useEffect(() => {
     setStakes(STAKES_SUGGESTIONS[randomIndex]);
   };
 
+  // Load pending invites for this profile
+  const loadPendingInvites = async () => {
+    if (!profile?.id) return;
+    
+    setIsLoadingPendingInvites(true);
+    try {
+      // Get invites created by this profile that haven't been used and haven't expired
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      
+      const { data, error } = await supabase
+        .from('rivalry_invites')
+        .select('*')
+        .eq('creator_profile_id', profile.id)
+        .is('used_at', null)
+        .gte('created_at', twentyFourHoursAgo)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setPendingInvites(data || []);
+    } catch (err) {
+      console.error('Failed to load pending invites:', err);
+      setPendingInvites([]);
+    } finally {
+      setIsLoadingPendingInvites(false);
+    }
+  };
+
   // Generate a unique 4-character invite code
   const generateInviteCode = async () => {
     setIsGeneratingInvite(true);
@@ -1247,6 +1279,9 @@ useEffect(() => {
       if (error) throw error;
       
       setInviteCode(code);
+      
+      // Refresh pending invites list
+      loadPendingInvites();
     } catch (err) {
       console.error('Failed to generate invite code:', err);
       setInviteError('Failed to create invite. Try again.');
@@ -1280,6 +1315,53 @@ useEffect(() => {
     setInviteCode(null);
     setInviteError('');
   };
+
+  // Delete a pending invite
+  const deletePendingInvite = async (inviteId) => {
+    try {
+      const { error } = await supabase
+        .from('rivalry_invites')
+        .delete()
+        .eq('id', inviteId);
+      
+      if (error) {
+        console.error('Failed to delete invite:', error);
+        return;
+      }
+      
+      // Remove from local state
+      setPendingInvites(prev => prev.filter(inv => inv.id !== inviteId));
+    } catch (err) {
+      console.error('Failed to delete invite:', err);
+    }
+  };
+
+  // Copy a pending invite code to clipboard
+  const copyPendingInviteCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  // Share pending invite via SMS
+  const sharePendingInviteSMS = (invite) => {
+    const stakesLine = invite.stakes ? `\nPlaying for: ${invite.stakes} 🎯\n` : '';
+    const message = invite.stakes 
+      ? `Hey! I challenge you to One-Upper - we answer weird prompts and AI judges decide who one-upped the other.\n${stakesLine}\nJoin with code: ${invite.code}\nOr tap: https://oneupper.app/join/${invite.code}\n\nLet the rivalry begin! 🎤`
+      : `I challenge you to One-Upper! 🎤\n\nJoin with code: ${invite.code}\nOr tap: https://oneupper.app/join/${invite.code}\n\nLet's see who's got the better one-liners.`;
+    window.location.href = `sms:?&body=${encodeURIComponent(message)}`;
+  };
+
+  // Load pending invites when entering State B
+  useEffect(() => {
+    if (currentState === 'B' && profile?.id) {
+      loadPendingInvites();
+    }
+  }, [currentState, profile?.id]);
 
   // Show onboarding flow if triggered
   if (showOnboarding && profile) {
@@ -1607,66 +1689,23 @@ useEffect(() => {
     return (
       <>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-5 py-8">
-        <HeaderWithBack backTo="/go" />
+        <HeaderWithBackAndMenu 
+          backTo="/go"
+          onProfiles={() => onNavigate && onNavigate('screen2')}
+          onHowToPlay={() => setShowHowToPlay(true)}
+          onLogOut={() => {
+            localStorage.removeItem('activeProfileId');
+            window.location.reload();
+          }}
+          showAllRounds={false}
+        />
         <div className="max-w-md mx-auto space-y-6">
           
-          {/* Greeting Row - Centered text with menu on right */}
-          <div className="relative">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-100">
-                {GREETINGS[greetingIndex](profile.name)}
-              </h2>
-            </div>
-            <div className="absolute top-0 right-0">
-              <button 
-                onClick={() => setShowMenu(!showMenu)}
-                className="text-slate-400 hover:text-slate-200 text-2xl"
-              >
-                ⋮
-              </button>
-              
-              {showMenu && (
-                <>
-                  {/* Backdrop to close menu */}
-                  <div 
-                    className="fixed inset-0 z-10" 
-                    onClick={() => setShowMenu(false)}
-                  />
-                  
-                  {/* Dropdown menu */}
-                  <div className="absolute right-0 top-8 bg-slate-700 border border-slate-600 rounded-lg shadow-lg py-2 w-48 z-20">
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        onNavigate && onNavigate('screen2');
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      Your Profiles
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        setShowHowToPlay(true);
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      How to Play
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowMenu(false);
-                        localStorage.removeItem('activeProfileId');
-                        window.location.reload();
-                      }}
-                      className="w-full text-left px-4 py-2 text-slate-200 hover:bg-slate-600 transition-colors"
-                    >
-                      Log Out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+          {/* Greeting */}
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-100">
+              {GREETINGS[greetingIndex](profile.name)}
+            </h2>
           </div>
 
           {/* Challenge a Friend Section OR Auto-accepting loading */}
@@ -1837,6 +1876,68 @@ useEffect(() => {
               >
                 Got an Invite?
               </button>
+            </div>
+          )}
+
+          {/* Pending Invites Section */}
+          {pendingInvites.length > 0 && (
+            <div className="mt-8">
+              <div className="border-t border-slate-700 pt-6">
+                <h3 className="text-slate-400 text-sm font-medium mb-1">
+                  Your Open Invites
+                </h3>
+                <p className="text-slate-500 text-xs mb-4">
+                  Codes expire in 24 hours • Anyone with the code can join
+                </p>
+                <div className="space-y-4">
+                  {pendingInvites.map((invite) => {
+                    const category = PROMPT_CATEGORIES.find(c => c.key === invite.prompt_category);
+                    return (
+                      <div key={invite.id} className="bg-slate-800/50 rounded-xl p-4">
+                        <div className="space-y-1 mb-4">
+                          <p className="text-slate-300 text-sm">
+                            Code: <span className="text-slate-100 font-mono text-base tracking-widest">{invite.code}</span>
+                          </p>
+                          {category && (
+                            <p className="text-slate-300 text-sm">
+                              Vibe: {category.emoji} {category.label}
+                            </p>
+                          )}
+                          {invite.stakes && (
+                            <p className="text-slate-300 text-sm">
+                              Playing for: <span className="text-orange-400">{invite.stakes}</span>
+                            </p>
+                          )}
+                        </div>
+                        
+                        {/* Action buttons - same as creation flow */}
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={() => copyPendingInviteCode(invite.code)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            {copied ? '✓ Copied!' : 'Copy Code'}
+                          </button>
+                          <button
+                            onClick={() => sharePendingInviteSMS(invite)}
+                            className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-100 py-2 px-3 rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Share via Text
+                          </button>
+                        </div>
+                        
+                        {/* Delete link */}
+                        <button
+                          onClick={() => deletePendingInvite(invite.id)}
+                          className="w-full text-slate-500 hover:text-red-400 text-sm py-1 transition-colors"
+                        >
+                          Delete Code
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           )}
 
