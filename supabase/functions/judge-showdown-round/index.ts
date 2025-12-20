@@ -14,44 +14,56 @@ interface JudgeShowdownRequest {
 
 // Bonus categories - Type 1: AI picks the specific reference
 const DYNAMIC_BONUS_CATEGORIES = [
-  { prompt: "Which answer sounds most like a famous celebrity's tweet? Name the celebrity.", prefix: "Most" },
-  { prompt: "Which answer has the strongest famous TV chef energy? Name the chef.", prefix: "Most" },
-  { prompt: "Which answer sounds like a famous comedian's bit? Name the comedian.", prefix: "Most" },
-  { prompt: "Which answer could be a famous movie character's backstory? Name the character.", prefix: "Best backstory for" },
+  { prompt: "Which answer sounds most like a famous celebrity's tweet? Name the celebrity.", prefix: "Most like", suffix: "'s tweet" },
+  { prompt: "Which answer has the strongest famous TV chef energy? Name the chef.", prefix: "Strongest", suffix: "energy" },
+  { prompt: "Which answer sounds like a famous comedian's bit? Name the comedian.", prefix: "Most like", suffix: "'s bit" },
+  { prompt: "Which answer could be a famous movie character's backstory? Name the character.", prefix: "Best backstory for", suffix: "" },
 ]
 
 // Bonus categories - Type 2: Fixed category, AI just picks winner
+// Mix of best, worst, and orthogonal categories
 const FIXED_BONUS_CATEGORIES = [
-  "Could be an Onion headline",
+  // Orthogonal / neutral categories
+  "Most quotable at a wedding toast",
+  "Best to yell from a moving car",
+  "Most likely to become a meme",
+  "Best podcast episode title",
+  "Best shower thought",
+  "Most 'no context needed'",
+  "Best bumper sticker",
+  "Most likely to be a fortune cookie",
+  
+  // "Worst" or dubious honor categories
+  "Biggest reach",
+  "Most likely to get you fired",
+  "Hardest to defend at Thanksgiving",
+  "Most concerning to a therapist",
+  "Best evidence in a custody hearing",
+  "Most likely to void a warranty",
+  "Best reason to call a lawyer",
+  "Most 'sir, this is a Wendy's'",
+  "Strongest 'hold my beer' energy",
+  "Most 'what could go wrong' vibes",
+  "Most likely to get banned from somewhere",
+  "Most 'I woke up and chose chaos'",
+  
+  // Fun/absurd categories  
   "Sounds like a Florida Man story",
   "Best TMZ breaking news",
   "Most clickbait article title",
-  "Best podcast episode title",
-  "Best topic for a graduate thesis",
-  "Most likely to be a TED Talk",
-  "Best LinkedIn humblebrag",
-  "Most corporate jargon energy",
   "Best plot for a Lifetime movie",
   "Best reality TV confession",
   "Most soap opera cliffhanger",
   "Best true crime documentary title",
   "Most dramatic movie trailer voiceover",
-  "Most likely to get you arrested",
-  "Strongest 'hold my beer' energy",
-  "Most 'what could go wrong' vibes",
-  "Best way to get banned from a place",
-  "Most likely to void a warranty",
-  "Best reason to call a lawyer",
+  "Could be an Onion headline",
   "Biggest 'trust me bro' moment",
   "Most 'main character' energy",
-  "Best shower thought",
   "Most 'said with full confidence'",
-  "Best 'no context needed'",
-  "Most 'I woke up and chose chaos'",
 ]
 
 // Pick a random bonus category
-function getRandomBonusCategory(): { prompt: string; isDynamic: boolean; prefix?: string } {
+function getRandomBonusCategory(): { prompt: string; isDynamic: boolean; prefix?: string; suffix?: string } {
   const allCategories = [
     ...DYNAMIC_BONUS_CATEGORIES.map(c => ({ ...c, isDynamic: true })),
     ...FIXED_BONUS_CATEGORIES.map(c => ({ prompt: c, isDynamic: false })),
@@ -60,7 +72,7 @@ function getRandomBonusCategory(): { prompt: string; isDynamic: boolean; prefix?
   return selected
 }
 
-// Replace letter references (A, B, C) with player names in banter text
+// Replace letter references (A, B, C) with player names in text
 function replaceLettersWithNames(text: string, letterToName: Record<string, string>): string {
   let result = text
   
@@ -76,6 +88,38 @@ function replaceLettersWithNames(text: string, letterToName: Record<string, stri
   }
   
   return result
+}
+
+// Calculate final rankings from per-judge rankings
+function calculateFinalRankings(
+  judgeRankings: Record<string, string[]>,
+  answerMap: Record<string, any>,
+  answerCount: number
+): { letter: string; totalPoints: number; placement: number; judgeBreakdown: Record<string, number> }[] {
+  const points: Record<string, number> = {}
+  const judgeBreakdown: Record<string, Record<string, number>> = {}
+  
+  // Points: 1st gets N points, last gets 1 point (where N = number of answers)
+  for (const [judgeKey, rankings] of Object.entries(judgeRankings)) {
+    rankings.forEach((letter, idx) => {
+      const pts = answerCount - idx // 5 players: 5,4,3,2,1 points
+      points[letter] = (points[letter] || 0) + pts
+      
+      // Track each judge's placement for this answer
+      if (!judgeBreakdown[letter]) judgeBreakdown[letter] = {}
+      judgeBreakdown[letter][judgeKey] = idx + 1 // 1-indexed placement
+    })
+  }
+  
+  // Sort by total points descending
+  return Object.entries(points)
+    .sort((a, b) => b[1] - a[1])
+    .map(([letter, totalPts], idx) => ({
+      letter,
+      totalPoints: totalPts,
+      placement: idx + 1,
+      judgeBreakdown: judgeBreakdown[letter] || {}
+    }))
 }
 
 serve(async (req) => {
@@ -196,32 +240,23 @@ serve(async (req) => {
       `${judge.name} (${judge.emoji}, key: "${judge.key}"): ${judge.description}`
     ).join('\n')
 
+    // Build the ranking arrays for JSON example
+    const answerLetters = answerLabels.slice(0, answers.length)
+    const rankingExample = `["${answerLetters.join('", "')}"]`
+
     // Build bonus instruction based on type
-    const bonusInstruction = bonusCategory.isDynamic
-      ? `BONUS CATEGORY (AI picks specific reference): ${bonusCategory.prompt}
-Return the category as "${bonusCategory.prefix} [Name You Pick]" format.`
-      : `BONUS CATEGORY (fixed): "${bonusCategory.prompt}"
-Return the category exactly as written.`
+    let bonusInstruction: string
+    let bonusCategoryExample: string
+    
+    if (bonusCategory.isDynamic) {
+      bonusInstruction = `Pick winner for "${bonusCategory.prompt}" - in the "category" field, combine the prefix "${bonusCategory.prefix}" with the specific name you chose (e.g., "${bonusCategory.prefix} Gordon Ramsay${bonusCategory.suffix ? ' ' + bonusCategory.suffix : ''}"). Do NOT include the original question in category.`
+      bonusCategoryExample = `"${bonusCategory.prefix} [specific name]${bonusCategory.suffix ? ' ' + bonusCategory.suffix : ''}"`
+    } else {
+      bonusInstruction = `Pick winner for "${bonusCategory.prompt}".`
+      bonusCategoryExample = `"${bonusCategory.prompt}"`
+    }
 
-    // Build dynamic example for banter based on actual judges
-    const banterExample = sortedJudges.slice(0, 3).flatMap((judge, idx) => {
-      if (idx === 0) {
-        return [
-          { judgeKey: judge.key, judgeName: judge.name, emoji: judge.emoji, comment: "First reaction to the answers..." },
-          { judgeKey: sortedJudges[1]?.key || judge.key, judgeName: sortedJudges[1]?.name || judge.name, emoji: sortedJudges[1]?.emoji || judge.emoji, comment: "Response or different take..." },
-        ]
-      }
-      return []
-    })
-    // Add a couple more to show the back-and-forth pattern
-    banterExample.push(
-      { judgeKey: sortedJudges[0].key, judgeName: sortedJudges[0].name, emoji: sortedJudges[0].emoji, comment: "Another comment..." },
-      { judgeKey: sortedJudges[2]?.key || sortedJudges[0].key, judgeName: sortedJudges[2]?.name || sortedJudges[0].name, emoji: sortedJudges[2]?.emoji || sortedJudges[0].emoji, comment: "Final anticipatory comment..." }
-    )
-
-    const banterExampleJson = JSON.stringify(banterExample, null, 2)
-
-    const prompt = `You are the judging panel for "One-Upper," a comedy competition where players try to one-up each other with outlandish answers.
+    const prompt = `You are judges for "One-Upper," a comedy game show. Players one-up each other with outlandish answers.
 
 PROMPT: "${round.prompt_text}"
 
@@ -231,38 +266,55 @@ ${answersText}
 JUDGES:
 ${judgesText}
 
-YOUR TASKS:
-
-1. RANK all answers from best to worst (reward boldness, creativity, humor - truth doesn't matter)
-
-2. BANTER: Write 4-5 short back-and-forth comments between the judges discussing the answers. Rules:
-   - Judges should react to MULTIPLE answers, not just the winner
-   - They can agree, disagree, riff off each other
-   - Build tension/suspense but DO NOT reveal who wins
-   - Reference answers by their letter (A, B, C)
-   - Keep each comment to 1-2 sentences MAX in their character voice
-   - End with something anticipatory like "Let's see how it shakes out" or "This is gonna be close"
-
-3. BONUS WINNER: ${bonusInstruction}
-
-SCORING PHILOSOPHY:
-- Outlandish beats safe
-- Creative exaggeration wins
-- Humor and entertainment value matter most
-- "That couldn't possibly be true" is a compliment here
-- Boring or generic answers should rank last
-
-CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
+Return ONLY valid JSON. No markdown, no backticks, no explanation.
 
 {
-  "rankings": ["${answerLabels.slice(0, answers.length).join('", "')}"],
-  "banterMessages": ${banterExampleJson},
+  "judgeRankings": {
+    "${sortedJudges[0].key}": ${rankingExample},
+    "${sortedJudges[1].key}": ${rankingExample},
+    "${sortedJudges[2].key}": ${rankingExample}
+  },
+  "banterMessages": [
+    { "judgeKey": "${sortedJudges[0].key}", "comment": "..." },
+    { "judgeKey": "${sortedJudges[1].key}", "comment": "..." },
+    { "judgeKey": "${sortedJudges[2].key}", "comment": "..." },
+    { "judgeKey": "${sortedJudges[0].key}", "comment": "..." }
+  ],
   "bonusWinner": {
     "answer": "A",
-    "category": "The display category name",
-    "reason": "Brief witty reason (1 sentence)"
-  }
-}`
+    "category": ${bonusCategoryExample},
+    "reason": "..."
+  },
+  "winnerReactions": {
+    "${sortedJudges[0].key}": "...",
+    "${sortedJudges[1].key}": "...",
+    "${sortedJudges[2].key}": "..."
+  },
+  "lastPlaceRoast": "...",
+  "mvpMoment": "..."
+}
+
+RULES:
+
+1. JUDGE RANKINGS: Each judge ranks ALL ${answers.length} answers independently based on their personality. Rankings CAN disagree - that's the fun.
+
+2. BANTER: Exactly 4 comments players will READ ALOUD. Each comment:
+   - MAX 12 words, one sentence
+   - Make them laugh, gasp, or groan
+   - Reference answers by letter (A, B, C...)
+   - Playful roasts welcome, mean burns not
+   - DO NOT reveal who wins
+   - End with anticipation ("This'll be close...")
+
+3. BONUS: ${bonusInstruction} Reason in 6 words max.
+
+4. WINNER REACTIONS: Each judge's take on their #1 pick. 8 words max each.
+
+5. LAST PLACE ROAST: Start with the answer letter (e.g., "A tried but..."). Gentle, playful dig. 10 words max. Funny, not cruel.
+
+6. MVP MOMENT: Start with the winner's answer letter (e.g., "A crushed it because..."). What made them special. 10 words max.
+
+SCORING VIBE: Outlandish beats safe. Weird beats boring. "That can't be true" is a compliment.`
 
     // Call Claude API
     const anthropicResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -274,7 +326,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
+        max_tokens: 1800,
         messages: [
           { role: 'user', content: prompt }
         ]
@@ -307,11 +359,17 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       )
     }
 
+    // Calculate final rankings from per-judge rankings
+    const finalRankings = calculateFinalRankings(
+      judgeResponse.judgeRankings,
+      answerMap,
+      answers.length
+    )
+
     // Process banter messages - replace letter references with player names
-    // Use emoji from our judge data, not from AI response (AI might return broken emojis)
     const judgesByKey = Object.fromEntries(sortedJudges.map(j => [j.key, j]))
     
-    const banterMessages = (judgeResponse.banterMessages || []).slice(0, 5).map((msg: any) => {
+    const banterMessages = (judgeResponse.banterMessages || []).slice(0, 4).map((msg: any) => {
       const judge = judgesByKey[msg.judgeKey]
       return {
         judgeKey: msg.judgeKey,
@@ -321,29 +379,54 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
       }
     })
 
-    // Also create the old banter format for backwards compatibility
-    const banterByJudge: Record<string, string> = {}
-    for (const msg of banterMessages) {
-      if (!banterByJudge[msg.judgeKey]) {
-        banterByJudge[msg.judgeKey] = msg.comment
+    // Process winner reactions - replace letters with names
+    const winnerReactions: Record<string, string> = {}
+    if (judgeResponse.winnerReactions) {
+      for (const [judgeKey, reaction] of Object.entries(judgeResponse.winnerReactions)) {
+        winnerReactions[judgeKey] = replaceLettersWithNames(reaction as string, letterToName)
       }
     }
+
+    // Process last place roast
+    const lastPlaceRoast = judgeResponse.lastPlaceRoast 
+      ? replaceLettersWithNames(judgeResponse.lastPlaceRoast, letterToName)
+      : null
+
+    // Process MVP moment
+    const mvpMoment = judgeResponse.mvpMoment
+      ? replaceLettersWithNames(judgeResponse.mvpMoment, letterToName)
+      : null
 
     // Process bonus winner
     let bonusReasonWithNames = judgeResponse.bonusWinner?.reason || ''
     bonusReasonWithNames = replaceLettersWithNames(bonusReasonWithNames, letterToName)
 
-    // Convert letter rankings to player IDs with placements
-    const rankings = judgeResponse.rankings.map((letter: string, idx: number) => {
-      const answer = answerMap[letter]
+    // Convert final rankings to player IDs with placements
+    const rankings = finalRankings.map((ranking) => {
+      const answer = answerMap[ranking.letter]
       return {
         playerId: answer?.player_id,
         answerId: answer?.id,
-        placement: idx + 1,
+        placement: ranking.placement,
+        totalPoints: ranking.totalPoints,
+        judgeBreakdown: ranking.judgeBreakdown,
         answer: answer?.answer_text,
-        playerName: answer?.player?.guest_name || `Player ${letter}`
+        playerName: answer?.player?.guest_name || `Player ${ranking.letter}`
       }
     }).filter((r: any) => r.playerId)
+
+    // Store per-judge rankings with player names for display
+    const judgeRankingsDisplay: Record<string, { playerId: string; playerName: string; placement: number }[]> = {}
+    for (const [judgeKey, letterRankings] of Object.entries(judgeResponse.judgeRankings)) {
+      judgeRankingsDisplay[judgeKey] = (letterRankings as string[]).map((letter, idx) => {
+        const answer = answerMap[letter]
+        return {
+          playerId: answer?.player_id,
+          playerName: answer?.player?.guest_name || `Player ${letter}`,
+          placement: idx + 1
+        }
+      })
+    }
 
     // Convert bonus winner letter to player ID
     const bonusWinnerLetter = judgeResponse.bonusWinner?.answer
@@ -360,8 +443,11 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
     // Build verdict object
     const verdict = {
       rankings,
-      banter: banterByJudge,
+      judgeRankings: judgeRankingsDisplay,
       banterMessages,
+      winnerReactions,
+      lastPlaceRoast,
+      mvpMoment,
       bonusWinner,
       judgeWhisperers: []
     }
@@ -377,7 +463,6 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
 
       if (votes && votes.length > 0) {
         // Include everyone who predicted correctly - even the winner!
-        // If you believed in yourself and were right, you deserve the bonus
         verdict.judgeWhisperers = votes.map(v => v.voter_id)
       }
     }
@@ -399,15 +484,18 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
     }
 
     // Calculate and update player scores
+    // Points based on final placement: 1st=5, 2nd=3, 3rd=2, 4th=1, 5th=0
     const placementPoints = [5, 3, 2, 1, 0]
     
     for (const ranking of rankings) {
       let pointsEarned = placementPoints[ranking.placement - 1] || 0
       
+      // Bonus category winner gets +1
       if (bonusWinner && bonusWinner.playerId === ranking.playerId) {
         pointsEarned += 1
       }
       
+      // Judge whisperers get +1
       if (verdict.judgeWhisperers.includes(ranking.playerId)) {
         pointsEarned += 1
       }

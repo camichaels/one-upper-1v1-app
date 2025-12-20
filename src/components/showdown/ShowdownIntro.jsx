@@ -312,13 +312,12 @@ export default function ShowdownIntro({ showdown, currentPlayer, onShowdownUpdat
             judgesStage >= 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
           }`}
         >
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-start gap-3">
             <span className="text-xl">🎙️</span>
-            <span className="text-orange-400 font-semibold text-sm">Ripley</span>
+            <p className="text-slate-200">
+              {judgeIntroLine}
+            </p>
           </div>
-          <p className="text-slate-200">
-            {judgeIntroLine}
-          </p>
         </div>
 
         {/* Let's go button */}

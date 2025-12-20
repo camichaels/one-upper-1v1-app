@@ -19,6 +19,7 @@ import OfflineBanner from './components/OfflineBanner';
 import ErrorBoundary from './components/ErrorBoundary';
 import useOnlineStatus from './hooks/useOnlineStatus';
 import VerdictFlowPrototype from './components/VerdictFlowPrototype';
+import ShowdownRevealPrototype from './components/showdown/ShowdownRevealPrototype';
 
 // Showdown components
 import ShowdownEntry from './components/showdown/ShowdownEntry';
@@ -41,6 +42,7 @@ function App() {
       <Routes>
         {/* TEMP PROTO */}
         <Route path="/prototype" element={<VerdictFlowPrototype />} />
+        <Route path="/prototype/showdown-reveal" element={<ShowdownRevealPrototype />} />
 
         {/* Landing Page */}
         <Route path="/" element={<LandingPage />} />

@@ -3,30 +3,55 @@ import { submitGuessesAndVote, TOTAL_ROUNDS } from '../../services/showdown';
 
 export default function ShowdownGuessing({ round, showdown, currentPlayer, onSubmit }) {
   const [guesses, setGuesses] = useState({});
+  const [selectedAnswerId, setSelectedAnswerId] = useState(null); // For matching UI
   const [vote, setVote] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(45);
+  const [timeRemaining, setTimeRemaining] = useState(60);
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
   const [shuffledAnswers, setShuffledAnswers] = useState([]);
+  const [shuffledVoteAnswers, setShuffledVoteAnswers] = useState([]);
+  const [shuffledPlayers, setShuffledPlayers] = useState([]);
+  const [revealStage, setRevealStage] = useState(0);
 
   const players = showdown.players || [];
   const answers = round.answers || [];
 
-  // Shuffle answers on mount (but keep order stable)
+  // Shuffle answers and players on mount
   useEffect(() => {
     const otherAnswers = answers.filter(a => a.player_id !== currentPlayer?.id);
     const myAnswer = answers.find(a => a.player_id === currentPlayer?.id);
     
-    // Shuffle other answers
-    const shuffled = [...otherAnswers].sort(() => Math.random() - 0.5);
+    // Shuffle other answers for "Who said it"
+    const shuffledOthers = [...otherAnswers].sort(() => Math.random() - 0.5);
     
-    // Add my answer at the end (not in dropdown)
+    // Add my answer at the end
     if (myAnswer) {
-      shuffled.push(myAnswer);
+      shuffledOthers.push(myAnswer);
     }
     
-    setShuffledAnswers(shuffled);
-  }, [answers, currentPlayer?.id]);
+    setShuffledAnswers(shuffledOthers);
+
+    // Separate shuffle for "Which will judges pick" (all answers, different order)
+    const allAnswersShuffled = [...answers].sort(() => Math.random() - 0.5);
+    setShuffledVoteAnswers(allAnswersShuffled);
+
+    // Shuffle other players for the picker
+    const otherPlayers = players.filter(p => p.id !== currentPlayer?.id);
+    setShuffledPlayers([...otherPlayers].sort(() => Math.random() - 0.5));
+  }, [answers, players, currentPlayer?.id]);
+
+  // Reveal animation on mount
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setRevealStage(1), 100),   // Prompt visible
+      setTimeout(() => setRevealStage(2), 300),   // Timer visible
+      setTimeout(() => setRevealStage(3), 500),   // "Who said it?" label
+      setTimeout(() => setRevealStage(4), 700),   // Answer cards start
+      setTimeout(() => setRevealStage(5), 700 + (shuffledAnswers.length * 150) + 200), // Player chips
+      setTimeout(() => setRevealStage(6), 700 + (shuffledAnswers.length * 150) + 500), // "Who wins" section
+    ];
+    return () => timers.forEach(t => clearTimeout(t));
+  }, [shuffledAnswers.length]);
 
   // Timer countdown
   useEffect(() => {
@@ -41,12 +66,10 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
 
       if (remaining === 0 && !hasAutoSubmitted) {
         setHasAutoSubmitted(true);
-        // Only auto-submit if they have at least one guess AND a vote
         const hasAnyGuesses = Object.keys(guesses).length > 0;
         if (hasAnyGuesses && vote) {
           handleSubmit(true);
         } else {
-          // No submission, but still move to waiting screen
           onSubmit();
         }
       }
@@ -62,24 +85,53 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
     return { name, avatar };
   }
 
-  // Get players available for a dropdown (not already assigned elsewhere)
-  function getAvailablePlayers(currentAnswerId) {
-    const assignedPlayerIds = Object.entries(guesses)
-      .filter(([answerId, playerId]) => answerId !== currentAnswerId && playerId)
-      .map(([_, playerId]) => playerId);
-
-    return players.filter(p => 
-      p.id !== currentPlayer?.id && // Not yourself
-      !assignedPlayerIds.includes(p.id) // Not already assigned
-    );
+  // Get players not yet assigned
+  function getAvailablePlayers() {
+    const assignedPlayerIds = Object.values(guesses).filter(Boolean);
+    return shuffledPlayers.filter(p => !assignedPlayerIds.includes(p.id));
   }
 
-  // Handle guess selection
-  function handleGuessChange(answerId, playerId) {
-    setGuesses(prev => ({
-      ...prev,
-      [answerId]: playerId
-    }));
+  // Handle tapping an answer card (for matching)
+  function handleAnswerTap(answerId) {
+    const answer = shuffledAnswers.find(a => a.id === answerId);
+    if (answer?.player_id === currentPlayer?.id) return; // Can't select your own
+    
+    if (selectedAnswerId === answerId) {
+      setSelectedAnswerId(null); // Deselect
+    } else {
+      setSelectedAnswerId(answerId);
+    }
+  }
+
+  // Handle tapping a player chip to assign
+  function handlePlayerAssign(playerId) {
+    if (!selectedAnswerId) return;
+    
+    const newGuesses = {
+      ...guesses,
+      [selectedAnswerId]: playerId
+    };
+    
+    // Auto-slot: if only one player left and one answer left, assign automatically
+    const assignedPlayerIds = Object.values(newGuesses).filter(Boolean);
+    const remainingPlayers = shuffledPlayers.filter(p => !assignedPlayerIds.includes(p.id));
+    const unassignedAnswers = otherAnswers.filter(a => !newGuesses[a.id]);
+    
+    if (remainingPlayers.length === 1 && unassignedAnswers.length === 1) {
+      newGuesses[unassignedAnswers[0].id] = remainingPlayers[0].id;
+    }
+    
+    setGuesses(newGuesses);
+    setSelectedAnswerId(null);
+  }
+
+  // Handle removing an assignment
+  function handleRemoveAssignment(answerId) {
+    setGuesses(prev => {
+      const updated = { ...prev };
+      delete updated[answerId];
+      return updated;
+    });
   }
 
   // Check if all guesses are complete
@@ -92,7 +144,6 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
 
     setIsSubmitting(true);
     try {
-      // Format guesses for API
       const guessArray = Object.entries(guesses).map(([answerId, playerId]) => ({
         answerId,
         guessedPlayerId: playerId
@@ -114,21 +165,14 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
   };
 
   const isLowTime = timeRemaining <= 10;
+  const availablePlayers = getAvailablePlayers();
 
   return (
     <div className="max-w-md mx-auto mt-4">
-      {/* Header - smaller, orange */}
-      <div className="text-center mb-3">
-        <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
-      </div>
-      
-      {/* Prompt - bold */}
-      <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-4 px-2">
-        {round.prompt_text}
-      </p>
-
       {/* Timer */}
-      <div className={`text-center mb-6 ${isLowTime ? 'animate-pulse' : ''}`}>
+      <div className={`text-center mb-4 transition-all duration-500 ${
+        revealStage >= 1 ? 'opacity-100' : 'opacity-0'
+      } ${isLowTime ? 'animate-pulse' : ''}`}>
         <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full ${
           isLowTime ? 'bg-red-500/20 text-red-400' : 'bg-slate-700/50 text-slate-300'
         }`}>
@@ -139,95 +183,160 @@ export default function ShowdownGuessing({ round, showdown, currentPlayer, onSub
         </div>
       </div>
 
-      {/* Who wrote what section */}
-      <p className="text-slate-100 font-semibold mb-3">Who wrote what?</p>
+      {/* Prompt */}
+      <p className={`text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2 transition-all duration-500 ${
+        revealStage >= 2 ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-4'
+      }`}>
+        {round.prompt_text}
+      </p>
+
+      {/* Who said it section */}
+      <p className={`text-slate-100 font-semibold mb-3 transition-all duration-500 ${
+        revealStage >= 3 ? 'opacity-100' : 'opacity-0'
+      }`}>
+        Who said it?
+      </p>
       
-      <div className="bg-slate-800/50 rounded-xl overflow-hidden mb-6">
+      <div className="space-y-3 mb-4">
         {shuffledAnswers.map((answer, index) => {
           const isMyAnswer = answer.player_id === currentPlayer?.id;
-          const availablePlayers = getAvailablePlayers(answer.id);
-          const selectedPlayerId = guesses[answer.id];
-          const selectedPlayer = players.find(p => p.id === selectedPlayerId);
+          const assignedPlayerId = guesses[answer.id];
+          const assignedPlayer = players.find(p => p.id === assignedPlayerId);
+          const isSelected = selectedAnswerId === answer.id;
+          
+          // Stagger the reveal of each answer card
+          const cardDelay = 700 + (index * 150);
+          const isVisible = revealStage >= 4 && Date.now() > cardDelay;
 
           return (
-            <div 
+            <div
               key={answer.id}
-              className="p-4"
+              onClick={() => !isMyAnswer && !assignedPlayerId && handleAnswerTap(answer.id)}
+              className={`bg-slate-800/50 rounded-xl p-4 transition-all duration-300 ${
+                revealStage >= 4 ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'
+              } ${
+                isMyAnswer 
+                  ? 'border border-slate-700' 
+                  : isSelected
+                    ? 'border-2 border-orange-500 bg-orange-500/10 cursor-pointer'
+                    : assignedPlayerId
+                      ? 'border border-green-500/50 bg-green-500/5'
+                      : 'border border-slate-700 hover:border-slate-500 cursor-pointer'
+              }`}
+              style={{ transitionDelay: `${index * 100}ms` }}
             >
-              {/* Answer text */}
-              <p className="text-slate-100 mb-3 leading-relaxed">
-                {answer.answer_text || '[no answer]'}
-              </p>
-
-              {isMyAnswer ? (
-                <div className="flex items-center gap-2 text-orange-400 text-sm">
-                  <span>★</span>
-                  <span>Yours</span>
-                </div>
-              ) : (
-                <div>
-                  <select
-                    value={selectedPlayerId || ''}
-                    onChange={(e) => handleGuessChange(answer.id, e.target.value || null)}
-                    className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-orange-500 text-sm"
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-slate-100 leading-relaxed flex-1">
+                  {answer.answer_text || '[no answer]'}
+                </p>
+                
+                {isMyAnswer ? (
+                  <span className="text-green-400 text-sm font-medium whitespace-nowrap shrink-0">✓ You</span>
+                ) : assignedPlayer ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemoveAssignment(answer.id);
+                    }}
+                    className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 rounded-full px-2 py-1 text-sm transition-colors shrink-0"
                   >
-                    <option value="">Select a player...</option>
-                    {/* Show currently selected player first if assigned */}
-                    {selectedPlayer && (
-                      <option value={selectedPlayer.id}>
-                        {getPlayerDisplay(selectedPlayer).avatar} {getPlayerDisplay(selectedPlayer).name}
-                      </option>
-                    )}
-                    {/* Show available players */}
-                    {availablePlayers
-                      .filter(p => p.id !== selectedPlayerId)
-                      .map(player => {
-                        const { name, avatar } = getPlayerDisplay(player);
-                        return (
-                          <option key={player.id} value={player.id}>
-                            {avatar} {name}
-                          </option>
-                        );
-                      })}
-                  </select>
-                </div>
-              )}
+                    <span>{getPlayerDisplay(assignedPlayer).avatar}</span>
+                    <span className="text-slate-200">{getPlayerDisplay(assignedPlayer).name}</span>
+                    <span className="text-slate-400 ml-1">×</span>
+                  </button>
+                ) : isSelected ? (
+                  <span className="text-orange-400 text-sm whitespace-nowrap shrink-0">Pick below ↓</span>
+                ) : (
+                  <span className="text-slate-500 text-sm whitespace-nowrap shrink-0">Tap to match</span>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
 
-      {/* Pick the winner section */}
-      <p className="text-slate-100 font-semibold mb-3">Pick the judges' favorite</p>
+      {/* Available players to assign */}
+      {(selectedAnswerId || availablePlayers.length > 0) && (
+        <div className={`mb-6 transition-all duration-500 ${
+          revealStage >= 5 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}>
+          {selectedAnswerId ? (
+            <>
+              <p className="text-slate-400 text-sm mb-2">Tap a player:</p>
+              <div className="flex flex-wrap gap-2">
+                {availablePlayers.map(player => {
+                  const { name, avatar } = getPlayerDisplay(player);
+                  return (
+                    <button
+                      key={player.id}
+                      onClick={() => handlePlayerAssign(player.id)}
+                      className="flex items-center gap-2 bg-slate-700 hover:bg-orange-500 text-slate-100 rounded-full px-3 py-2 transition-colors"
+                    >
+                      <span className="text-lg">{avatar}</span>
+                      <span className="font-medium">{name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : availablePlayers.length > 0 ? (
+            <>
+              <p className="text-slate-500 text-sm mb-2">Unmatched:</p>
+              <div className="flex flex-wrap gap-2">
+                {availablePlayers.map(player => {
+                  const { name, avatar } = getPlayerDisplay(player);
+                  return (
+                    <div
+                      key={player.id}
+                      className="flex items-center gap-2 bg-slate-800 text-slate-400 rounded-full px-3 py-2"
+                    >
+                      <span className="text-lg">{avatar}</span>
+                      <span>{name}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {/* All matched indicator */}
+      {allGuessesComplete && (
+        <div className="mb-6 text-center">
+          <span className="inline-flex items-center gap-2 text-green-400 text-sm">
+            <span>✓</span>
+            <span>All matched!</span>
+          </span>
+        </div>
+      )}
+
+      {/* Which will judges pick section */}
+      <p className={`text-slate-100 font-semibold mb-3 transition-all duration-500 ${
+        revealStage >= 6 ? 'opacity-100' : 'opacity-0'
+      }`}>
+        Predict the judges' favorite
+      </p>
       
-      <div className="bg-slate-800/50 rounded-xl overflow-hidden mb-6">
-        {shuffledAnswers.map((answer, index) => {
+      <div className={`space-y-2 mb-6 transition-all duration-500 ${
+        revealStage >= 6 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+      }`}>
+        {shuffledVoteAnswers.map((answer) => {
           const isSelected = vote === answer.id;
 
           return (
             <button
               key={answer.id}
               onClick={() => setVote(answer.id)}
-              className={`w-full text-left p-4 transition-colors ${
+              className={`w-full text-left p-4 rounded-xl transition-all duration-200 ${
                 isSelected 
-                  ? 'bg-orange-500/20' 
-                  : 'hover:bg-slate-700/50'
+                  ? 'bg-orange-500/20 border-2 border-orange-500 scale-[1.02]' 
+                  : 'bg-slate-800/50 border border-slate-700 hover:border-slate-500'
               }`}
             >
-              <div className="flex items-start gap-3">
-                <div className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 ${
-                  isSelected ? 'border-orange-500 bg-orange-500' : 'border-slate-500'
-                }`}>
-                  {isSelected && (
-                    <div className="w-full h-full flex items-center justify-center text-white text-xs">✓</div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-slate-200 text-sm leading-relaxed">
-                    {answer.answer_text?.slice(0, 60) || '[no answer]'}{answer.answer_text?.length > 60 ? '...' : ''}
-                  </p>
-                </div>
-              </div>
+              <p className={`leading-relaxed ${isSelected ? 'text-orange-100' : 'text-slate-200'}`}>
+                {answer.answer_text || '[no answer]'}
+              </p>
             </button>
           );
         })}

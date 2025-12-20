@@ -1,17 +1,45 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import confetti from 'canvas-confetti';
 import { calculateGuessResults, updateRevealStep, TOTAL_ROUNDS } from '../../services/showdown';
 import { supabase } from '../../lib/supabase';
 
 // Reveal phases: authors → banter → rankings
 const REVEAL_PHASES = ['authors', 'banter', 'rankings'];
 
+// Points for placement: 1st=5, 2nd=3, 3rd=2, 4th=1, 5th=0
+const PLACEMENT_POINTS = [5, 3, 2, 1, 0];
+
 export default function ShowdownReveal({ round, showdown, currentPlayer, isHost, onShowLeaderboard }) {
   const [isCalculating, setIsCalculating] = useState(true);
   const [guessResults, setGuessResults] = useState([]);
+  
+  // Animation states for authors phase
+  const [revealedCards, setRevealedCards] = useState([]);
+  const [showBestGuesser, setShowBestGuesser] = useState(false);
+  const [animationComplete, setAnimationComplete] = useState(false);
+  const [shuffledAnswers, setShuffledAnswers] = useState([]);
+  
+  // Animation states for banter phase
+  const [banterKey, setBanterKey] = useState(null);
+  const [answersRevealed, setAnswersRevealed] = useState(false);
+  const [revealedBanterItems, setRevealedBanterItems] = useState([]);
+  const [banterButtonReady, setBanterButtonReady] = useState(false);
+  
+  // Animation states for rankings phase (NEW - judge-by-judge reveal)
+  const [rankingsKey, setRankingsKey] = useState(null);
+  const [revealedJudges, setRevealedJudges] = useState([]);
+  const [standings, setStandings] = useState([]);
+  const [leaderboardFlash, setLeaderboardFlash] = useState(false);
+  const [showWinner, setShowWinner] = useState(false);
+  
+  const confettiRef = useRef(false);
+  const rankingsInitRef = useRef(null);
+  const rankingsTimersRef = useRef([]);
 
   const players = showdown.players || [];
   const answers = round.answers || [];
   const verdict = round.verdict || {};
+  const judges = showdown.judges || [];
   const isLastRound = round.round_number >= TOTAL_ROUNDS;
   
   // Use reveal_step from round (synced via real-time) or default to 'authors'
@@ -25,6 +53,57 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
       name: player.guest_name || player.profile?.name || 'Player',
       avatar: player.guest_avatar || player.profile?.avatar || '😎'
     };
+  }
+
+  // Truncate name to max length
+  function truncateName(name, maxLength = 8) {
+    if (name.length <= maxLength) return name;
+    return name.slice(0, maxLength) + '...';
+  }
+
+  // Calculate standings from judge rankings using Borda count
+  // judgeRankingsObj is keyed by judge key, each value is array of { playerId, playerName, placement }
+  function calculateStandingsFromJudgeKeys(revealedJudgeKeys, judgeRankingsObj) {
+    const pointTotals = {};
+    
+    // Initialize all players with 0 points
+    players.forEach(p => {
+      pointTotals[p.id] = 0;
+    });
+    
+    // Add points from each revealed judge
+    // Points: 1st gets N points, last gets 1 (where N = player count)
+    const playerCount = players.length;
+    
+    revealedJudgeKeys.forEach(judgeKey => {
+      const rankings = judgeRankingsObj[judgeKey];
+      if (rankings && Array.isArray(rankings)) {
+        rankings.forEach((ranking) => {
+          // ranking is { playerId, playerName, placement }
+          // Points: position 1 gets playerCount points, position N gets 1
+          const points = playerCount - ranking.placement + 1;
+          pointTotals[ranking.playerId] = (pointTotals[ranking.playerId] || 0) + points;
+        });
+      }
+    });
+    
+    // Convert to array and sort
+    const standingsArray = Object.entries(pointTotals)
+      .map(([playerId, points]) => ({ playerId, points }))
+      .sort((a, b) => b.points - a.points);
+    
+    // Assign placements (handle ties)
+    standingsArray.forEach((standing, index) => {
+      if (index === 0) {
+        standing.placement = 1;
+      } else if (standing.points === standingsArray[index - 1].points) {
+        standing.placement = standingsArray[index - 1].placement;
+      } else {
+        standing.placement = index + 1;
+      }
+    });
+    
+    return standingsArray;
   }
 
   // Calculate guess results and fetch guess data on mount
@@ -51,6 +130,252 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     loadData();
   }, [round.id]);
 
+  // Sort answers consistently by ID (same order for all players)
+  useEffect(() => {
+    if (answers.length > 0 && shuffledAnswers.length === 0) {
+      // Sort by ID to ensure all players see same order
+      const sorted = [...answers].sort((a, b) => a.id.localeCompare(b.id));
+      setShuffledAnswers(sorted);
+    }
+  }, [answers]);
+
+  // Staged reveal animation for authors phase
+  useEffect(() => {
+    if (revealPhase !== 'authors' || isCalculating || shuffledAnswers.length === 0) return;
+    
+    // Reset animation state when entering this phase
+    setRevealedCards([]);
+    setShowBestGuesser(false);
+    setAnimationComplete(false);
+    confettiRef.current = false;
+    
+    const timers = [];
+    
+    // Reveal each card with delay
+    shuffledAnswers.forEach((answer, index) => {
+      // First show the card (answer only)
+      timers.push(setTimeout(() => {
+        setRevealedCards(prev => [...prev, { answerId: answer.id, stage: 'answer' }]);
+      }, index * 2000));
+      
+      // Then reveal the author
+      timers.push(setTimeout(() => {
+        setRevealedCards(prev => 
+          prev.map(card => 
+            card.answerId === answer.id 
+              ? { ...card, stage: 'author' }
+              : card
+          )
+        );
+      }, index * 2000 + 800));
+    });
+    
+    // Show best guesser after all cards
+    const bestGuesserDelay = shuffledAnswers.length * 2000 + 500;
+    timers.push(setTimeout(() => {
+      setShowBestGuesser(true);
+    }, bestGuesserDelay));
+    
+    // Animation complete - show button
+    timers.push(setTimeout(() => {
+      setAnimationComplete(true);
+    }, bestGuesserDelay + 1000));
+    
+    return () => timers.forEach(t => clearTimeout(t));
+  }, [revealPhase, isCalculating, shuffledAnswers]);
+
+  // Ref to track banter phase initialization and timers
+  const banterInitRef = useRef(null);
+  const banterTimersRef = useRef([]);
+
+  // Staged reveal animation for banter phase
+  useEffect(() => {
+    if (revealPhase !== 'banter') {
+      // Reset when leaving banter phase
+      banterInitRef.current = null;
+      banterTimersRef.current.forEach(t => clearTimeout(t));
+      banterTimersRef.current = [];
+      setBanterKey(null);
+      return;
+    }
+    
+    // Skip if we've already initialized for this round
+    const initKey = `${round.id}-banter`;
+    if (banterInitRef.current === initKey) {
+      return;
+    }
+    
+    banterInitRef.current = initKey;
+    
+    // Clear any old timers from previous round
+    banterTimersRef.current.forEach(t => clearTimeout(t));
+    banterTimersRef.current = [];
+    
+    // Reset animation state - everything hidden
+    setBanterKey(null);
+    setAnswersRevealed(false);
+    setRevealedBanterItems([]);
+    setBanterButtonReady(false);
+    
+    // Get banter messages
+    const banterMessages = Array.isArray(verdict.banterMessages) 
+      ? verdict.banterMessages 
+      : [];
+    
+    // Timing matched to VerdictFlow:
+    // 50ms: allow render
+    banterTimersRef.current.push(setTimeout(() => {
+      setBanterKey(initKey);
+    }, 50));
+    
+    // 150ms: prompt + answers slide in
+    banterTimersRef.current.push(setTimeout(() => {
+      setAnswersRevealed(true);
+    }, 150));
+    
+    // 1100ms: first banter, then +1200ms for each subsequent
+    banterMessages.forEach((_, i) => {
+      banterTimersRef.current.push(setTimeout(() => {
+        setRevealedBanterItems(prev => [...prev, i]);
+      }, 1100 + (i * 1200)));
+    });
+    
+    // Button 500ms after last banter
+    const buttonDelay = 1100 + ((banterMessages.length - 1) * 1200) + 500;
+    banterTimersRef.current.push(setTimeout(() => {
+      setBanterButtonReady(true);
+    }, Math.max(buttonDelay, 1600)));
+    
+  }, [revealPhase, round.id, verdict.banterMessages]);
+
+  // NEW: Staged reveal animation for rankings phase (judge-by-judge)
+  useEffect(() => {
+    if (revealPhase !== 'rankings') {
+      // Reset when leaving rankings phase
+      rankingsInitRef.current = null;
+      rankingsTimersRef.current.forEach(t => clearTimeout(t));
+      rankingsTimersRef.current = [];
+      setRankingsKey(null);
+      return;
+    }
+    
+    // Skip if we've already initialized for this round
+    const initKey = `${round.id}-rankings`;
+    if (rankingsInitRef.current === initKey) {
+      return;
+    }
+    
+    rankingsInitRef.current = initKey;
+    
+    // Clear any old timers
+    rankingsTimersRef.current.forEach(t => clearTimeout(t));
+    rankingsTimersRef.current = [];
+    
+    // Reset animation state
+    setRankingsKey(null);
+    setShowWinner(false);
+    confettiRef.current = false;
+    
+    // Get judge rankings from verdict - keyed by judge.key
+    const judgeRankingsObj = verdict.judgeRankings || {};
+    const judgeKeys = Object.keys(judgeRankingsObj);
+    const numJudges = Math.min(judgeKeys.length, 3);
+    
+    if (numJudges === 0) {
+      // No judge data yet, show fallback
+      setRankingsKey(initKey);
+      setRevealedJudges([]);
+      setStandings(players.map((p, i) => ({ playerId: p.id, points: 0, placement: i + 1 })));
+      return;
+    }
+    
+    // Start with Judge 1 already revealed
+    const initialStandings = calculateStandingsFromJudgeKeys([judgeKeys[0]], judgeRankingsObj);
+    setRevealedJudges([judgeKeys[0]]);
+    setStandings(initialStandings);
+    
+    // Allow render
+    rankingsTimersRef.current.push(setTimeout(() => {
+      setRankingsKey(initKey);
+    }, 50));
+    
+    // Reveal subsequent judges with animation
+    for (let i = 1; i < numJudges; i++) {
+      const isLastJudge = i === numJudges - 1;
+      const delay = i * 2000; // 2s between each judge
+      const judgeKey = judgeKeys[i];
+      
+      rankingsTimersRef.current.push(setTimeout(() => {
+        // Add judge to revealed list
+        setRevealedJudges(prev => [...prev, judgeKey]);
+        
+        // Flash leaderboard
+        setLeaderboardFlash(true);
+        
+        // Update standings after flash
+        setTimeout(() => {
+          const revealedSoFar = judgeKeys.slice(0, i + 1);
+          const newStandings = calculateStandingsFromJudgeKeys(revealedSoFar, judgeRankingsObj);
+          setStandings(newStandings);
+          
+          setTimeout(() => {
+            setLeaderboardFlash(false);
+            
+            // If last judge, show winner after dramatic pause
+            if (isLastJudge) {
+              setTimeout(() => {
+                setShowWinner(true);
+                
+                // Confetti for winner
+                const winnerId = newStandings[0]?.playerId;
+                if (winnerId === currentPlayer?.id && !confettiRef.current) {
+                  confettiRef.current = true;
+                  confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.3 }
+                  });
+                }
+              }, 800);
+            }
+          }, 300);
+        }, 200);
+      }, delay));
+    }
+    
+    return () => rankingsTimersRef.current.forEach(t => clearTimeout(t));
+  }, [revealPhase, round.id, verdict.judgeRankings, players, currentPlayer?.id]);
+
+  // Fire confetti for best guesser
+  useEffect(() => {
+    if (showBestGuesser && round.best_guesser_id === currentPlayer?.id && !confettiRef.current) {
+      confettiRef.current = true;
+      
+      // Center burst
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+      
+      // Side bursts
+      setTimeout(() => {
+        confetti({
+          particleCount: 50,
+          angle: 60,
+          spread: 55,
+          origin: { x: 0 }
+        });
+        confetti({
+          particleCount: 50,
+          angle: 120,
+          spread: 55,
+          origin: { x: 1 }
+        });
+      }, 200);
+    }
+  }, [showBestGuesser, round.best_guesser_id, currentPlayer?.id]);
+
   // Handle host advancing phases - updates DB so all players sync
   async function handleContinue() {
     if (!isHost) return;
@@ -68,24 +393,12 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     }
   }
 
-  // Get who guessed a particular answer and whether they were correct
-  function getGuessersForAnswer(answerId, correctPlayerId) {
-    // Find all guesses for this answer
-    const guessesForAnswer = guessResults.filter(g => g.answer_id === answerId);
-    
-    const guessers = guessesForAnswer.map(guess => {
-      const guesser = getPlayerDisplay(guess.guesser_id);
-      const isCorrect = guess.guessed_player_id === correctPlayerId;
-      return { ...guesser, isCorrect, guesserId: guess.guesser_id };
-    });
-
-    // Sort: correct first, then wrong, alphabetical within each group
-    return guessers.sort((a, b) => {
-      if (a.isCorrect !== b.isCorrect) {
-        return a.isCorrect ? -1 : 1; // Correct first
-      }
-      return a.name.localeCompare(b.name); // Alphabetical within group
-    });
+  // Check if current player guessed correctly for a given answer
+  function didIGuessCorrectly(answerId, correctPlayerId) {
+    const myGuess = guessResults.find(
+      g => g.guesser_id === currentPlayer?.id && g.answer_id === answerId
+    );
+    return myGuess?.guessed_player_id === correctPlayerId;
   }
 
   if (isCalculating) {
@@ -97,391 +410,370 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     );
   }
 
-  // Phase 1: Authors Reveal - who wrote what with guess accuracy
+  // Phase 1: Authors Reveal - animated card reveals with green/red feedback
   if (revealPhase === 'authors') {
     const bestGuesserId = round.best_guesser_id;
     const bestGuesser = bestGuesserId ? getPlayerDisplay(bestGuesserId) : null;
+    const iAmBestGuesser = bestGuesserId === currentPlayer?.id;
 
     return (
       <div className="max-w-md mx-auto mt-4">
-        {/* Round indicator - smaller, orange */}
-        <div className="text-center mb-3">
-          <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
-        </div>
-        
         {/* Prompt - bold */}
         <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
           {round.prompt_text}
         </p>
 
-        {/* Answers with authors and guess results - separate boxes */}
+        {/* Section header - matches "Who said it?" style */}
+        <p className="text-slate-100 font-semibold mb-3">
+          Did you guess right?
+        </p>
+
+        {/* Answer cards with staged reveal */}
         <div className="space-y-3 mb-6">
-          {answers.map((answer) => {
+          {shuffledAnswers.map((answer) => {
             const author = getPlayerDisplay(answer.player_id);
-            const isMe = answer.player_id === currentPlayer?.id;
-            const guessers = getGuessersForAnswer(answer.id, answer.player_id);
+            const isMyAnswer = answer.player_id === currentPlayer?.id;
+            const revealState = revealedCards.find(c => c.answerId === answer.id);
+            const isRevealed = revealState?.stage === 'author';
+            const isVisible = !!revealState;
+            
+            // Determine card color based on guess result
+            let cardBgClass = 'bg-slate-800/50'; // Default before reveal
+            if (isRevealed) {
+              if (isMyAnswer) {
+                cardBgClass = 'bg-green-500/20'; // Your own answer - green
+              } else if (didIGuessCorrectly(answer.id, answer.player_id)) {
+                cardBgClass = 'bg-green-500/20'; // Guessed correctly - green
+              } else {
+                cardBgClass = 'bg-red-500/20'; // Guessed wrong - red
+              }
+            }
 
             return (
               <div 
                 key={answer.id}
-                className="bg-slate-800/50 rounded-xl p-4"
+                className={`rounded-xl p-4 transition-all duration-500 ${cardBgClass} ${
+                  isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+                }`}
               >
                 {/* Answer text */}
                 <p className="text-slate-100 leading-relaxed mb-3">
                   {answer.answer_text || '[no answer]'}
                 </p>
                 
-                {/* Written by */}
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-slate-500 text-sm">Written by:</span>
-                  <span className="text-xl">{author.avatar}</span>
-                  <span className={`font-semibold ${isMe ? 'text-orange-400' : 'text-orange-400'}`}>
-                    {author.name} {isMe && '(You)'}
+                {/* Author reveal */}
+                <div className={`flex items-center gap-2 transition-all duration-500 ${
+                  isRevealed ? 'opacity-100' : 'opacity-0'
+                }`}>
+                  <span className="text-2xl">{author.avatar}</span>
+                  <span className="text-orange-400 font-semibold">
+                    {author.name}
+                    {isMyAnswer && ' (You)'}
                   </span>
                 </div>
-
-                {/* Predicted by */}
-                {guessers.length > 0 && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <span className="text-slate-500">Predicted by:</span>
-                    <div>
-                      {guessers.map((g, i) => (
-                        <span key={g.guesserId}>
-                          {i > 0 && <span className="text-slate-600"> · </span>}
-                          <span className={g.isCorrect ? 'text-green-400' : 'text-red-400'}>
-                            {g.isCorrect ? '✓' : '✗'} {g.name}
-                          </span>
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
 
-        {/* Best Guesser */}
-        {bestGuesser && (
-          <div className="bg-slate-800/50 rounded-xl p-4 mb-6">
-            <p className="text-orange-400 font-semibold">
-              {bestGuesser.name} guessed best!
+        {/* Best Guesser reveal */}
+        {showBestGuesser && bestGuesser && (
+          <div className={`rounded-xl p-4 mb-6 transition-all duration-500 ${
+            iAmBestGuesser ? 'bg-orange-500/20' : 'bg-slate-800/50'
+          }`}>
+            <p className={`font-bold text-lg ${iAmBestGuesser ? 'text-orange-400' : 'text-slate-100'}`}>
+              {iAmBestGuesser ? 'You guessed best!' : `${bestGuesser.name} guessed best!`}
             </p>
-            <p className="text-slate-300 text-sm mt-1">Bonus +1 point</p>
-            <p className="text-slate-500 text-xs mt-1">Fastest with the most correct predictions</p>
+            <p className="text-slate-400 text-sm mt-1">+1 bonus point</p>
+            <p className="text-slate-500 text-xs mt-1">Fastest with the most correct</p>
           </div>
         )}
 
-        {/* Continue button */}
-        {isHost ? (
-          <button
-            onClick={handleContinue}
-            className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
-          >
-            Hear From the Judges
-          </button>
-        ) : (
-          <button
-            disabled
-            className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
-          >
-            Waiting for host...
-          </button>
+        {/* Continue button - only show after animation */}
+        {animationComplete && (
+          <div className="transition-all duration-500">
+            {isHost ? (
+              <button
+                onClick={handleContinue}
+                className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+              >
+                Hear From the Judges
+              </button>
+            ) : (
+              <button
+                disabled
+                className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
+              >
+                Waiting for host...
+              </button>
+            )}
+          </div>
         )}
       </div>
     );
   }
 
-  // Phase 2: Judge Banter - conversation flow like Rivalry
+  // Phase 2: Judge Banter - animated conversation flow
   if (revealPhase === 'banter') {
-    const judges = showdown.judges || [];
-    const banter = verdict.banter || {};
-    
-    // Check if banter is an array (conversation) or object (one comment per judge)
+    // Get banter messages from verdict
     const banterMessages = Array.isArray(verdict.banterMessages) 
       ? verdict.banterMessages 
-      : judges.map(judge => ({
-          judgeKey: judge.key,
-          judgeName: judge.name,
-          emoji: judge.emoji,
-          comment: banter[judge.key] || ""
-        })).filter(msg => msg.comment); // Filter out empty comments
+      : [];
 
     // Show deliberating animation if no banter yet
     if (banterMessages.length === 0) {
       return (
         <div className="max-w-md mx-auto mt-4">
-          {/* Round indicator */}
-          <div className="text-center mb-3">
-            <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
-          </div>
-          
           {/* Prompt */}
-          <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-8 px-2">
+          <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
             {round.prompt_text}
           </p>
 
-          {/* Deliberating message */}
-          <div className="text-center space-y-8">
-            <div className="text-xl text-slate-200 font-medium">Judges are deliberating...</div>
-            
-            {/* Orbiting judges */}
-            <div className="relative w-48 h-48 mx-auto">
-              <div className="judges-orbit w-full h-full relative">
-                {judges.map((judge, i) => {
-                  const angle = (i * (360 / judges.length) - 90) * (Math.PI / 180);
-                  const radius = 70;
-                  const x = Math.cos(angle) * radius;
-                  const y = Math.sin(angle) * radius;
-                  
-                  return (
-                    <div
-                      key={judge.key}
-                      className="absolute left-1/2 top-1/2"
-                      style={{
-                        transform: `translate(-50%, -50%) translate(${x}px, ${y}px)`,
-                      }}
-                    >
-                      <div className="judge-item-inner flex flex-col items-center">
-                        <span className="text-4xl">{judge.emoji}</span>
-                        <span className="text-xs text-slate-400 mt-1">{judge.name}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <p className="text-slate-400 text-sm">This won't take long...</p>
+          <div className="text-center py-8">
+            <div className="text-4xl mb-4 animate-pulse">🤔</div>
+            <p className="text-slate-300">Judges are deliberating...</p>
           </div>
         </div>
       );
     }
 
+    // Don't render content until initialized to prevent flash
+    if (!banterKey) {
+      return (
+        <div className="max-w-md mx-auto mt-4">
+          {/* Empty container - same structure, no content yet */}
+        </div>
+      );
+    }
+
     return (
-      <div className="max-w-md mx-auto mt-4">
-        {/* Round indicator - smaller, orange */}
-        <div className="text-center mb-3">
-          <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
-        </div>
-        
-        {/* Prompt - bold */}
-        <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
-          {round.prompt_text}
-        </p>
+      <div key={banterKey} className="max-w-md mx-auto mt-4">
+        {/* Prompt + Answers animate in together */}
+        <div className={`transition-all duration-500 ${
+          answersRevealed ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}>
+          {/* Prompt */}
+          <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
+            {round.prompt_text}
+          </p>
 
-        {/* Ripley intro */}
-        <div className="bg-slate-800/80 rounded-2xl p-4 mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl">🎙️</span>
-            <span className="text-orange-400 font-semibold text-sm">Ripley</span>
+          {/* Answers for context - single compact box */}
+          <div className="bg-slate-700/40 rounded-xl py-3 px-4 mb-6">
+            <div className="space-y-1">
+              {answers.map((answer) => {
+                const author = getPlayerDisplay(answer.player_id);
+                return (
+                  <p key={answer.id} className="text-slate-200 text-sm">
+                    <span className="text-slate-400">{author.name}:</span> {answer.answer_text}
+                  </p>
+                );
+              })}
+            </div>
           </div>
-          <p className="text-slate-300 text-sm mb-2">
-            Judges, what are you thinking?
-          </p>
-          <p className="text-slate-300 text-sm">
-            Players, feel free to read these aloud. We won't judge. They will.
-          </p>
         </div>
 
-        {/* Judge banter - alternating conversation flow */}
+        {/* Judge banter - animated conversation flow */}
         <div className="space-y-3 mb-6">
           {banterMessages.map((msg, index) => {
-            // Alternate left/right positioning
             const isLeft = index % 2 === 0;
+            const isRevealed = revealedBanterItems.includes(index);
             
             return (
               <div 
-                key={index} 
-                className={`flex ${isLeft ? 'justify-start' : 'justify-end'}`}
+                key={index}
+                className={`flex ${isLeft ? 'justify-start' : 'justify-end'} transition-all duration-500 ${
+                  isRevealed 
+                    ? 'opacity-100 translate-y-0' 
+                    : 'opacity-0 translate-y-4 h-0 overflow-hidden'
+                }`}
               >
-                <div className={`bg-slate-800/50 rounded-xl p-4 max-w-[85%]`}>
+                <div className={`bg-slate-800/70 rounded-2xl p-4 max-w-[85%] ${
+                  isLeft ? 'rounded-tl-sm' : 'rounded-tr-sm'
+                }`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xl">{msg.emoji}</span>
-                    <span className="text-slate-100 font-semibold text-sm">{msg.judgeName}</span>
+                    <span className="text-lg">{msg.emoji}</span>
+                    <span className="text-orange-400 text-sm font-medium">{msg.judgeName}</span>
                   </div>
-                  <p className="text-slate-300 text-sm">
-                    {msg.comment}
-                  </p>
+                  <p className="text-slate-200 text-sm">{msg.comment}</p>
                 </div>
               </div>
             );
           })}
         </div>
 
-        {/* Continue button */}
-        {isHost ? (
-          <button
-            onClick={handleContinue}
-            className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
-          >
-            And the winner is...
-          </button>
-        ) : (
-          <button
-            disabled
-            className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
-          >
-            Waiting for host...
-          </button>
-        )}
+        {/* Continue button - animated in */}
+        <div className={`transition-all duration-500 ${
+          banterButtonReady ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
+        }`}>
+          {isHost ? (
+            <button
+              onClick={handleContinue}
+              className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+            >
+              And the winner is...
+            </button>
+          ) : (
+            <button
+              disabled
+              className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
+            >
+              Waiting for host...
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
-  // Phase 3: Rankings - cleaner design, no trophy icon, no outline boxes
+  // Phase 3: Rankings - NEW judge-by-judge reveal with leaderboard shuffle
   if (revealPhase === 'rankings') {
-    const rankings = verdict.rankings || [];
-    const bonusWinner = verdict.bonusWinner;
-    const judgeWhisperers = verdict.judgeWhisperers || [];
+    const judgeRankingsObj = verdict.judgeRankings || {};
+    const winnerName = standings[0] ? getPlayerDisplay(standings[0].playerId).name : 'Unknown';
+    
+    // Circle numbers for rankings
+    const circleNumbers = ['①', '②', '③', '④', '⑤'];
+    
+    // Get circle color based on placement
+    function getCircleColor(placement) {
+      if (placement === 1) return 'text-yellow-400';
+      if (placement === 2) return 'text-slate-300';
+      if (placement === 3) return 'text-amber-600';
+      return 'text-slate-500';
+    }
+    
+    // Find judge object by key
+    function getJudgeByKey(key) {
+      return judges.find(j => j.key === key) || { name: key, emoji: '⚖️' };
+    }
 
-    // If no AI rankings yet, show placeholder based on submission order
-    const displayRankings = rankings.length > 0 ? rankings : answers.map((a, i) => ({
-      playerId: a.player_id,
-      placement: i + 1,
-      answer: a.answer_text
-    }));
-
-    // Check if current player won this round
-    const isWinner = displayRankings[0]?.playerId === currentPlayer?.id;
-
-    // Placement points
-    const placementPoints = [5, 3, 2, 1, 0];
+    // Don't render until initialized
+    if (!rankingsKey) {
+      return (
+        <div className="max-w-md mx-auto mt-4">
+          {/* Empty container */}
+        </div>
+      );
+    }
 
     return (
-      <div className="max-w-md mx-auto mt-4">
-        {/* Confetti for winner */}
-        {isWinner && (
-          <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
-            {[...Array(50)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute animate-fall"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `-${Math.random() * 20}%`,
-                  animationDelay: `${Math.random() * 2}s`,
-                  animationDuration: `${2 + Math.random() * 2}s`,
-                  fontSize: `${12 + Math.random() * 12}px`,
-                }}
-              >
-                {['🎉', '✨', '⭐', '🌟', '💫', '🎊'][Math.floor(Math.random() * 6)]}
-              </div>
-            ))}
-            <style>{`
-              @keyframes fall {
-                0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-                100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-              }
-              .animate-fall { animation: fall linear forwards; }
-            `}</style>
+      <div key={rankingsKey} className="max-w-md mx-auto mt-4">
+        {/* Winner headline - appears after all judges revealed */}
+        {showWinner && (
+          <div className="text-center mb-4 animate-fade-in">
+            <h2 className="text-xl font-bold text-orange-500">
+              {standings[0]?.playerId === currentPlayer?.id ? 'You win the round!' : `${winnerName} wins the round!`}
+            </h2>
           </div>
         )}
-
-        {/* Round indicator - smaller, orange */}
-        <div className="text-center mb-3">
-          <p className="text-sm font-medium text-orange-400">Round {round.round_number} of {TOTAL_ROUNDS}</p>
-        </div>
         
-        {/* Prompt - bold */}
-        <p className="text-xl text-slate-100 font-bold text-center leading-relaxed mb-6 px-2">
-          {round.prompt_text}
-        </p>
-
-        {/* Section header */}
-        <p className="text-slate-400 text-sm mb-3">Judges say...</p>
-
-        {/* Rankings - show all players with their answers */}
-        <div className="space-y-2 mb-6">
-          {displayRankings.map((ranking, index) => {
-            const player = getPlayerDisplay(ranking.playerId);
-            const isMe = ranking.playerId === currentPlayer?.id;
-            const isFirst = index === 0;
-            const points = placementPoints[index] || 0;
-
-            return (
-              <div 
-                key={ranking.playerId}
-                className={`rounded-xl p-4 ${
-                  isFirst 
-                    ? 'bg-gradient-to-r from-yellow-500/20 to-orange-500/20' 
-                    : 'bg-slate-800/50'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`font-bold w-8 ${isFirst ? 'text-yellow-400' : 'text-slate-400'}`}>
-                      {index + 1}.
+        {/* Leaderboard - single box, centered content */}
+        <div className={`rounded-xl p-4 mb-6 transition-all duration-150 ${
+          leaderboardFlash ? 'bg-orange-500/30' : 'bg-slate-800/60'
+        }`}>
+          <div className="space-y-2 flex flex-col items-center">
+            {[1, 2, 3, 4, 5].slice(0, players.length).map(placement => {
+              const playersAtRank = standings.filter(s => s.placement === placement);
+              
+              return playersAtRank.map(standing => {
+                const player = getPlayerDisplay(standing.playerId);
+                const isMe = standing.playerId === currentPlayer?.id;
+                const circleNum = circleNumbers[standing.placement - 1] || standing.placement;
+                
+                return (
+                  <div 
+                    key={standing.playerId}
+                    className="flex items-center py-2 w-48 transition-all duration-500"
+                  >
+                    <span className={`text-xl w-10 ${getCircleColor(standing.placement)}`}>
+                      {circleNum}
                     </span>
-                    <span className="text-2xl">{player.avatar}</span>
-                    <span className={`font-semibold ${isMe ? 'text-orange-400' : 'text-slate-100'}`}>
+                    <span className={`font-medium ${
+                      isMe ? 'text-orange-400' : 'text-slate-100'
+                    }`}>
                       {player.name}
                     </span>
                   </div>
-                  <span className={`font-bold ${isFirst ? 'text-yellow-400' : 'text-slate-400'}`}>
-                    +{points} pts
-                  </span>
+                );
+              });
+            })}
+          </div>
+        </div>
+        
+        {/* Judge cards - newest at top, stack down */}
+        <div className="space-y-3 mb-6">
+          {[...revealedJudges].reverse().map((judgeKey) => {
+            const rankings = judgeRankingsObj[judgeKey];
+            const judge = getJudgeByKey(judgeKey);
+            const isFirstJudge = judgeKey === revealedJudges[0];
+            
+            if (!rankings || !Array.isArray(rankings)) return null;
+            
+            // Get one-liner from winnerReactions for this judge
+            const oneLiner = verdict.winnerReactions?.[judgeKey] || '';
+            
+            return (
+              <div 
+                key={judgeKey}
+                className={`bg-slate-800/50 rounded-xl p-4 ${isFirstJudge ? '' : 'animate-slide-up'}`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-xl">{judge.emoji}</span>
+                  <span className="font-bold text-orange-400">{judge.name}</span>
                 </div>
-                <p className="text-slate-300 text-sm mt-2 ml-11">
-                  {ranking.answer || '[crickets]'}
-                </p>
+                {oneLiner && (
+                  <p className="text-slate-300 text-sm mb-2">{oneLiner}</p>
+                )}
+                <div className="text-slate-400 text-sm">
+                  {rankings.map((r, i) => (
+                    <span key={r.playerId}>
+                      {r.playerName || getPlayerDisplay(r.playerId).name}
+                      {i < rankings.length - 1 ? ' → ' : ''}
+                    </span>
+                  ))}
+                </div>
               </div>
             );
           })}
         </div>
-
-        {/* Bonus Awards */}
-        {(bonusWinner || round.best_guesser_id || judgeWhisperers.length > 0) && (
-          <>
-            <p className="text-slate-400 text-sm mb-3">Bonus points (+1 each)</p>
-            <div className="bg-slate-800/50 rounded-xl p-4 mb-6 space-y-2">
-              {/* Judges Pick */}
-              {bonusWinner && (
-                <p className="text-slate-300 text-sm">
-                  {bonusWinner.categoryDisplay}: <span className="text-orange-400 font-medium">{getPlayerDisplay(bonusWinner.playerId).name}</span>
-                </p>
-              )}
-
-              {/* Best Guesser */}
-              {round.best_guesser_id && (
-                <p className="text-slate-300 text-sm">
-                  Best Guesser: <span className="text-orange-400 font-medium">{getPlayerDisplay(round.best_guesser_id).name}</span>
-                </p>
-              )}
-
-              {/* Judge Whisperers */}
-              {judgeWhisperers.length > 0 && (
-                <p className="text-slate-300 text-sm">
-                  Predicted the Winner: <span className="text-orange-400 font-medium">{judgeWhisperers.map(id => getPlayerDisplay(id).name).join(', ')}</span>
-                </p>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* No AI results notice */}
-        {rankings.length === 0 && (
-          <div className="bg-slate-700/30 rounded-xl p-3 mb-6 text-center">
-            <p className="text-slate-500 text-sm">AI judging coming soon - showing submission order</p>
+        
+        {/* Continue button - show after winner revealed */}
+        {showWinner && (
+          <div className="animate-slide-up">
+            {isHost ? (
+              <button
+                onClick={handleContinue}
+                className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+              >
+                To the scores
+              </button>
+            ) : (
+              <button
+                disabled
+                className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
+              >
+                Waiting for host...
+              </button>
+            )}
           </div>
         )}
 
-        {/* Continue button */}
-        {isHost ? (
-          <button
-            onClick={handleContinue}
-            className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
-          >
-            {isLastRound ? 'See Who Won' : "Who's Winning?"}
-          </button>
-        ) : (
-          <button
-            disabled
-            className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
-          >
-            Waiting for host...
-          </button>
-        )}
+        {/* CSS for animations */}
+        <style>{`
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+          }
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+          }
+          .animate-slide-up {
+            animation: slideUp 0.4s ease-out forwards;
+          }
+        `}</style>
       </div>
     );
   }
