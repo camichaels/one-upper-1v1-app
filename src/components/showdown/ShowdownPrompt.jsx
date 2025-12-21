@@ -1,11 +1,43 @@
 import { useState, useEffect, useRef } from 'react';
 import { TOTAL_ROUNDS } from '../../services/showdown';
 
+// Randomized placeholder text for answer input
+const ANSWER_PLACEHOLDERS = [
+  "Drop your best answer here...",
+  "Go on, one-up everyone...",
+  "Make the judges nervous...",
+  "What's your wildest take?",
+  "Channel your inner chaos...",
+  "Say something unhinged...",
+  "Your most outlandish answer...",
+  "Time to get weird...",
+  "What would Florida Man say?",
+  "Make it memorable...",
+  "The wilder the better...",
+  "Trust your worst instincts...",
+  "Go full chaos mode...",
+  "Overthink this. Or don't.",
+  "Your therapist can't see this...",
+  "No wrong answers. Just boring ones.",
+  "Make future you cringe...",
+  "Type something unhinged...",
+  "What's the worst best answer?",
+  "Let the intrusive thoughts win...",
+  "This is a safe space for chaos...",
+  "Be the answer they remember...",
+  "Normal is boring...",
+  "Convince no one you're normal...",
+  "Reality is optional here...",
+];
+
 export default function ShowdownPrompt({ round, showdown, currentPlayer, onSubmit }) {
   const [answer, setAnswer] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(60);
   const [hasAutoSubmitted, setHasAutoSubmitted] = useState(false);
+  const [placeholder] = useState(() => 
+    ANSWER_PLACEHOLDERS[Math.floor(Math.random() * ANSWER_PLACEHOLDERS.length)]
+  );
   const textareaRef = useRef(null);
 
   // Word count (rough - split by spaces)
@@ -81,7 +113,7 @@ export default function ShowdownPrompt({ round, showdown, currentPlayer, onSubmi
           ref={textareaRef}
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Go on, one-up everyone..."
+          placeholder={placeholder}
           className="w-full bg-slate-700/50 border border-slate-600 rounded-xl px-4 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-orange-500 transition-colors resize-none text-lg"
           rows={4}
           disabled={isSubmitting}

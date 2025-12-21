@@ -310,55 +310,7 @@ export default function ShowdownLeaderboard({ round, showdown, currentPlayer, is
         </table>
       </div>
 
-      {/* The Spoils - placement points explanation */}
-      <div className="bg-slate-800/30 rounded-xl p-3 mb-4">
-        <p className="text-slate-400 text-xs mb-2">The Spoils</p>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
-          <span className="text-slate-300">① <span className="text-yellow-400">+5</span></span>
-          <span className="text-slate-300">② <span className="text-slate-300">+3</span></span>
-          <span className="text-slate-300">③ <span className="text-amber-600">+2</span></span>
-          {players.length >= 4 && (
-            <span className="text-slate-300">④ <span className="text-slate-500">+1</span></span>
-          )}
-          {players.length >= 5 && (
-            <span className="text-slate-300">⑤ <span className="text-slate-500">+0</span></span>
-          )}
-        </div>
-      </div>
-
-      {/* Bonus Points for current round */}
-      {(verdict.bonusWinner || round.best_guesser_id || (verdict.judgeWhisperers?.length > 0)) && (
-        <div className="bg-slate-800/40 rounded-xl p-4 mb-4">
-          <p className="text-slate-400 text-xs mb-3">Round {currentRound} Bonuses</p>
-          <div className="space-y-2 text-sm">
-            {round.best_guesser_id && (
-              <p className="text-slate-300">
-                🎯 Best Guesser: <span className="text-orange-400 font-medium">
-                  {getPlayerDisplay(players.find(p => p.id === round.best_guesser_id) || {}).name}
-                </span> (+1)
-              </p>
-            )}
-            {verdict.judgeWhisperers?.length > 0 && (
-              <p className="text-slate-300">
-                🔮 Predicted Winner: <span className="text-orange-400 font-medium">
-                  {verdict.judgeWhisperers.map(id => 
-                    getPlayerDisplay(players.find(p => p.id === id) || {}).name
-                  ).join(', ')}
-                </span> (+1 each)
-              </p>
-            )}
-            {verdict.bonusWinner && (
-              <p className="text-slate-300">
-                🎪 {verdict.bonusWinner.categoryDisplay || verdict.bonusWinner.category}: <span className="text-orange-400 font-medium">
-                  {getPlayerDisplay(players.find(p => p.id === verdict.bonusWinner.playerId) || {}).name}
-                </span> (+1)
-              </p>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Random tidbit - mic icon, no italics, no quotes */}
+      {/* Tidbit */}
       {randomTidbit && (
         <div className="bg-slate-800/30 rounded-xl p-4 mb-6">
           <p className="text-slate-300 text-sm flex items-start gap-2">

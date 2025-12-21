@@ -2,6 +2,67 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateShowdownRecap, TOTAL_ROUNDS, getShowdownRounds } from '../../services/showdown';
 
+// Player Recap Carousel Component
+function PlayerRecapCarousel({ recaps, animationDelay }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  
+  const goNext = () => setCurrentIndex((currentIndex + 1) % recaps.length);
+  const goPrev = () => setCurrentIndex((currentIndex - 1 + recaps.length) % recaps.length);
+  
+  const pr = recaps[currentIndex];
+  if (!pr) return null;
+  
+  return (
+    <div 
+      className="animate-reveal"
+      style={{ animationDelay: `${animationDelay}ms` }}
+    >
+      {/* Card with arrows inside */}
+      <div className="bg-slate-800/50 rounded-xl p-4 relative">
+        {/* Left arrow - vertically centered */}
+        <button
+          onClick={goPrev}
+          className="absolute left-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        
+        {/* Right arrow - vertically centered */}
+        <button
+          onClick={goNext}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+        
+        {/* Content - with left/right margin for arrows */}
+        <div className="mx-6">
+          {/* Name + Title */}
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">{pr.avatar}</span>
+            <span className="font-bold text-slate-100">{pr.player}</span>
+          </div>
+          <p className="text-orange-400 font-medium text-sm mb-1">{pr.title}</p>
+          <p className="text-slate-300 text-sm mb-3">{pr.roast}</p>
+          
+          {/* Divider */}
+          <div className="border-t border-slate-700/50 my-3"></div>
+          
+          {/* Psych Take */}
+          <div className="flex items-start gap-2">
+            <span className="text-sm">🛋️</span>
+            <p className="text-slate-400 text-sm">{pr.psychTake}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Ripley loading quips
 const LOADING_QUIPS = [
   "Let me find the best moments...",
@@ -14,10 +75,9 @@ const LOADING_QUIPS = [
 ];
 
 export default function ShowdownHighlights({ showdown, currentPlayer }) {
-  const [currentCard, setCurrentCard] = useState(0);
   const [recap, setRecap] = useState(showdown.recap || null);
   const [isLoading, setIsLoading] = useState(!showdown.recap);
-  const [showFullResults, setShowFullResults] = useState(false);
+  const [showRoundByRound, setShowRoundByRound] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [rounds, setRounds] = useState([]);
@@ -30,7 +90,6 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
   const sortedPlayers = [...players].sort((a, b) => 
     (b.total_score || 0) - (a.total_score || 0)
   );
-  const champion = sortedPlayers[0];
 
   // Build player map for lookups
   const playerMap = {};
@@ -85,72 +144,13 @@ export default function ShowdownHighlights({ showdown, currentPlayer }) {
     };
   }
 
-  // Build highlight cards from recap data
-  function getHighlightCards() {
-    if (!recap) return [];
-
-    const cards = [];
-
-    // Card 1: The Story (Ripley)
-    if (recap.narrative) {
-      cards.push({
-        type: 'narrative',
-        title: 'The Story',
-        content: recap.narrative
-      });
-    }
-
-    // Card 2: Quote of the Night
-    if (recap.quoteOfTheNight) {
-      cards.push({
-        type: 'quote',
-        title: 'Quote of the Night',
-        data: recap.quoteOfTheNight
-      });
-    }
-
-    // Card 3: For the Runner-Uppers (non-winners only)
-    // Support both old format (superlatives) and new format (runnerUpperAwards)
-    const awards = recap.runnerUpperAwards || recap.superlatives;
-    if (awards?.length > 0) {
-      cards.push({
-        type: 'runnerUppers',
-        title: 'For the Runner-Uppers',
-        data: awards
-      });
-    }
-
-    // Card 4: Brag Check (all players)
-    if (recap.bragChecks?.length > 0) {
-      cards.push({
-        type: 'bragChecks',
-        title: 'Brag Check',
-        data: recap.bragChecks
-      });
-    }
-
-    // Card 5: Final Thoughts (Ripley)
-    if (recap.deepThought) {
-      cards.push({
-        type: 'deep',
-        title: 'Final Thoughts',
-        content: recap.deepThought
-      });
-    }
-
-    return cards;
-  }
-
-  const cards = getHighlightCards();
-  const totalCards = cards.length;
-
-  // Circular navigation
-  function nextCard() {
-    setCurrentCard((currentCard + 1) % totalCards);
-  }
-
-  function prevCard() {
-    setCurrentCard((currentCard - 1 + totalCards) % totalCards);
+  // Get placement icon
+  function getPlacementIcon(placement) {
+    if (placement === 1) return '🥇';
+    if (placement === 2) return '🥈';
+    if (placement === 3) return '🥉';
+    const circleNumbers = ['④', '⑤', '⑥', '⑦', '⑧'];
+    return circleNumbers[placement - 4] || `${placement}.`;
   }
 
   function handleNewShowdown() {
@@ -185,11 +185,36 @@ https://oneupper.app`;
     setShowShareModal(false);
   }
 
-  // Render full results dropdown
-  function renderFullResults() {
+  // Loading state
+  if (isLoading) {
     return (
-      <div className="mt-4 space-y-6">
-        {/* Round by round */}
+      <div className="max-w-md mx-auto mt-4 flex flex-col items-center justify-center" style={{ minHeight: '60vh' }}>
+        <div className="text-4xl mb-4 animate-bounce">🎙️</div>
+        <p className="text-slate-400 text-center">{loadingQuip}</p>
+      </div>
+    );
+  }
+
+  // No recap fallback
+  if (!recap) {
+    return (
+      <div className="max-w-md mx-auto mt-4">
+        <p className="text-slate-400 text-center mb-6">Couldn't load the recap. But hey, you played!</p>
+        <button
+          onClick={handleNewShowdown}
+          className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+        >
+          Start New Showdown
+        </button>
+      </div>
+    );
+  }
+
+  // Render Round by Round content
+  function renderRoundByRound() {
+    return (
+      <div className="mt-4 space-y-4">
+        {/* Round cards */}
         {rounds.map((round) => {
           const answers = round.answers || [];
           const verdict = round.verdict || {};
@@ -207,21 +232,20 @@ https://oneupper.app`;
               <h4 className="text-orange-400 text-sm font-semibold mb-1">
                 Round {round.round_number}
               </h4>
-              <p className="text-slate-400 text-xs mb-2 italic">
-                "{round.prompt_text}"
+              <p className="text-slate-400 text-xs mb-2">
+                {round.prompt_text}
               </p>
               <div className="space-y-1">
                 {sortedAnswers.map((answer, idx) => {
                   const player = playerMap[answer.player_id];
                   const placement = rankings.find(r => r.playerId === answer.player_id)?.placement || idx + 1;
-                  const medal = placement === 1 ? '🥇' : placement === 2 ? '🥈' : placement === 3 ? '🥉' : `${placement}.`;
+                  const icon = getPlacementIcon(placement);
                   
                   return (
                     <div key={answer.id} className="flex items-start gap-2 text-sm">
-                      <span className="w-6 text-center flex-shrink-0">{medal}</span>
-                      <span className="flex-shrink-0">{player?.avatar}</span>
+                      <span className="w-6 text-center flex-shrink-0">{icon}</span>
                       <span className="text-slate-300 flex-1 break-words">
-                        {answer.answer_text || '[crickets]'}
+                        <span className="text-slate-400">{player?.name}:</span> {answer.answer_text || '[crickets]'}
                       </span>
                     </div>
                   );
@@ -236,201 +260,52 @@ https://oneupper.app`;
           );
         })}
 
-        {/* Final standings */}
-        <div>
-          <h3 className="text-orange-400 text-sm font-semibold mb-2">Final Standings</h3>
-          <div className="space-y-2">
-            {sortedPlayers.map((player, index) => {
-              const { name, avatar } = getPlayerDisplay(player);
-              const isMe = player.id === currentPlayer?.id;
-              const placement = index + 1;
-              const medal = placement === 1 ? '🥇' : placement === 2 ? '🥈' : placement === 3 ? '🥉' : `${placement}.`;
-              
-              return (
-                <div key={player.id} className="flex items-center gap-3 bg-slate-700/30 rounded-lg p-2">
-                  <span className="w-8 text-center">{medal}</span>
-                  <span className="text-xl">{avatar}</span>
-                  <span className={`flex-1 ${isMe ? 'text-orange-400' : 'text-slate-200'}`}>
-                    {name}
-                  </span>
-                  <span className="text-slate-400">{player.total_score || 0} pts</span>
-                </div>
-              );
-            })}
-          </div>
+        {/* Score table */}
+        <div className="bg-slate-700/20 rounded-lg p-3">
+          <h4 className="text-orange-400 text-sm font-semibold mb-3">Final Scores</h4>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-slate-500 text-xs">
+                <th className="text-left pb-2"></th>
+                <th className="text-left pb-2"></th>
+                {rounds.map((_, i) => (
+                  <th key={i} className="text-center pb-2 px-1">R{i + 1}</th>
+                ))}
+                <th className="text-right pb-2">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedPlayers.map((player, idx) => {
+                const { name, avatar } = getPlayerDisplay(player);
+                const placement = idx + 1;
+                const icon = getPlacementIcon(placement);
+                
+                // Get round scores
+                const roundScores = rounds.map(round => {
+                  const verdict = round.verdict || {};
+                  const rankings = verdict.rankings || [];
+                  const ranking = rankings.find(r => r.playerId === player.id);
+                  return ranking?.totalPoints || 0;
+                });
+
+                return (
+                  <tr key={player.id} className="text-slate-300">
+                    <td className="py-1 pr-1">{icon}</td>
+                    <td className="py-1 pr-2 font-medium whitespace-nowrap">
+                      {name.length > 10 ? name.slice(0, 10) + '...' : name}
+                    </td>
+                    {roundScores.map((score, i) => (
+                      <td key={i} className="py-1 text-center text-slate-400 px-1">{score}</td>
+                    ))}
+                    <td className="py-1 text-right font-bold">{player.total_score || 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     );
-  }
-
-  // Full-screen loading state
-  if (isLoading) {
-    return (
-      <div className="max-w-md mx-auto mt-4">
-        {/* Title */}
-        <h1 className="text-xl font-bold text-orange-400 text-center mb-8">
-          Highlights
-        </h1>
-
-        {/* Loading content */}
-        <div className="text-center mb-8">
-          {/* Animated clapperboard */}
-          <div className="text-6xl mb-6 animate-pulse">🎬</div>
-          
-          <p className="text-xl text-slate-200 font-medium mb-6">
-            Generating highlights...
-          </p>
-
-          {/* Ripley quip */}
-          <div className="bg-slate-800/80 rounded-xl p-4 mx-4">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xl">🎙️</span>
-              <span className="text-orange-400 font-semibold text-sm">Ripley</span>
-            </div>
-            <p className="text-slate-300 text-sm text-left">{loadingQuip}</p>
-          </div>
-        </div>
-
-        {/* Round by Round dropdown - available even while loading */}
-        <div className="mb-6">
-          <button
-            onClick={() => setShowFullResults(!showFullResults)}
-            className="w-full flex items-center justify-between bg-slate-800/40 rounded-xl p-3 text-slate-300 hover:bg-slate-800/60 transition-colors"
-          >
-            <span className="font-medium">Round by Round</span>
-            <svg 
-              className={`w-5 h-5 transition-transform ${showFullResults ? 'rotate-180' : ''}`} 
-              fill="none" 
-              stroke="currentColor" 
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </button>
-          
-          {showFullResults && (
-            <div className="bg-slate-800/40 rounded-b-xl px-4 pb-4 -mt-2 pt-2">
-              {renderFullResults()}
-            </div>
-          )}
-        </div>
-
-        {/* Action buttons */}
-        <div className="space-y-3">
-          <button
-            onClick={handleNewShowdown}
-            className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
-          >
-            Start New Showdown
-          </button>
-          
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowShareModal(true)}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
-            >
-              Share Results
-            </button>
-            <button
-              onClick={handleDone}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Render a highlight card
-  function renderCard(card) {
-    switch (card.type) {
-      case 'narrative':
-        return (
-          <div className="text-left">
-            {/* Ripley attribution */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">🎙️</span>
-              <span className="text-orange-400 font-semibold">Ripley</span>
-            </div>
-            <p className="text-slate-200 text-base leading-relaxed">
-              {card.content}
-            </p>
-          </div>
-        );
-
-      case 'quote':
-        return (
-          <div className="text-left">
-            <p className="text-slate-400 text-sm mb-3">
-              Round {card.data.round}: "{card.data.prompt}"
-            </p>
-            <div className="bg-slate-700/50 rounded-xl p-4 mb-3">
-              <p className="text-lg text-slate-100 italic leading-relaxed">
-                "{card.data.answer}"
-              </p>
-              <p className="text-orange-400 mt-3 font-medium">
-                — {card.data.playerAvatar} {card.data.player}
-              </p>
-            </div>
-            <p className="text-slate-400 text-sm">
-              {card.data.reaction}
-            </p>
-          </div>
-        );
-
-      case 'runnerUppers':
-        return (
-          <div className="space-y-4 text-left">
-            {card.data.map((award, i) => (
-              <div key={i}>
-                <p className="text-orange-400 font-semibold">
-                  {award.emoji} {award.title}
-                </p>
-                <p className="text-slate-200 text-sm">{award.player}</p>
-                <p className="text-slate-400 text-sm mt-1">{award.explanation}</p>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'bragChecks':
-        return (
-          <div className="space-y-4 text-left">
-            {card.data.map((brag, i) => (
-              <div key={i}>
-                <p className="text-slate-200 font-medium">
-                  {brag.playerAvatar} {brag.player}
-                </p>
-                <p className="text-slate-500 text-sm italic">
-                  Walked in: "{brag.entryBrag}"
-                </p>
-                <p className="text-slate-300 text-sm">
-                  {brag.realityCheck}
-                </p>
-              </div>
-            ))}
-          </div>
-        );
-
-      case 'deep':
-        return (
-          <div className="text-left">
-            {/* Ripley attribution */}
-            <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">🎙️</span>
-              <span className="text-orange-400 font-semibold">Ripley</span>
-            </div>
-            <p className="text-slate-200 text-base leading-relaxed italic">
-              {card.content}
-            </p>
-          </div>
-        );
-
-      default:
-        return null;
-    }
   }
 
   // Share Modal
@@ -451,27 +326,16 @@ https://oneupper.app`;
           <div className="space-y-3">
             <button
               onClick={handleCopyShare}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
             >
-              {copied ? (
-                <>
-                  <span>✓</span>
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <span>📋</span>
-                  <span>Copy to Clipboard</span>
-                </>
-              )}
+              {copied ? '✓ Copied!' : 'Copy'}
             </button>
             
             <button
               onClick={handleTextShare}
-              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
             >
-              <span>💬</span>
-              <span>Share via Text</span>
+              Share via Text
             </button>
             
             <button
@@ -486,74 +350,100 @@ https://oneupper.app`;
     );
   }
 
+  // Calculate animation delays
+  const storyDelay = 0;
+  const oneUpDelay = 400;
+  const playerRecapsStartDelay = 800;
+  const finalThoughtsDelay = playerRecapsStartDelay + 600;
+  const roundByRoundDelay = finalThoughtsDelay + 300;
+  const buttonsDelay = roundByRoundDelay + 300;
+
   return (
-    <div className="max-w-md mx-auto mt-4">
+    <div className="max-w-md mx-auto mt-4 pb-6">
       {/* Share Modal */}
       {renderShareModal()}
 
-      {/* Title */}
-      <h1 className="text-xl font-bold text-orange-400 text-center mb-4">
-        Highlights
-      </h1>
-
-      {/* Card area - takes up most of the screen */}
-      <div className="bg-slate-800/60 rounded-xl p-4 mb-4" style={{ minHeight: '320px' }}>
-        {cards.length > 0 ? (
-          <>
-            {/* Card title */}
-            <h2 className="text-orange-400 font-semibold text-sm mb-4 text-center">
-              {cards[currentCard]?.title}
-            </h2>
-            
-            {/* Card content with centered arrows */}
-            <div className="flex items-center gap-2">
-              {/* Left arrow */}
-              <button
-                onClick={prevCard}
-                className="p-1 flex-shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              
-              {/* Card content */}
-              <div className="flex-1 min-h-[240px] flex flex-col justify-center">
-                {renderCard(cards[currentCard])}
-              </div>
-              
-              {/* Right arrow */}
-              <button
-                onClick={nextCard}
-                className="p-1 flex-shrink-0 text-slate-400 hover:text-slate-200 transition-colors"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Card counter */}
-            <p className="text-center text-slate-500 text-xs mt-3">
-              {currentCard + 1} of {totalCards}
-            </p>
-          </>
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-slate-500">No highlights available</p>
+      {/* The Story */}
+      {recap.narrative && (
+        <div 
+          className="mb-8 animate-reveal"
+          style={{ animationDelay: `${storyDelay}ms` }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🎙️</span>
+            <span className="text-orange-400 font-semibold text-sm">The Story</span>
           </div>
-        )}
-      </div>
+          <p className="text-slate-200 text-sm leading-relaxed">
+            {recap.narrative}
+          </p>
+        </div>
+      )}
 
-      {/* Round by Round dropdown */}
-      <div className="mb-4">
+      {/* The One-Up */}
+      {recap.theOneUp && (
+        <div 
+          className="mb-8 animate-reveal"
+          style={{ animationDelay: `${oneUpDelay}ms` }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-xl">🎤</span>
+            <span className="text-orange-400 font-semibold text-sm">The One-Up</span>
+          </div>
+          
+          <p className="text-2xl font-bold text-slate-100 mb-2">
+            {recap.theOneUp.answer}
+          </p>
+          <p className="text-slate-400 text-sm mb-3">
+            — {recap.theOneUp.player}
+          </p>
+          
+          <p className="text-slate-500 text-xs mb-2">
+            Responding to: {recap.theOneUp.prompt}
+          </p>
+          <p className="text-slate-300 text-sm">
+            {recap.theOneUp.commentary}
+          </p>
+        </div>
+      )}
+
+      {/* Player Recaps - Carousel */}
+      {recap.playerRecaps?.length > 0 && (
+        <div className="mb-8">
+          <PlayerRecapCarousel 
+            recaps={recap.playerRecaps} 
+            animationDelay={playerRecapsStartDelay}
+          />
+        </div>
+      )}
+
+      {/* Final Thoughts */}
+      {recap.finalThoughts && (
+        <div 
+          className="mb-8 animate-reveal"
+          style={{ animationDelay: `${finalThoughtsDelay}ms` }}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">🎙️</span>
+            <span className="text-orange-400 font-semibold text-sm">Final Thoughts</span>
+          </div>
+          <p className="text-slate-300 text-sm leading-relaxed">
+            {recap.finalThoughts}
+          </p>
+        </div>
+      )}
+
+      {/* Round by Round (expandable) */}
+      <div 
+        className="mb-6 animate-reveal"
+        style={{ animationDelay: `${roundByRoundDelay}ms` }}
+      >
         <button
-          onClick={() => setShowFullResults(!showFullResults)}
+          onClick={() => setShowRoundByRound(!showRoundByRound)}
           className="w-full flex items-center justify-between bg-slate-800/40 rounded-xl p-3 text-slate-300 hover:bg-slate-800/60 transition-colors"
         >
           <span className="font-medium">Round by Round</span>
           <svg 
-            className={`w-5 h-5 transition-transform ${showFullResults ? 'rotate-180' : ''}`} 
+            className={`w-5 h-5 transition-transform ${showRoundByRound ? 'rotate-180' : ''}`} 
             fill="none" 
             stroke="currentColor" 
             viewBox="0 0 24 24"
@@ -562,15 +452,18 @@ https://oneupper.app`;
           </svg>
         </button>
         
-        {showFullResults && (
+        {showRoundByRound && (
           <div className="bg-slate-800/40 rounded-b-xl px-4 pb-4 -mt-2 pt-2">
-            {renderFullResults()}
+            {renderRoundByRound()}
           </div>
         )}
       </div>
 
       {/* Action buttons */}
-      <div className="space-y-3">
+      <div 
+        className="space-y-3 animate-reveal"
+        style={{ animationDelay: `${buttonsDelay}ms` }}
+      >
         <button
           onClick={handleNewShowdown}
           className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
@@ -583,7 +476,7 @@ https://oneupper.app`;
             onClick={() => setShowShareModal(true)}
             className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold py-3 px-4 rounded-xl transition-colors"
           >
-            Share Results
+            Share
           </button>
           <button
             onClick={handleDone}
@@ -593,6 +486,24 @@ https://oneupper.app`;
           </button>
         </div>
       </div>
+
+      {/* CSS for animations */}
+      <style>{`
+        @keyframes reveal {
+          from { 
+            opacity: 0; 
+            transform: translateY(12px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        .animate-reveal {
+          opacity: 0;
+          animation: reveal 0.4s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 }

@@ -85,7 +85,6 @@ serve(async (req) => {
       playerMap[p.id] = {
         name: p.guest_name || 'Player',
         avatar: p.guest_avatar || '😎',
-        entryBrag: p.entry_brag || '',
         totalScore: p.total_score || 0
       }
     })
@@ -117,16 +116,11 @@ serve(async (req) => {
       return {
         roundNumber: round.round_number,
         prompt: round.prompt_text,
-        answers: answerDetails,
-        bonusWinner: verdict.bonusWinner ? {
-          player: playerMap[verdict.bonusWinner.playerId]?.name,
-          category: verdict.bonusWinner.categoryDisplay
-        } : null,
-        bestGuesser: round.best_guesser_id ? playerMap[round.best_guesser_id]?.name : null
+        answers: answerDetails
       }
     })
 
-    // Build player summaries
+    // Build player summaries for AI context
     const playerSummaries = sortedPlayers.map((p: any, index: number) => {
       const player = playerMap[p.id]
       
@@ -136,112 +130,89 @@ serve(async (req) => {
         return rankings[0]?.playerId === p.id
       }).length
 
-      // Find their best answer (1st place finishes)
-      const bestAnswers = rounds.map((r: any) => {
-        const rankings = r.verdict?.rankings || []
-        const answer = r.answers?.find((a: any) => a.player_id === p.id)
-        const placement = rankings.find((rank: any) => rank.playerId === p.id)?.placement
-        if (placement === 1 && answer) {
-          return { round: r.round_number, prompt: r.prompt_text, answer: answer.answer_text }
-        }
-        return null
-      }).filter(Boolean)
-
       return {
         name: player.name,
         avatar: player.avatar,
-        entryBrag: player.entryBrag,
         finalPlace: index + 1,
         totalScore: player.totalScore,
-        roundWins,
-        bestAnswers
+        roundWins
       }
     })
 
     // Pick a random prompt for the share message
     const randomRound = rounds[Math.floor(Math.random() * rounds.length)]
-    const sharePrompt = randomRound?.prompt_text || "What's your best one-upper moment?"
+    const sharePrompt = randomRound?.prompt_text || "Think you can one-up your friends?"
 
     // Build the AI prompt
-    const nonWinners = playerSummaries.filter(p => p.finalPlace !== 1)
-    const prompt = `You're Ripley, the witty host recapping a party game called "One-Upper" where players tried to out-do each other with outlandish answers to prompts.
+    const prompt = `You're Ripley, the witty host recapping a party game called "One-Upper" where players tried to out-do each other with creative, outlandish answers.
 
 THE SHOWDOWN DATA:
 
-PLAYERS (in final standing order):
-${playerSummaries.map((p, i) => `${i + 1}. ${p.name} (${p.avatar}) - ${p.totalScore} pts, ${p.roundWins} round wins
-   Entry brag: "${p.entryBrag}"
-   ${p.bestAnswers.length > 0 ? `Best moment: Round ${p.bestAnswers[0].round} - "${p.bestAnswers[0].answer}"` : 'No round wins'}`).join('\n')}
+PLAYERS (final standings):
+${playerSummaries.map((p, i) => `${i + 1}. ${p.name} - ${p.totalScore} pts, ${p.roundWins} round wins`).join('\n')}
 
 ROUND BY ROUND:
 ${roundSummaries.map(r => `
 Round ${r.roundNumber}: "${r.prompt}"
-${r.answers.map((a: any) => `  ${a.placement}. ${a.player}: "${a.answer}"`).join('\n')}
-  Bonus: ${r.bonusWinner ? `${r.bonusWinner.category} → ${r.bonusWinner.player}` : 'None'}
-`).join('\n')}
+${r.answers.map((a: any) => `  ${a.placement}. ${a.player}: "${a.answer}"`).join('\n')}`).join('\n')}
 
 CHAMPION: ${championName}
-RUNNER-UPPERS (non-winners): ${nonWinners.map(p => p.name).join(', ')}
 
-YOUR TASK - Generate these highlight cards:
+---
 
-1. NARRATIVE (2-3 sentences): Tell the story of this showdown. Reference specific moments. Sports commentary meets comedy roast. This is YOU (Ripley) speaking.
+YOUR TASK - Generate a recap with these sections:
 
-2. QUOTE OF THE NIGHT: Pick THE single funniest answer from ANY player. Include:
+1. NARRATIVE: Tell the story of this showdown in EXACTLY 2 sentences - no more. Be specific - reference actual answers and moments. Edgy sports commentary meets comedy roast. You (Ripley) are speaking. Keep it punchy.
+
+2. THE ONE-UP: Pick THE single funniest/best answer from the entire showdown (any player, any placement - doesn't have to be a winner). This is the moment everyone will remember.
    - round (number)
-   - prompt (the question)
-   - answer (verbatim)
+   - prompt (the question asked)
+   - answer (verbatim - the answer given)
    - player (who said it)
-   - playerAvatar (their emoji)
-   - reaction (1 pithy sentence)
+   - commentary (1 punchy sentence - why this was THE moment)
 
-3. RUNNER-UPPER AWARDS: Give awards ONLY to non-winners (${nonWinners.map(p => p.name).join(', ')}). DO NOT include ${championName}. Each non-winner gets a fun award:
+3. PLAYER RECAPS: One for EACH player, in final standing order (${sortedPlayers.map(p => playerMap[p.id].name).join(', ')}). Each gets:
    - player (name)
-   - emoji (a fun icon for this award, like 🎯 or 👻 or 🎪)
-   - title (creative award name like "The Shoe Chaos Architect")
-   - explanation (1 sentence why they earned it)
-   Even players who didn't answer much should get something - be creative!
+   - title (creative 2-4 word award/title, like "The Chaos Architect" or "The Accidental Genius")
+   - roast (1 sentence about HOW THEY PLAYED - specific to their answers/performance tonight)
+   - psychTake (1 sentence about WHAT THEIR ANSWERS REVEAL about them as a person - pop psychology, personality read)
 
-4. BRAG CHECK: Include ALL players. Compare their entry brag to their performance. Each gets:
-   - player (name)
-   - playerAvatar (their emoji)
-   - entryBrag (what they said walking in)
-   - realityCheck (1 SHORT sentence - punchy, not mean)
+   CRITICAL: "roast" and "psychTake" MUST be different:
+   - roast = their PERFORMANCE (what they did)
+   - psychTake = their PERSONALITY (who they are)
+   
+   BAD (too similar):
+     roast: "Caused maximum chaos"
+     psychTake: "Loves chaos"
+   
+   GOOD (distinct):
+     roast: "Won 4 rounds with answers that made judges uncomfortable"
+     psychTake: "Has the energy of someone who's been asked to leave a PTA meeting"
 
-5. DEEP THOUGHT (2-3 sentences): A slightly profound observation about what these answers revealed, then undercut it. This is YOU (Ripley) closing the show.
+4. FINAL THOUGHTS: Exactly 2 sentences. A slightly profound observation about what tonight revealed, then undercut it with humor. You (Ripley) are closing the show.
 
-TONE: Funny, specific, never mean-spirited. You're celebrating chaos, not mocking players.
+TONE: Witty, specific, celebratory. You're roasting friends at a party, not being mean. Reference actual answers when possible.
 
-CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
+CRITICAL: Return ONLY valid JSON. No markdown, no backticks, no explanation.
 
 {
-  "narrative": "string (Ripley speaking)",
-  "quoteOfTheNight": {
-    "round": 1,
+  "narrative": "string",
+  "theOneUp": {
+    "round": number,
     "prompt": "string",
     "answer": "string",
     "player": "string",
-    "playerAvatar": "string",
-    "reaction": "string"
+    "commentary": "string"
   },
-  "runnerUpperAwards": [
+  "playerRecaps": [
     {
       "player": "string",
-      "emoji": "string",
       "title": "string",
-      "explanation": "string"
+      "roast": "string",
+      "psychTake": "string"
     }
   ],
-  "bragChecks": [
-    {
-      "player": "string",
-      "playerAvatar": "string",
-      "entryBrag": "string",
-      "realityCheck": "string"
-    }
-  ],
-  "deepThought": "string (Ripley's closing)",
-  "sharePrompt": "${sharePrompt}"
+  "finalThoughts": "string"
 }`
 
     // Call Claude API
@@ -254,7 +225,7 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 2048,
+        max_tokens: 1500,
         messages: [
           { role: 'user', content: prompt }
         ]
@@ -286,8 +257,17 @@ CRITICAL: Return ONLY valid JSON. No markdown, no backticks.
       )
     }
 
-    // Add the share prompt to the recap (in case AI didn't include it)
-    recap.sharePrompt = recap.sharePrompt || sharePrompt
+    // Add player avatars to recaps (we have this data, no need for AI to generate)
+    recap.playerRecaps = recap.playerRecaps.map((pr: any) => {
+      const player = sortedPlayers.find(p => playerMap[p.id].name === pr.player)
+      return {
+        ...pr,
+        avatar: player ? playerMap[player.id].avatar : '😎'
+      }
+    })
+
+    // Add the share prompt
+    recap.sharePrompt = sharePrompt
 
     // Store recap in showdown
     const { error: updateError } = await supabase

@@ -216,6 +216,9 @@ serve(async (req) => {
 
     // Use judges directly (they're already full objects)
     const sortedJudges = judges
+    
+    // Shuffle judges for banter order (different order each round)
+    const shuffledJudgesForBanter = [...judges].sort(() => Math.random() - 0.5)
 
     // Create answer mapping (A, B, C, etc.) and letter-to-name mapping
     const answerLabels = 'ABCDEFGHIJ'.split('')
@@ -275,10 +278,10 @@ Return ONLY valid JSON. No markdown, no backticks, no explanation.
     "${sortedJudges[2].key}": ${rankingExample}
   },
   "banterMessages": [
-    { "judgeKey": "${sortedJudges[0].key}", "comment": "..." },
-    { "judgeKey": "${sortedJudges[1].key}", "comment": "..." },
-    { "judgeKey": "${sortedJudges[2].key}", "comment": "..." },
-    { "judgeKey": "${sortedJudges[0].key}", "comment": "..." }
+    { "judgeKey": "${shuffledJudgesForBanter[0].key}", "comment": "..." },
+    { "judgeKey": "${shuffledJudgesForBanter[1].key}", "comment": "..." },
+    { "judgeKey": "${shuffledJudgesForBanter[2].key}", "comment": "..." },
+    { "judgeKey": "${shuffledJudgesForBanter[0].key}", "comment": "..." }
   ],
   "bonusWinner": {
     "answer": "A",
@@ -298,17 +301,19 @@ RULES:
 
 1. JUDGE RANKINGS: Each judge ranks ALL ${answers.length} answers independently based on their personality. Rankings CAN disagree - that's the fun.
 
-2. BANTER: Exactly 4 comments players will READ ALOUD. Each comment:
+2. BANTER: Exactly 4 comments that read like a conversation between judges. Each comment:
    - MAX 12 words, one sentence
    - Make them laugh, gasp, or groan
    - Reference answers by letter (A, B, C...)
+   - Each judge should have a DIFFERENT take or observation - no repetition
+   - Build on or react to what the previous judge said (like real banter)
    - Playful roasts welcome, mean burns not
    - DO NOT reveal who wins
    - End with anticipation ("This'll be close...")
 
-3. BONUS: ${bonusInstruction} Reason in 6 words max.
+3. BONUS: ${bonusInstruction} Reason in 6 words max. TIP: Consider giving this to someone OTHER than the 1st place winner - spread the love and make it interesting.
 
-4. WINNER REACTIONS: Each judge's take on their #1 pick. 8 words max each.
+4. WINNER REACTIONS: Each judge's take on their #1 pick. 8 words max each. Be creative - don't repeat words or phrases between judges.
 
 5. LAST PLACE ROAST: Start with the answer letter (e.g., "A tried but..."). Gentle, playful dig. 10 words max. Funny, not cruel.
 

@@ -1,41 +1,26 @@
 import { useState, useEffect } from 'react';
 import { generateShowdownRecap } from '../../services/showdown';
 
-// Ripley quips for winners
-const WINNER_QUIPS = [
-  "Absolutely dominant!",
-  "The One-Upper has been crowned!",
-  "That's how it's done!",
-  "You understood the assignment.",
-  "Take a bow!",
+// Ripley quips - same pool for everyone, about the showdown overall
+const RIPLEY_QUIPS = [
+  "What a showdown!",
   "The judges have spoken!",
-  "Remember this moment.",
-  "Champion energy right there.",
-  "You came to play!",
-  "Bow down, everyone.",
-];
-
-// Ripley quips for non-winners
-const NON_WINNER_QUIPS = [
-  "Tough crowd tonight!",
-  "You'll get 'em next time.",
-  "Hey, someone had to lose.",
-  "The judges are harsh. We know.",
-  "Shake it off.",
-  "There's always next showdown.",
-  "Not your night. It happens.",
-  "The real win was the chaos we caused.",
-  "Can't win 'em all.",
-  "You made it weird. That counts.",
+  "That was a battle.",
+  "Everyone brought their A-game.",
+  "Some real creativity out there.",
+  "The scores don't lie.",
+  "That's a wrap!",
+  "Until next time...",
+  "You all made it weird. That counts.",
+  "Champions are made in moments like these.",
+  "The crowd goes wild!",
+  "History has been made.",
+  "Take notes, everyone.",
 ];
 
 export default function ShowdownChampion({ showdown, currentPlayer, isHost, onContinue }) {
   const [showConfetti, setShowConfetti] = useState(false);
   const [trophySettled, setTrophySettled] = useState(false);
-  const [ripleyQuip] = useState(() => {
-    // Will be set properly once we know if player is winner
-    return '';
-  });
   
   const players = showdown.players || [];
   
@@ -48,16 +33,9 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
   const winners = sortedPlayers.filter(p => (p.total_score || 0) === topScore);
   const isMultipleWinners = winners.length > 1;
   const iAmWinner = winners.some(w => w.id === currentPlayer?.id);
-  
-  // Get my placement
-  const myPlayer = players.find(p => p.id === currentPlayer?.id);
-  const myPlacement = myPlayer ? getPlacement(myPlayer) : 999;
 
-  // Pick a random Ripley quip based on winner status
-  const [selectedQuip] = useState(() => {
-    const pool = iAmWinner ? WINNER_QUIPS : NON_WINNER_QUIPS;
-    return pool[Math.floor(Math.random() * pool.length)];
-  });
+  // Pick a consistent Ripley quip based on showdown id
+  const selectedQuip = RIPLEY_QUIPS[showdown.id?.charCodeAt(0) % RIPLEY_QUIPS.length] || RIPLEY_QUIPS[0];
 
   // Get player display info
   function getPlayerDisplay(player) {
@@ -73,7 +51,7 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
     return sortedPlayers.filter(p => (p.total_score || 0) > score).length + 1;
   }
 
-  // Winner's name for non-winners to see
+  // Winner's name for headline
   const winnerName = winners.length === 1 
     ? getPlayerDisplay(winners[0]).name 
     : winners.map(w => getPlayerDisplay(w).name).join(' & ');
@@ -81,56 +59,52 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
   // Pre-fetch recap in background so it's ready when user advances
   useEffect(() => {
     if (!showdown.recap) {
-      // Start generating recap in background
       generateShowdownRecap(showdown.id).catch(err => {
         console.log('Background recap generation started:', err?.message || 'in progress');
       });
     }
   }, [showdown.id, showdown.recap]);
 
-  // Start confetti for winner, trigger trophy settle animation
+  // Start confetti for winner only, trigger trophy settle animation
   useEffect(() => {
     if (iAmWinner) {
       setShowConfetti(true);
-      // Trophy settles after 2 seconds
       const settleTimer = setTimeout(() => setTrophySettled(true), 2000);
-      // Confetti stops after 5 seconds
       const confettiTimer = setTimeout(() => setShowConfetti(false), 5000);
       return () => {
         clearTimeout(settleTimer);
         clearTimeout(confettiTimer);
       };
     } else {
-      // Non-winners see settled state immediately
       setTrophySettled(true);
     }
   }, [iAmWinner]);
 
-  // Render placement indicator based on position
-  function renderPlacementIndicator(placement, isLarge = false) {
-    if (placement === 1) {
-      return (
-        <div className={`${isLarge ? 'text-7xl' : 'text-4xl'} ${isLarge && !trophySettled && iAmWinner ? 'animate-bounce' : ''}`}>
-          🏆
-        </div>
-      );
-    }
-    if (placement === 2) {
-      return <div className={isLarge ? 'text-6xl' : 'text-3xl'}>🥈</div>;
-    }
-    if (placement === 3) {
-      return <div className={isLarge ? 'text-6xl' : 'text-3xl'}>🥉</div>;
-    }
-    // 4th and 5th get muted boxes
-    return (
-      <div className={`${isLarge ? 'w-16 h-16 text-3xl' : 'w-10 h-10 text-xl'} bg-slate-700/50 rounded-lg flex items-center justify-center text-slate-400 font-bold`}>
-        {placement}
-      </div>
-    );
+  // Get placement indicator
+  function getPlacementIcon(placement) {
+    if (placement === 1) return '🏆';
+    if (placement === 2) return '🥈';
+    if (placement === 3) return '🥉';
+    // Circle numbers for 4th and 5th
+    const circleNumbers = ['④', '⑤', '⑥', '⑦', '⑧'];
+    return circleNumbers[placement - 4] || `${placement}`;
   }
 
+  // Get card background based on placement
+  function getCardBg(placement) {
+    if (placement === 1) return 'bg-yellow-500/20';
+    if (placement === 2) return 'bg-slate-400/20';
+    if (placement === 3) return 'bg-amber-700/20';
+    return 'bg-slate-800/30';
+  }
+
+  // Calculate animation delays
+  const lastPlayerDelay = 500 + ((sortedPlayers.length - 1) * 200);
+  const ripleyDelay = lastPlayerDelay + 600;
+  const buttonDelay = ripleyDelay + 400;
+
   return (
-    <div className="max-w-md mx-auto mt-4 flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
+    <div className="max-w-md mx-auto mt-4">
       {/* Confetti - winner only */}
       {showConfetti && (
         <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
@@ -149,98 +123,84 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
               {['🎉', '✨', '⭐', '🌟', '💫', '🎊', '🏆', '👑'][Math.floor(Math.random() * 8)]}
             </div>
           ))}
-          <style>{`
-            @keyframes fall {
-              0% { transform: translateY(0) rotate(0deg); opacity: 1; }
-              100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
-            }
-            .animate-fall { animation: fall linear forwards; }
-          `}</style>
         </div>
       )}
 
-      {/* Main content area */}
-      <div className="flex-grow flex flex-col justify-center text-center pb-4">
-        
-        {/* Placement indicator */}
-        <div className="flex justify-center mb-3">
-          {renderPlacementIndicator(myPlacement, true)}
+      {/* Trophy - winner only, appears immediately */}
+      {iAmWinner && (
+        <div 
+          className={`text-center mb-2 ${!trophySettled ? 'animate-bounce' : ''}`}
+        >
+          <span className="text-7xl">🏆</span>
         </div>
+      )}
 
-        {/* Title - different for winner vs others */}
-        {iAmWinner ? (
-          <h1 className="text-3xl font-bold text-yellow-400 mb-2">
-            You Won!
-          </h1>
-        ) : (
-          <h1 className="text-2xl font-bold text-slate-100 mb-2">
-            {isMultipleWinners ? `${winnerName} Tie!` : `${winnerName} Wins!`}
-          </h1>
-        )}
+      {/* Headline - same for everyone */}
+      <h1 
+        className="text-2xl font-bold text-center mb-6 animate-reveal"
+        style={{ animationDelay: iAmWinner ? '300ms' : '0ms' }}
+      >
+        <span className={iAmWinner ? 'text-yellow-400' : 'text-slate-100'}>
+          {isMultipleWinners ? `${winnerName} Tie!` : `${winnerName} Wins!`}
+        </span>
+      </h1>
 
-        {/* Show my info for non-winners */}
-        {!iAmWinner && myPlayer && (
-          <div className="mt-2 mb-4">
-            <div className="text-3xl mb-1">{getPlayerDisplay(myPlayer).avatar}</div>
-            <p className="text-orange-400 font-medium">{getPlayerDisplay(myPlayer).name}</p>
-            <p className="text-slate-400 text-sm">{myPlayer.total_score || 0} points</p>
-          </div>
-        )}
-
-        {/* Winner shows their avatar and score */}
-        {iAmWinner && myPlayer && (
-          <div className="mb-4">
-            <div className="text-4xl mb-1">{getPlayerDisplay(myPlayer).avatar}</div>
-            <p className="text-orange-400 font-medium text-lg">{getPlayerDisplay(myPlayer).name}</p>
-            <p className="text-slate-400">{myPlayer.total_score || 0} points</p>
-          </div>
-        )}
-
-        {/* Full Leaderboard */}
-        <div className="bg-slate-800/50 rounded-xl p-4 mb-4 mx-2">
-          <div className="space-y-2">
-            {sortedPlayers.map((player) => {
-              const { name, avatar } = getPlayerDisplay(player);
-              const isMe = player.id === currentPlayer?.id;
-              const placement = getPlacement(player);
-              const score = player.total_score || 0;
-              const isWinner = placement === 1;
-              
-              return (
-                <div 
-                  key={player.id} 
-                  className={`flex items-center justify-between p-2 rounded-lg ${isMe ? 'bg-slate-700/50' : ''}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 flex justify-center">
-                      {renderPlacementIndicator(placement, false)}
-                    </div>
-                    <span className="text-xl">{avatar}</span>
-                    <span className={`font-medium ${isMe ? 'text-orange-400' : isWinner ? 'text-yellow-400' : 'text-slate-200'}`}>
-                      {name}
-                    </span>
-                  </div>
-                  <span className={`font-bold ${isWinner ? 'text-yellow-400' : 'text-slate-400'}`}>
-                    {score} pts
+      {/* Player cards - each shaded by placement */}
+      <div className="space-y-2 mb-6">
+        {sortedPlayers.map((player, index) => {
+          const { name, avatar } = getPlayerDisplay(player);
+          const placement = getPlacement(player);
+          const score = player.total_score || 0;
+          const delay = 500 + (index * 200);
+          
+          return (
+            <div
+              key={player.id}
+              className={`rounded-xl p-3 animate-reveal ${getCardBg(placement)}`}
+              style={{ animationDelay: `${delay}ms` }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`text-2xl ${placement > 3 ? 'text-slate-500' : ''}`}>
+                    {getPlacementIcon(placement)}
+                  </span>
+                  <span className="text-xl">{avatar}</span>
+                  <span className={`font-medium ${
+                    placement === 1 ? 'text-yellow-400' : 'text-slate-100'
+                  }`}>
+                    {name}
                   </span>
                 </div>
-              );
-            })}
-          </div>
-        </div>
+                <span className={`font-bold ${
+                  placement === 1 ? 'text-yellow-400' : 'text-slate-300'
+                }`}>
+                  {score} pts
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
-        {/* Ripley quip */}
-        <div className="bg-slate-800/80 rounded-xl p-4 mx-2 mb-4">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl">🎙️</span>
+      {/* Ripley quip */}
+      <div 
+        className="bg-slate-800/50 rounded-xl p-4 mb-6 animate-reveal"
+        style={{ animationDelay: `${ripleyDelay}ms` }}
+      >
+        <div className="flex items-start gap-3">
+          <span className="text-xl">🎙️</span>
+          <div>
             <span className="text-orange-400 font-semibold text-sm">Ripley</span>
+            <p className="text-slate-300 text-sm mt-1">{selectedQuip}</p>
           </div>
-          <p className="text-slate-300 text-sm">{selectedQuip}</p>
         </div>
       </div>
 
       {/* Continue button */}
-      <div className="mt-auto">
+      <div 
+        className="animate-reveal"
+        style={{ animationDelay: `${buttonDelay}ms` }}
+      >
         {isHost ? (
           <button
             onClick={onContinue}
@@ -257,6 +217,38 @@ export default function ShowdownChampion({ showdown, currentPlayer, isHost, onCo
           </button>
         )}
       </div>
+
+      {/* CSS for animations */}
+      <style>{`
+        @keyframes fall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes reveal {
+          from { 
+            opacity: 0; 
+            transform: translateY(12px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        .animate-fall { 
+          animation: fall linear forwards; 
+        }
+        .animate-reveal {
+          opacity: 0;
+          animation: reveal 0.4s ease-out forwards;
+        }
+        .animate-bounce {
+          animation: bounce 1s ease-in-out infinite;
+        }
+        @keyframes bounce {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-20px); }
+        }
+      `}</style>
     </div>
   );
 }

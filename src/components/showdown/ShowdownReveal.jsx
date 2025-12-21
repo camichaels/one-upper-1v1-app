@@ -25,12 +25,8 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
   const [revealedBanterItems, setRevealedBanterItems] = useState([]);
   const [banterButtonReady, setBanterButtonReady] = useState(false);
   
-  // Animation states for rankings phase (NEW - judge-by-judge reveal)
+  // Animation states for rankings phase
   const [rankingsKey, setRankingsKey] = useState(null);
-  const [revealedJudges, setRevealedJudges] = useState([]);
-  const [standings, setStandings] = useState([]);
-  const [leaderboardFlash, setLeaderboardFlash] = useState(false);
-  const [showWinner, setShowWinner] = useState(false);
   
   const confettiRef = useRef(false);
   const rankingsInitRef = useRef(null);
@@ -59,51 +55,6 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
   function truncateName(name, maxLength = 8) {
     if (name.length <= maxLength) return name;
     return name.slice(0, maxLength) + '...';
-  }
-
-  // Calculate standings from judge rankings using Borda count
-  // judgeRankingsObj is keyed by judge key, each value is array of { playerId, playerName, placement }
-  function calculateStandingsFromJudgeKeys(revealedJudgeKeys, judgeRankingsObj) {
-    const pointTotals = {};
-    
-    // Initialize all players with 0 points
-    players.forEach(p => {
-      pointTotals[p.id] = 0;
-    });
-    
-    // Add points from each revealed judge
-    // Points: 1st gets N points, last gets 1 (where N = player count)
-    const playerCount = players.length;
-    
-    revealedJudgeKeys.forEach(judgeKey => {
-      const rankings = judgeRankingsObj[judgeKey];
-      if (rankings && Array.isArray(rankings)) {
-        rankings.forEach((ranking) => {
-          // ranking is { playerId, playerName, placement }
-          // Points: position 1 gets playerCount points, position N gets 1
-          const points = playerCount - ranking.placement + 1;
-          pointTotals[ranking.playerId] = (pointTotals[ranking.playerId] || 0) + points;
-        });
-      }
-    });
-    
-    // Convert to array and sort
-    const standingsArray = Object.entries(pointTotals)
-      .map(([playerId, points]) => ({ playerId, points }))
-      .sort((a, b) => b.points - a.points);
-    
-    // Assign placements (handle ties)
-    standingsArray.forEach((standing, index) => {
-      if (index === 0) {
-        standing.placement = 1;
-      } else if (standing.points === standingsArray[index - 1].points) {
-        standing.placement = standingsArray[index - 1].placement;
-      } else {
-        standing.placement = index + 1;
-      }
-    });
-    
-    return standingsArray;
   }
 
   // Calculate guess results and fetch guess data on mount
@@ -248,7 +199,7 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     
   }, [revealPhase, round.id, verdict.banterMessages]);
 
-  // NEW: Staged reveal animation for rankings phase (judge-by-judge)
+  // NEW: Sequential reveal animation for rankings phase
   useEffect(() => {
     if (revealPhase !== 'rankings') {
       // Reset when leaving rankings phase
@@ -272,79 +223,25 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     rankingsTimersRef.current = [];
     
     // Reset animation state
-    setRankingsKey(null);
-    setShowWinner(false);
     confettiRef.current = false;
+    setRankingsKey(initKey);
     
-    // Get judge rankings from verdict - keyed by judge.key
-    const judgeRankingsObj = verdict.judgeRankings || {};
-    const judgeKeys = Object.keys(judgeRankingsObj);
-    const numJudges = Math.min(judgeKeys.length, 3);
-    
-    if (numJudges === 0) {
-      // No judge data yet, show fallback
-      setRankingsKey(initKey);
-      setRevealedJudges([]);
-      setStandings(players.map((p, i) => ({ playerId: p.id, points: 0, placement: i + 1 })));
-      return;
-    }
-    
-    // Start with Judge 1 already revealed
-    const initialStandings = calculateStandingsFromJudgeKeys([judgeKeys[0]], judgeRankingsObj);
-    setRevealedJudges([judgeKeys[0]]);
-    setStandings(initialStandings);
-    
-    // Allow render
+    // Fire confetti for winner after headline appears
     rankingsTimersRef.current.push(setTimeout(() => {
-      setRankingsKey(initKey);
-    }, 50));
-    
-    // Reveal subsequent judges with animation
-    for (let i = 1; i < numJudges; i++) {
-      const isLastJudge = i === numJudges - 1;
-      const delay = i * 2000; // 2s between each judge
-      const judgeKey = judgeKeys[i];
-      
-      rankingsTimersRef.current.push(setTimeout(() => {
-        // Add judge to revealed list
-        setRevealedJudges(prev => [...prev, judgeKey]);
-        
-        // Flash leaderboard
-        setLeaderboardFlash(true);
-        
-        // Update standings after flash
-        setTimeout(() => {
-          const revealedSoFar = judgeKeys.slice(0, i + 1);
-          const newStandings = calculateStandingsFromJudgeKeys(revealedSoFar, judgeRankingsObj);
-          setStandings(newStandings);
-          
-          setTimeout(() => {
-            setLeaderboardFlash(false);
-            
-            // If last judge, show winner after dramatic pause
-            if (isLastJudge) {
-              setTimeout(() => {
-                setShowWinner(true);
-                
-                // Confetti for winner
-                const winnerId = newStandings[0]?.playerId;
-                if (winnerId === currentPlayer?.id && !confettiRef.current) {
-                  confettiRef.current = true;
-                  confetti({
-                    particleCount: 100,
-                    spread: 70,
-                    origin: { y: 0.3 }
-                  });
-                }
-              }, 800);
-            }
-          }, 300);
-        }, 200);
-      }, delay));
-    }
+      const rankings = verdict.rankings || [];
+      const winnerId = rankings[0]?.playerId;
+      if (winnerId === currentPlayer?.id && !confettiRef.current) {
+        confettiRef.current = true;
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.3 }
+        });
+      }
+    }, 400));
     
     return () => rankingsTimersRef.current.forEach(t => clearTimeout(t));
-  }, [revealPhase, round.id, verdict.judgeRankings, players, currentPlayer?.id]);
+  }, [revealPhase, round.id, verdict.rankings, currentPlayer?.id]);
 
   // Fire confetti for best guesser
   useEffect(() => {
@@ -625,10 +522,16 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     );
   }
 
-  // Phase 3: Rankings - NEW judge-by-judge reveal with leaderboard shuffle
+  // Phase 3: Rankings - The Verdict
   if (revealPhase === 'rankings') {
+    const rankings = verdict.rankings || [];
     const judgeRankingsObj = verdict.judgeRankings || {};
-    const winnerName = standings[0] ? getPlayerDisplay(standings[0].playerId).name : 'Unknown';
+    const judgeKeys = Object.keys(judgeRankingsObj);
+    
+    // Get winner info
+    const winner = rankings[0];
+    const winnerName = winner ? getPlayerDisplay(winner.playerId).name : 'Unknown';
+    const isWinnerMe = winner?.playerId === currentPlayer?.id;
     
     // Circle numbers for rankings
     const circleNumbers = ['①', '②', '③', '④', '⑤'];
@@ -636,15 +539,72 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
     // Get circle color based on placement
     function getCircleColor(placement) {
       if (placement === 1) return 'text-yellow-400';
-      if (placement === 2) return 'text-slate-300';
+      if (placement === 2) return 'text-slate-400';
       if (placement === 3) return 'text-amber-600';
       return 'text-slate-500';
+    }
+    
+    // Get background for placement card - winner is shaded, others normal
+    function getCardBg(placement) {
+      if (placement === 1) return 'bg-yellow-500/15';
+      return 'bg-slate-800/50';
     }
     
     // Find judge object by key
     function getJudgeByKey(key) {
       return judges.find(j => j.key === key) || { name: key, emoji: '⚖️' };
     }
+    
+    // Get bonuses for a player
+    function getPlayerBonuses(playerId) {
+      const bonuses = [];
+      
+      // Best Guesser
+      if (round.best_guesser_id === playerId) {
+        bonuses.push({ icon: '🎯', label: 'Best Guesser', points: 1 });
+      }
+      
+      // Predicted Winner (Judge Whisperer)
+      if (verdict.judgeWhisperers?.includes(playerId)) {
+        bonuses.push({ icon: '🔮', label: 'Predicted Winner', points: 1 });
+      }
+      
+      // AI Bonus Category
+      if (verdict.bonusWinner?.playerId === playerId) {
+        bonuses.push({ 
+          icon: '🎪', 
+          label: verdict.bonusWinner.categoryDisplay || verdict.bonusWinner.category, 
+          points: 1 
+        });
+      }
+      
+      return bonuses;
+    }
+    
+    // Quippy transition lines
+    const quippyLines = [
+      "But what did the judges really think?",
+      "The judges have thoughts...",
+      "Behind the scores...",
+      "Let's hear from the panel...",
+      "The judges weigh in...",
+      "What were they thinking?",
+      "Inside the judges' heads...",
+      "The verdict breakdown...",
+      "How it went down...",
+      "Judge logic incoming...",
+      "The method to the madness...",
+      "Why these rankings?",
+      "The judges explain themselves...",
+    ];
+    
+    // Pick a consistent quippy line based on round number
+    const quippyLine = quippyLines[round.round_number % quippyLines.length];
+    
+    // Calculate animation delays
+    const lastPlayerCardDelay = 700 + ((rankings.length - 1) * 300);
+    const quippyDelay = lastPlayerCardDelay + 900; // longer pause after player cards
+    const firstJudgeDelay = quippyDelay + 600;
 
     // Don't render until initialized
     if (!rankingsKey) {
@@ -657,121 +617,178 @@ export default function ShowdownReveal({ round, showdown, currentPlayer, isHost,
 
     return (
       <div key={rankingsKey} className="max-w-md mx-auto mt-4">
-        {/* Winner headline - appears after all judges revealed */}
-        {showWinner && (
-          <div className="text-center mb-4 animate-fade-in">
-            <h2 className="text-xl font-bold text-orange-500">
-              {standings[0]?.playerId === currentPlayer?.id ? 'You win the round!' : `${winnerName} wins the round!`}
-            </h2>
-          </div>
-        )}
+        {/* Winner headline */}
+        <h2 
+          className="text-xl font-bold text-orange-400 text-center mb-2 animate-reveal"
+          style={{ animationDelay: '0ms' }}
+        >
+          {isWinnerMe ? 'You win the round!' : `${winnerName} wins the round!`}
+        </h2>
         
-        {/* Leaderboard - single box, centered content */}
-        <div className={`rounded-xl p-4 mb-6 transition-all duration-150 ${
-          leaderboardFlash ? 'bg-orange-500/30' : 'bg-slate-800/60'
-        }`}>
-          <div className="space-y-2 flex flex-col items-center">
-            {[1, 2, 3, 4, 5].slice(0, players.length).map(placement => {
-              const playersAtRank = standings.filter(s => s.placement === placement);
-              
-              return playersAtRank.map(standing => {
-                const player = getPlayerDisplay(standing.playerId);
-                const isMe = standing.playerId === currentPlayer?.id;
-                const circleNum = circleNumbers[standing.placement - 1] || standing.placement;
-                
-                return (
-                  <div 
-                    key={standing.playerId}
-                    className="flex items-center py-2 w-48 transition-all duration-500"
-                  >
-                    <span className={`text-xl w-10 ${getCircleColor(standing.placement)}`}>
-                      {circleNum}
-                    </span>
-                    <span className={`font-medium ${
-                      isMe ? 'text-orange-400' : 'text-slate-100'
-                    }`}>
-                      {player.name}
-                    </span>
-                  </div>
-                );
-              });
-            })}
-          </div>
-        </div>
+        {/* Prompt */}
+        <p 
+          className="text-slate-100 text-center mb-6 animate-reveal"
+          style={{ animationDelay: '400ms' }}
+        >
+          {round.prompt_text}
+        </p>
         
-        {/* Judge cards - newest at top, stack down */}
+        {/* Player answer cards */}
         <div className="space-y-3 mb-6">
-          {[...revealedJudges].reverse().map((judgeKey) => {
-            const rankings = judgeRankingsObj[judgeKey];
-            const judge = getJudgeByKey(judgeKey);
-            const isFirstJudge = judgeKey === revealedJudges[0];
-            
-            if (!rankings || !Array.isArray(rankings)) return null;
-            
-            // Get one-liner from winnerReactions for this judge
-            const oneLiner = verdict.winnerReactions?.[judgeKey] || '';
+          {rankings.map((ranking, index) => {
+            const player = getPlayerDisplay(ranking.playerId);
+            const circleNum = circleNumbers[ranking.placement - 1] || ranking.placement;
+            const bonuses = getPlayerBonuses(ranking.playerId);
+            const rankingPoints = PLACEMENT_POINTS[ranking.placement - 1] || 0;
+            const delay = 700 + (index * 300);
             
             return (
-              <div 
-                key={judgeKey}
-                className={`bg-slate-800/50 rounded-xl p-4 ${isFirstJudge ? '' : 'animate-slide-up'}`}
+              <div
+                key={ranking.playerId}
+                className={`rounded-xl p-4 animate-reveal ${getCardBg(ranking.placement)}`}
+                style={{ animationDelay: `${delay}ms` }}
               >
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-xl">{judge.emoji}</span>
-                  <span className="font-bold text-orange-400">{judge.name}</span>
-                </div>
-                {oneLiner && (
-                  <p className="text-slate-300 text-sm mb-2">{oneLiner}</p>
-                )}
-                <div className="text-slate-400 text-sm">
-                  {rankings.map((r, i) => (
-                    <span key={r.playerId}>
-                      {r.playerName || getPlayerDisplay(r.playerId).name}
-                      {i < rankings.length - 1 ? ' → ' : ''}
-                    </span>
-                  ))}
+                {/* Two-column layout: big rank number | content */}
+                <div className="flex gap-4">
+                  {/* Rank number - large, vertically centered */}
+                  <div className={`text-4xl font-bold ${getCircleColor(ranking.placement)} flex items-center`}>
+                    {circleNum}
+                  </div>
+                  
+                  {/* Content column */}
+                  <div className="flex-1 min-w-0">
+                    {/* Player name */}
+                    <p className="font-bold text-slate-100 mb-1">{player.name}</p>
+                    
+                    {/* Answer */}
+                    <p className="text-slate-300 text-sm mb-3 leading-relaxed">
+                      {ranking.answer || '[no answer]'}
+                    </p>
+                    
+                    {/* Ranking points row */}
+                    <div className="flex items-center justify-between text-sm text-slate-400">
+                      <div className="flex items-center gap-2">
+                        <span>⭐</span>
+                        <span>Ranking Points</span>
+                      </div>
+                      <span className="text-slate-200">+{rankingPoints}</span>
+                    </div>
+                    
+                    {/* Bonus rows */}
+                    {bonuses.map((bonus, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm text-slate-400 mt-1">
+                        <div className="flex items-center gap-2">
+                          <span>{bonus.icon}</span>
+                          <span>{bonus.label}</span>
+                        </div>
+                        <span className="text-slate-200">+{bonus.points}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
         
-        {/* Continue button - show after winner revealed */}
-        {showWinner && (
-          <div className="animate-slide-up">
-            {isHost ? (
-              <button
-                onClick={handleContinue}
-                className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+        {/* Quippy transition - acts as visual divider */}
+        <div 
+          className="bg-slate-700/50 rounded-xl px-4 py-3 mb-6 animate-reveal"
+          style={{ animationDelay: `${quippyDelay}ms` }}
+        >
+          <p className="text-slate-300 text-sm flex items-center gap-2">
+            <span>🎙️</span>
+            <span>{quippyLine}</span>
+          </p>
+        </div>
+        
+        {/* Judges section - no boxes, slide from right */}
+        <div className="space-y-4 mb-6">
+          {judgeKeys.map((judgeKey, index) => {
+            const judge = getJudgeByKey(judgeKey);
+            const judgeRankings = judgeRankingsObj[judgeKey] || [];
+            const oneLiner = verdict.winnerReactions?.[judgeKey] || '';
+            const delay = firstJudgeDelay + (index * 400);
+            
+            return (
+              <div
+                key={judgeKey}
+                className="animate-slide-right"
+                style={{ animationDelay: `${delay}ms` }}
               >
-                To the scores
-              </button>
-            ) : (
-              <button
-                disabled
-                className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
-              >
-                Waiting for host...
-              </button>
-            )}
-          </div>
-        )}
+                {/* Judge name: ranking sequence */}
+                <p className="text-sm mb-1">
+                  <span className="mr-1">{judge.emoji}</span>
+                  <span className="text-orange-400 font-medium">{judge.name}:</span>
+                  <span className="text-slate-400 ml-2">
+                    {judgeRankings.map((r, i) => (
+                      <span key={r.playerId}>
+                        {r.playerName || getPlayerDisplay(r.playerId).name}
+                        {i < judgeRankings.length - 1 ? ' → ' : ''}
+                      </span>
+                    ))}
+                  </span>
+                </p>
+                {/* One-liner */}
+                {oneLiner && (
+                  <p className="text-slate-300 text-sm pl-6">{oneLiner}</p>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Continue button */}
+        <div 
+          className="animate-reveal"
+          style={{ animationDelay: `${firstJudgeDelay + (judgeKeys.length * 400) + 400}ms` }}
+        >
+          {isHost ? (
+            <button
+              onClick={handleContinue}
+              className="w-full bg-orange-500 hover:bg-orange-400 text-white font-bold py-4 px-6 rounded-xl transition-colors text-lg"
+            >
+              {isLastRound ? 'See the Winner' : 'Showdown Standings'}
+            </button>
+          ) : (
+            <button
+              disabled
+              className="w-full bg-slate-700 text-slate-400 font-bold py-4 px-6 rounded-xl text-lg cursor-not-allowed"
+            >
+              Waiting for host...
+            </button>
+          )}
+        </div>
 
         {/* CSS for animations */}
         <style>{`
-          @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
+          @keyframes reveal {
+            from { 
+              opacity: 0; 
+              transform: translateY(12px); 
+            }
+            to { 
+              opacity: 1; 
+              transform: translateY(0); 
+            }
           }
-          @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+          @keyframes slideRight {
+            from { 
+              opacity: 0; 
+              transform: translateX(30px); 
+            }
+            to { 
+              opacity: 1; 
+              transform: translateX(0); 
+            }
           }
-          .animate-fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
+          .animate-reveal {
+            opacity: 0;
+            animation: reveal 0.4s ease-out forwards;
           }
-          .animate-slide-up {
-            animation: slideUp 0.4s ease-out forwards;
+          .animate-slide-right {
+            opacity: 0;
+            animation: slideRight 0.4s ease-out forwards;
           }
         `}</style>
       </div>

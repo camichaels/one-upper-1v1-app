@@ -27,6 +27,35 @@ const WAITING_HEADLINES = [
   "That's how it's done."
 ];
 
+// Randomized placeholder text for answer input
+const ANSWER_PLACEHOLDERS = [
+  "Drop your best answer here...",
+  "Go on, one-up everyone...",
+  "Make the judges nervous...",
+  "What's your wildest take?",
+  "Channel your inner chaos...",
+  "Say something unhinged...",
+  "Your most outlandish answer...",
+  "Time to get weird...",
+  "What would Florida Man say?",
+  "Make it memorable...",
+  "The wilder the better...",
+  "Trust your worst instincts...",
+  "Go full chaos mode...",
+  "Overthink this. Or don't.",
+  "Your therapist can't see this...",
+  "No wrong answers. Just boring ones.",
+  "Make future you cringe...",
+  "Type something unhinged...",
+  "What's the worst best answer?",
+  "Let the intrusive thoughts win...",
+  "This is a safe space for chaos...",
+  "Be the answer they remember...",
+  "Normal is boring...",
+  "Convince no one you're normal...",
+  "Reality is optional here...",
+];
+
 export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId, verdictStep, setVerdictStep }) {
   const [loading, setLoading] = useState(true);
   const [rivalry, setRivalry] = useState(null);
@@ -52,6 +81,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
   const [rivalryJudges, setRivalryJudges] = useState([]);
   const [rivalryCancelled, setRivalryCancelled] = useState(false);
   const [waitingHeadline] = useState(() => WAITING_HEADLINES[Math.floor(Math.random() * WAITING_HEADLINES.length)]);
+  const [answerPlaceholder] = useState(() => ANSWER_PLACEHOLDERS[Math.floor(Math.random() * ANSWER_PLACEHOLDERS.length)]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [promptRevealed, setPromptRevealed] = useState(false);
   const [contentRevealed, setContentRevealed] = useState(false);
@@ -1534,7 +1564,7 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
                 onChange={handleAnswerChange}
                 onFocus={() => setIsInputFocused(true)}
                 onBlur={() => setIsInputFocused(false)}
-                placeholder="Drop your best answer here..."
+                placeholder={answerPlaceholder}
                 className="w-full h-32 p-4 bg-slate-700/50 border-2 border-slate-600 rounded-xl text-slate-100 placeholder-slate-500 resize-none mb-2 focus:outline-none focus:border-orange-500 transition-all text-lg"
                 maxLength={300}
               />
