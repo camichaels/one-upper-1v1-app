@@ -43,11 +43,13 @@ const JUDGE_REMINDER_LINES = [
 // Category display names
 const CATEGORY_DISPLAY = {
   mixed: "Surprise Me",
-  pop_culture: "Pop Culture",
-  deep_think: "Deep Think",
-  edgy: "More Edgy",
-  absurd: "Totally Absurd",
-  everyday: "Everyday"
+  classics: "Classics",
+  pop_charts: "Pop Charts",
+  bad_taste: "Bad Taste",
+  nine_to_five: "9-5ish",
+  love_bites: "Love Bites",
+  nerd_up: "Nerd Up",
+  unfiltered: "Unfiltered"
 };
 
 // Helper to pick random item from array
