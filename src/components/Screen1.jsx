@@ -124,11 +124,13 @@ const GREETINGS = [
 // Prompt categories
 const PROMPT_CATEGORIES = [
   { key: 'mixed', label: 'Surprise Me', emoji: '🔀' },
-  { key: 'pop_culture', label: 'Pop Culture', emoji: '🌟' },
-  { key: 'deep_think', label: 'Deep Think', emoji: '🤔' },
-  { key: 'edgy', label: 'More Edgy', emoji: '🌶️' },
-  { key: 'absurd', label: 'Totally Absurd', emoji: '😂' },
-  { key: 'everyday', label: 'Everyday', emoji: '☕' },
+  { key: 'classics', label: 'Classics', emoji: '🤭' },
+  { key: 'pop_charts', label: 'Pop Charts', emoji: '🌟' },
+  { key: 'bad_taste', label: 'Bad Taste', emoji: '👨‍🍳' },
+  { key: 'nine_to_five', label: '9-5ish', emoji: '👔' },
+  { key: 'love_bites', label: 'Love Bites', emoji: '💋' },
+  { key: 'nerd_up', label: 'Nerd Up', emoji: '🚀' },
+  { key: 'unfiltered', label: 'Unfiltered', emoji: '🙈' },
 ];
 
 // Helper: Save profile to localStorage history
