@@ -56,6 +56,7 @@ serve(async (req) => {
       .select(`
         *,
         rivalry:rivalries!inner(
+          sms_enabled,
           profile_a:profiles!rivalries_profile_a_id_fkey(id, name),
           profile_b:profiles!rivalries_profile_b_id_fkey(id, name)
         )
@@ -466,7 +467,8 @@ Format:
       .eq('id', show.rivalry_id)
 
     // Send "verdict_ready" SMS to first submitter (they've been waiting longest)
-    if (show.first_submitter_id) {
+    // Only if SMS is enabled for this rivalry
+    if (show.first_submitter_id && show.rivalry.sms_enabled) {
       try {
         // Determine opponent name for the first submitter
         const opponentName = show.first_submitter_id === show.profile_a_id 
@@ -503,6 +505,8 @@ Format:
         console.error('Error sending verdict_ready SMS:', smsErr)
         // Don't block judgment if SMS fails
       }
+    } else if (show.first_submitter_id && !show.rivalry.sms_enabled) {
+      console.log('⏭️ Skipping verdict_ready SMS - SMS disabled for this rivalry')
     }
 
     return new Response(

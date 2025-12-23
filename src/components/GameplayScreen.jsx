@@ -535,20 +535,23 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         })
         .eq('id', currentShow.id);
     } else {
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            userId: opponentProfile.id,
-            notificationType: 'your_turn',
-            contextData: {
-              opponent: myProfile.name,
-              show_num: currentShow.show_number,
-              prompt: currentShow.prompt
+      // Only send SMS if enabled for this rivalry
+      if (rivalry.sms_enabled) {
+        try {
+          await supabase.functions.invoke('send-sms', {
+            body: {
+              userId: opponentProfile.id,
+              notificationType: 'your_turn',
+              contextData: {
+                opponent: myProfile.name,
+                show_num: currentShow.show_number,
+                prompt: currentShow.prompt
+              }
             }
-          }
-        });
-      } catch (smsErr) {
-        console.error('Failed to send your_turn SMS:', smsErr);
+          });
+        } catch (smsErr) {
+          console.error('Failed to send your_turn SMS:', smsErr);
+        }
       }
     }
 
@@ -780,22 +783,28 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
         }
       }
       
-      await supabase.functions.invoke('send-sms', {
-        body: {
-          userId: opponentProfile.id,
-          notificationType: 'nudge',
-          contextData: {
-            opponent: myProfile.name
+      // Only send SMS if enabled for this rivalry
+      if (rivalry.sms_enabled) {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            userId: opponentProfile.id,
+            notificationType: 'nudge',
+            contextData: {
+              opponent: myProfile.name
+            }
           }
-        }
-      });
-      
-      await supabase
-        .from('shows')
-        .update({ last_nudge_at: new Date().toISOString() })
-        .eq('id', currentShow.id);
-      
-      alert('Nudge sent! ⚡');
+        });
+        
+        await supabase
+          .from('shows')
+          .update({ last_nudge_at: new Date().toISOString() })
+          .eq('id', currentShow.id);
+        
+        alert('Nudge sent! ⚡');
+      } else {
+        alert('SMS is off for this rivalry. Use the link option instead!');
+        return;
+      }
     } catch (err) {
       console.error('Failed to send nudge:', err);
       alert('Failed to send nudge. Try again?');
@@ -828,18 +837,21 @@ export default function GameplayScreen({ onNavigate, activeProfileId, rivalryId,
 
       if (error) throw error;
 
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            userId: opponentProfile.id,
-            notificationType: 'rivalry_cancelled',
-            contextData: {
-              opponent: myProfile.name
+      // Only send SMS if enabled for this rivalry
+      if (rivalry.sms_enabled) {
+        try {
+          await supabase.functions.invoke('send-sms', {
+            body: {
+              userId: opponentProfile.id,
+              notificationType: 'rivalry_cancelled',
+              contextData: {
+                opponent: myProfile.name
+              }
             }
-          }
-        });
-      } catch (smsErr) {
-        console.error('Failed to send cancellation SMS:', smsErr);
+          });
+        } catch (smsErr) {
+          console.error('Failed to send cancellation SMS:', smsErr);
+        }
       }
 
       setShowCancelModal(false);

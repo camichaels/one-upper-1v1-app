@@ -199,6 +199,7 @@ export default function Screen1({ onNavigate }) {
   const [showMenu, setShowMenu] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [stakes, setStakes] = useState(''); // What the rivalry is playing for
+  const [skipSms, setSkipSms] = useState(false); // Skip SMS for in-person play
   const [challengerStakes, setChallengerStakes] = useState(null); // Stakes set by challenger (fetched when joining)
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [isAutoAccepting, setIsAutoAccepting] = useState(false);
@@ -845,6 +846,13 @@ useEffect(() => {
       const judgeObjects = await selectJudges();
       const judgeKeys = judgeObjects.map(j => j.key);
       
+      // Get sms_enabled from the invite
+      const { data: inviteData } = await supabase
+        .from('rivalry_invites')
+        .select('sms_enabled')
+        .eq('code', pendingInvite.code)
+        .single();
+      
       // Create rivalry (always put lower ID as profile_a for consistency)
       const [profileAId, profileBId] = [userProfile.id, pendingInvite.friendId].sort();
 
@@ -857,7 +865,8 @@ useEffect(() => {
           first_show_started: false,
           stakes: rivalryStakes,
           judges: judgeKeys,
-          prompt_category: promptCategory
+          prompt_category: promptCategory,
+          sms_enabled: inviteData?.sms_enabled ?? true
         })
         .select()
         .single();
@@ -904,18 +913,21 @@ useEffect(() => {
       setPendingInvite(null);
 
       // Send rivalry_started SMS to the friend (creator who shared their code)
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            userId: pendingInvite.friendId,
-            notificationType: 'rivalry_started',
-            contextData: {
-              opponent: userProfile.name
+      // Only if SMS is enabled for this rivalry
+      if (newRivalry.sms_enabled) {
+        try {
+          await supabase.functions.invoke('send-sms', {
+            body: {
+              userId: pendingInvite.friendId,
+              notificationType: 'rivalry_started',
+              contextData: {
+                opponent: userProfile.name
+              }
             }
-          }
-        });
-      } catch (smsErr) {
-        console.error('Failed to send rivalry_started SMS:', smsErr);
+          });
+        } catch (smsErr) {
+          console.error('Failed to send rivalry_started SMS:', smsErr);
+        }
       }
 
       // Navigate directly to gameplay
@@ -1039,7 +1051,8 @@ useEffect(() => {
           first_show_started: false,
           stakes: rivalryStakes,
           judges: judgeKeys,
-          prompt_category: promptCategory
+          prompt_category: promptCategory,
+          sms_enabled: invite.sms_enabled ?? true
         })
         .select()
         .single();
@@ -1078,18 +1091,21 @@ useEffect(() => {
       }
 
       // Send rivalry_started SMS to the creator
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            userId: friendId,
-            notificationType: 'rivalry_started',
-            contextData: {
-              opponent: profile.name
+      // Only if SMS is enabled for this rivalry
+      if (newRivalry.sms_enabled) {
+        try {
+          await supabase.functions.invoke('send-sms', {
+            body: {
+              userId: friendId,
+              notificationType: 'rivalry_started',
+              contextData: {
+                opponent: profile.name
+              }
             }
-          }
-        });
-      } catch (smsErr) {
-        console.error('Failed to send rivalry_started SMS:', smsErr);
+          });
+        } catch (smsErr) {
+          console.error('Failed to send rivalry_started SMS:', smsErr);
+        }
       }
 
       // Navigate to gameplay
@@ -1271,7 +1287,8 @@ useEffect(() => {
           code: code,
           creator_profile_id: profile.id,
           stakes: stakes.trim() || null,
-          prompt_category: selectedCategory
+          prompt_category: selectedCategory,
+          sms_enabled: !skipSms
         })
         .select()
         .single();
@@ -1314,6 +1331,7 @@ useEffect(() => {
   const resetInviteCode = () => {
     setInviteCode(null);
     setInviteError('');
+    setSkipSms(false); // Reset SMS preference for new invite
   };
 
   // Delete a pending invite
@@ -1816,6 +1834,20 @@ useEffect(() => {
                           🎲
                         </button>
                       </div>
+                    </div>
+
+                    {/* Skip SMS checkbox */}
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="skipSms"
+                        checked={skipSms}
+                        onChange={(e) => setSkipSms(e.target.checked)}
+                        className="w-5 h-5 rounded border-slate-600 bg-slate-700 text-orange-500 focus:ring-orange-500 focus:ring-offset-slate-800 cursor-pointer"
+                      />
+                      <label htmlFor="skipSms" className="text-sm text-slate-300 cursor-pointer">
+                        Playing in person (skip SMS)
+                      </label>
                     </div>
                     
                     {/* Invite Code Section */}
